@@ -32,7 +32,13 @@ import {
   DollarSign,
   Target,
   AlertTriangle,
+  HelpCircle,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface AccountWithMetrics {
   id: number;
@@ -285,57 +291,105 @@ export default function Accounts() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
-                <Users className="h-5 w-5 text-primary" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
+                  <Users className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{filteredAccounts.length}</p>
+                  <p className="text-xs text-muted-foreground">Total Accounts</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold">{filteredAccounts.length}</p>
-                <p className="text-xs text-muted-foreground">Total Accounts</p>
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button className="text-muted-foreground hover:text-foreground transition-colors" data-testid="tooltip-accounts-total">
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">Number of customer accounts matching your current filter criteria. Use filters to narrow down by segment or region.</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chart-2/10">
-                <Target className="h-5 w-5 text-chart-2" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chart-2/10">
+                  <Target className="h-5 w-5 text-chart-2" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">
+                    {filteredAccounts.filter((a) => a.enrolled).length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Enrolled</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold">
-                  {filteredAccounts.filter((a) => a.enrolled).length}
-                </p>
-                <p className="text-xs text-muted-foreground">Enrolled</p>
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button className="text-muted-foreground hover:text-foreground transition-colors" data-testid="tooltip-accounts-enrolled">
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">Accounts currently enrolled in the revenue growth program. Enrolled accounts are tracked for incremental revenue to calculate rev-share fees.</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chart-3/10">
-                <AlertTriangle className="h-5 w-5 text-chart-3" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chart-3/10">
+                  <AlertTriangle className="h-5 w-5 text-chart-3" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">
+                    {filteredAccounts.filter((a) => a.opportunityScore >= 70).length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">High Priority</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold">
-                  {filteredAccounts.filter((a) => a.opportunityScore >= 70).length}
-                </p>
-                <p className="text-xs text-muted-foreground">High Priority</p>
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button className="text-muted-foreground hover:text-foreground transition-colors" data-testid="tooltip-accounts-high-priority">
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">Accounts with opportunity scores of 70+ have significant category gaps compared to their ICP profile. These are prime targets for outreach.</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chart-1/10">
-                <DollarSign className="h-5 w-5 text-chart-1" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chart-1/10">
+                  <DollarSign className="h-5 w-5 text-chart-1" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{formatCurrency(totalOpportunity)}</p>
+                  <p className="text-xs text-muted-foreground">Est. Opportunity</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold">{formatCurrency(totalOpportunity)}</p>
-                <p className="text-xs text-muted-foreground">Est. Opportunity</p>
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button className="text-muted-foreground hover:text-foreground transition-colors" data-testid="tooltip-accounts-opportunity">
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">Total estimated revenue opportunity across all filtered accounts based on their category gaps and potential wallet share capture.</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </CardContent>
         </Card>

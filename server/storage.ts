@@ -58,6 +58,7 @@ export interface IStorage {
   createSegmentProfile(profile: InsertSegmentProfile): Promise<SegmentProfile>;
   updateSegmentProfile(id: number, profile: Partial<InsertSegmentProfile>): Promise<SegmentProfile | undefined>;
   approveSegmentProfile(id: number, approvedBy: string): Promise<SegmentProfile | undefined>;
+  deleteSegmentProfile(id: number): Promise<boolean>;
 
   // Profile Categories
   getProfileCategories(profileId: number): Promise<ProfileCategory[]>;
@@ -229,6 +230,14 @@ export class DatabaseStorage implements IStorage {
       updatedAt: sql`CURRENT_TIMESTAMP`,
     }).where(eq(segmentProfiles.id, id)).returning();
     return updated;
+  }
+
+  async deleteSegmentProfile(id: number): Promise<boolean> {
+    // First delete associated profile categories
+    await db.delete(profileCategories).where(eq(profileCategories.profileId, id));
+    // Then delete the profile itself
+    const result = await db.delete(segmentProfiles).where(eq(segmentProfiles.id, id)).returning();
+    return result.length > 0;
   }
 
   // Profile Categories

@@ -34,7 +34,13 @@ import {
   Package,
   FolderTree,
   ShoppingCart,
+  HelpCircle,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface DataUpload {
   id: number;
@@ -368,14 +374,32 @@ export default function DataUploads() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {uploadTypes.map((type) => {
           const latestUpload = displayUploads.find((u) => u.uploadType === type.id);
+          const tooltips: Record<string, string> = {
+            accounts: "Customer account data including segment classification, region, and Territory Manager assignments. This is the foundation for gap analysis.",
+            products: "Product catalog with SKUs, categories, and pricing. Used to map orders to categories for penetration analysis.",
+            categories: "Product category taxonomy that defines how products are grouped. Categories are used for ICP profile expectations.",
+            orders: "Historical order data that powers the gap analysis. Order patterns are compared against ICP profiles to identify opportunities.",
+          };
           return (
             <Card key={type.id}>
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <type.icon className="h-5 w-5 text-muted-foreground" />
-                  {latestUpload?.status === "completed" && (
-                    <CheckCircle className="h-4 w-4 text-chart-2" />
-                  )}
+                  <div className="flex items-center gap-2">
+                    {latestUpload?.status === "completed" && (
+                      <CheckCircle className="h-4 w-4 text-chart-2" />
+                    )}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button className="text-muted-foreground hover:text-foreground transition-colors" data-testid={`tooltip-upload-${type.id}`}>
+                          <HelpCircle className="h-4 w-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="text-sm">{tooltips[type.id]}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                 </div>
                 <CardTitle className="text-base mt-2">{type.label}</CardTitle>
                 <CardDescription className="text-xs">

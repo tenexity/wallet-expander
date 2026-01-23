@@ -266,6 +266,20 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/segment-profiles/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteSegmentProfile(id);
+      if (!success) {
+        return res.status(404).json({ message: "Profile not found" });
+      }
+      res.json({ message: "Profile deleted successfully" });
+    } catch (error) {
+      console.error("Delete profile error:", error);
+      res.status(500).json({ message: "Failed to delete profile" });
+    }
+  });
+
   app.post("/api/segment-profiles/analyze", async (req, res) => {
     try {
       const { segment } = req.body;

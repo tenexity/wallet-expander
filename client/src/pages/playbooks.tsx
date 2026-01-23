@@ -48,7 +48,13 @@ import {
   Calendar,
   User,
   MessageSquare,
+  HelpCircle,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface Task {
   id: number;
@@ -285,59 +291,107 @@ Can I send you our updated PVF catalog?`,
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
-                <ClipboardList className="h-5 w-5 text-primary" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
+                  <ClipboardList className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{displayTasks.length}</p>
+                  <p className="text-xs text-muted-foreground">Total Tasks</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold">{displayTasks.length}</p>
-                <p className="text-xs text-muted-foreground">Total Tasks</p>
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button className="text-muted-foreground hover:text-foreground transition-colors" data-testid="tooltip-playbooks-total">
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">Total number of AI-generated sales tasks including calls, emails, and site visits. Each task includes a customized script or template.</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chart-3/10">
-                <Clock className="h-5 w-5 text-chart-3" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chart-3/10">
+                  <Clock className="h-5 w-5 text-chart-3" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">
+                    {displayTasks.filter((t) => t.status === "pending").length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Pending</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold">
-                  {displayTasks.filter((t) => t.status === "pending").length}
-                </p>
-                <p className="text-xs text-muted-foreground">Pending</p>
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button className="text-muted-foreground hover:text-foreground transition-colors" data-testid="tooltip-playbooks-pending">
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">Tasks waiting to be started by Territory Managers. These are ready for action with AI-generated scripts and talking points.</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chart-1/10">
-                <User className="h-5 w-5 text-chart-1" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chart-1/10">
+                  <User className="h-5 w-5 text-chart-1" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">
+                    {displayTasks.filter((t) => t.status === "in_progress").length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">In Progress</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold">
-                  {displayTasks.filter((t) => t.status === "in_progress").length}
-                </p>
-                <p className="text-xs text-muted-foreground">In Progress</p>
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button className="text-muted-foreground hover:text-foreground transition-colors" data-testid="tooltip-playbooks-progress">
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">Tasks currently being worked on by Territory Managers. These represent active outreach efforts to capture wallet share.</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chart-2/10">
-                <CheckCircle className="h-5 w-5 text-chart-2" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chart-2/10">
+                  <CheckCircle className="h-5 w-5 text-chart-2" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">
+                    {displayTasks.filter((t) => t.status === "completed").length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Completed</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold">
-                  {displayTasks.filter((t) => t.status === "completed").length}
-                </p>
-                <p className="text-xs text-muted-foreground">Completed</p>
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button className="text-muted-foreground hover:text-foreground transition-colors" data-testid="tooltip-playbooks-completed">
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">Successfully completed tasks with recorded outcomes. Review these to track conversion rates and refine your outreach strategy.</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </CardContent>
         </Card>

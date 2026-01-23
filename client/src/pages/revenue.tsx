@@ -33,7 +33,13 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Percent,
+  HelpCircle,
 } from "lucide-react";
+import {
+  Tooltip as TooltipComponent,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   LineChart,
   Line,
@@ -266,53 +272,101 @@ export default function Revenue() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
-                <Target className="h-5 w-5 text-primary" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
+                  <Target className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{displayAccounts.length}</p>
+                  <p className="text-xs text-muted-foreground">Enrolled Accounts</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold">{displayAccounts.length}</p>
-                <p className="text-xs text-muted-foreground">Enrolled Accounts</p>
-              </div>
+              <TooltipComponent>
+                <TooltipTrigger asChild>
+                  <button className="text-muted-foreground hover:text-foreground transition-colors" data-testid="tooltip-revenue-enrolled">
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">Accounts actively enrolled in the revenue growth program. Their incremental revenue above baseline is used to calculate your rev-share fees.</p>
+                </TooltipContent>
+              </TooltipComponent>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chart-2/10">
-                <TrendingUp className="h-5 w-5 text-chart-2" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chart-2/10">
+                  <TrendingUp className="h-5 w-5 text-chart-2" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{formatCurrency(totalIncremental)}</p>
+                  <p className="text-xs text-muted-foreground">Incremental Revenue</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold">{formatCurrency(totalIncremental)}</p>
-                <p className="text-xs text-muted-foreground">Incremental Revenue</p>
-              </div>
+              <TooltipComponent>
+                <TooltipTrigger asChild>
+                  <button className="text-muted-foreground hover:text-foreground transition-colors" data-testid="tooltip-revenue-incremental">
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">Total revenue generated above baseline across all enrolled accounts. This represents the new wallet share captured through your sales efforts.</p>
+                </TooltipContent>
+              </TooltipComponent>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chart-3/10">
-                <Percent className="h-5 w-5 text-chart-3" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chart-3/10">
+                  <Percent className="h-5 w-5 text-chart-3" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">+{growthRate.toFixed(0)}%</p>
+                  <p className="text-xs text-muted-foreground">vs Baseline</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold">+{growthRate.toFixed(0)}%</p>
-                <p className="text-xs text-muted-foreground">vs Baseline</p>
-              </div>
+              <TooltipComponent>
+                <TooltipTrigger asChild>
+                  <button className="text-muted-foreground hover:text-foreground transition-colors" data-testid="tooltip-revenue-growth">
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">Percentage growth of current revenue compared to the baseline period. Higher growth rates indicate successful wallet share capture.</p>
+                </TooltipContent>
+              </TooltipComponent>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chart-1/10">
-                <DollarSign className="h-5 w-5 text-chart-1" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chart-1/10">
+                  <DollarSign className="h-5 w-5 text-chart-1" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{formatCurrency(totalFees)}</p>
+                  <p className="text-xs text-muted-foreground">Total Fees Earned</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold">{formatCurrency(totalFees)}</p>
-                <p className="text-xs text-muted-foreground">Total Fees Earned</p>
-              </div>
+              <TooltipComponent>
+                <TooltipTrigger asChild>
+                  <button className="text-muted-foreground hover:text-foreground transition-colors" data-testid="tooltip-revenue-fees">
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">Your total rev-share earnings calculated as 15% of incremental revenue. This is the fee earned for helping capture additional wallet share.</p>
+                </TooltipContent>
+              </TooltipComponent>
             </div>
           </CardContent>
         </Card>

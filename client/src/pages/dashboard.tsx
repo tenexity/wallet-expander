@@ -7,6 +7,7 @@ import { ProgressRing } from "@/components/progress-ring";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { InfoTooltip } from "@/components/info-tooltip";
 import {
   DollarSign,
   Users,
@@ -290,6 +291,7 @@ export default function Dashboard() {
           icon={Users}
           trend={{ value: 12, label: "vs last month" }}
           testId="kpi-total-accounts"
+          tooltip="The total number of customer accounts in your database that can be analyzed for wallet share opportunities."
         />
         <KPICard
           title="Enrolled Accounts"
@@ -298,6 +300,7 @@ export default function Dashboard() {
           icon={Target}
           trend={{ value: 8, label: "vs last month" }}
           testId="kpi-enrolled-accounts"
+          tooltip="Accounts actively participating in the revenue growth program. These accounts are being tracked for incremental revenue to calculate rev-share fees."
         />
         <KPICard
           title="Total Revenue (12M)"
@@ -305,6 +308,7 @@ export default function Dashboard() {
           icon={DollarSign}
           trend={{ value: 15, label: "YoY" }}
           testId="kpi-total-revenue"
+          tooltip="Cumulative revenue from all accounts over the last 12 months. This serves as the baseline for measuring growth and calculating opportunities."
         />
         <KPICard
           title="Incremental Revenue"
@@ -313,17 +317,24 @@ export default function Dashboard() {
           icon={TrendingUp}
           trend={{ value: 23, label: "vs baseline" }}
           testId="kpi-incremental-revenue"
+          tooltip="Additional revenue generated from enrolled accounts above their baseline. This is the basis for calculating rev-share fees (15% of incremental revenue)."
         />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between gap-2">
-            <div>
-              <CardTitle className="text-base">Top Opportunities</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                Accounts with highest wallet share leakage
-              </p>
+            <div className="flex items-start gap-2">
+              <div>
+                <CardTitle className="text-base">Top Opportunities</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Accounts with highest wallet share leakage
+                </p>
+              </div>
+              <InfoTooltip
+                content="Accounts ranked by opportunity score based on their category gaps vs ICP expectations. Higher scores indicate more potential revenue to capture from wallet share leakage."
+                testId="tooltip-top-opportunities"
+              />
             </div>
             <Button variant="ghost" size="sm" asChild>
               <Link href="/accounts">View All</Link>
@@ -340,10 +351,18 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Segment Breakdown</CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              Accounts by contractor type
-            </p>
+            <div className="flex items-start gap-2">
+              <div>
+                <CardTitle className="text-base">Segment Breakdown</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Accounts by contractor type
+                </p>
+              </div>
+              <InfoTooltip
+                content="Distribution of your accounts across customer segments (HVAC, Plumbing, Mechanical). Each segment has its own ICP profile defining expected category mix."
+                testId="tooltip-segment-breakdown"
+              />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="h-48">
@@ -395,11 +414,17 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2">
-            <div>
-              <CardTitle className="text-base">Recent Tasks</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                Upcoming TM actions
-              </p>
+            <div className="flex items-start gap-2">
+              <div>
+                <CardTitle className="text-base">Recent Tasks</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Upcoming TM actions
+                </p>
+              </div>
+              <InfoTooltip
+                content="AI-generated sales tasks for Territory Managers including calls, emails, and site visits. Each task includes personalized scripts and talking points based on account gaps."
+                testId="tooltip-recent-tasks"
+              />
             </div>
             <Button variant="ghost" size="sm" asChild>
               <Link href="/playbooks">View All</Link>
@@ -416,11 +441,17 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2">
-            <div>
-              <CardTitle className="text-base">ICP Profiles</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                Segment profile status
-              </p>
+            <div className="flex items-start gap-2">
+              <div>
+                <CardTitle className="text-base">ICP Profiles</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Segment profile status
+                </p>
+              </div>
+              <InfoTooltip
+                content="Ideal Customer Profiles (ICPs) define expected category mix for each segment based on Class A customer data. Use AI analysis to refine profiles and approve them for scoring."
+                testId="tooltip-icp-profiles"
+              />
             </div>
             <Button variant="ghost" size="sm" asChild>
               <Link href="/icp-builder">Manage</Link>
@@ -458,10 +489,16 @@ export default function Dashboard() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Revenue by Segment
-          </CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Revenue by Segment
+            </CardTitle>
+            <InfoTooltip
+              content="Total revenue contribution by customer segment. Compare segment performance to identify growth opportunities and track the impact of wallet share capture efforts."
+              testId="tooltip-revenue-by-segment"
+            />
+          </div>
         </CardHeader>
         <CardContent>
           <div className="h-64">

@@ -39,7 +39,25 @@ import {
   Clock,
   ChevronRight,
   Loader2,
+  Info,
+  HelpCircle,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface SegmentProfile {
   id: number;
@@ -94,6 +112,27 @@ export default function ICPBuilder() {
       toast({
         title: "Profile approved",
         description: "The ICP profile is now active for scoring",
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (profileId: number) => {
+      return apiRequest("DELETE", `/api/segment-profiles/${profileId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/segment-profiles"] });
+      setSelectedProfile(null);
+      toast({
+        title: "Profile deleted",
+        description: "The ICP profile has been removed",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Delete failed",
+        description: "Could not delete the profile. Please try again.",
+        variant: "destructive",
       });
     },
   });
@@ -202,46 +241,82 @@ export default function ICPBuilder() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chart-2/10">
-                <CheckCircle className="h-5 w-5 text-chart-2" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chart-2/10">
+                  <CheckCircle className="h-5 w-5 text-chart-2" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">
+                    {displayProfiles.filter((p) => p.status === "approved").length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Approved Profiles</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold">
-                  {displayProfiles.filter((p) => p.status === "approved").length}
-                </p>
-                <p className="text-xs text-muted-foreground">Approved Profiles</p>
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button className="text-muted-foreground hover:text-foreground transition-colors">
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">Approved ICP profiles are active and being used to score accounts. Only approved profiles contribute to opportunity scoring calculations.</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chart-3/10">
-                <Clock className="h-5 w-5 text-chart-3" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chart-3/10">
+                  <Clock className="h-5 w-5 text-chart-3" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">
+                    {displayProfiles.filter((p) => p.status === "draft").length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Draft Profiles</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold">
-                  {displayProfiles.filter((p) => p.status === "draft").length}
-                </p>
-                <p className="text-xs text-muted-foreground">Draft Profiles</p>
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button className="text-muted-foreground hover:text-foreground transition-colors">
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">Draft profiles are being refined before approval. Edit category expectations and thresholds, then approve when ready to activate.</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
-                <Target className="h-5 w-5 text-primary" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
+                  <Target className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">
+                    {displayProfiles.reduce((sum, p) => sum + p.accountCount, 0)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Accounts Scored</p>
+                </div>
               </div>
-              <div>
-                <p className="text-2xl font-bold">
-                  {displayProfiles.reduce((sum, p) => sum + p.accountCount, 0)}
-                </p>
-                <p className="text-xs text-muted-foreground">Accounts Scored</p>
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button className="text-muted-foreground hover:text-foreground transition-colors">
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p className="text-sm">Total number of accounts that have been scored against their matching segment ICP profile to identify category gaps and opportunities.</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </CardContent>
         </Card>
@@ -306,12 +381,26 @@ export default function ICPBuilder() {
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Sparkles className="h-4 w-4" />
-                AI Analysis
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  AI Analysis
+                </CardTitle>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button className="text-muted-foreground hover:text-foreground transition-colors" data-testid="tooltip-ai-analysis">
+                      <Info className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="max-w-xs">
+                    <p className="text-sm">
+                      This AI tool analyzes your Class A (top-tier) customer purchasing data to identify patterns and generate Ideal Customer Profiles. Class A customers typically represent your highest-value accounts with complete category coverage.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
               <CardDescription>
-                Generate suggested profiles from Class A customer data
+                Generate suggested profiles from Class A customer data samples
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -366,6 +455,37 @@ export default function ICPBuilder() {
                       </>
                     ) : (
                       <>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              data-testid="button-delete-profile"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Profile</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete the "{selectedProfile.name}" profile? This action cannot be undone and will remove all associated category expectations.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteMutation.mutate(selectedProfile.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                data-testid="button-confirm-delete"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                         <Button
                           variant="outline"
                           size="sm"

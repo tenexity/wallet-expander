@@ -95,6 +95,25 @@ npx tsx server/seed.ts
 - shadcn/ui component library with custom styling
 - Responsive layout with sidebar navigation
 
+## UI Components
+
+### Tooltip System
+The application includes comprehensive tooltips for user self-education:
+
+- **KPICard component** (`client/src/components/kpi-card.tsx`) - Supports optional `tooltip` prop for help icons
+- **InfoTooltip component** (`client/src/components/info-tooltip.tsx`) - Reusable tooltip pattern with HelpCircle icons
+
+Tooltips are implemented across all pages:
+- Dashboard: 4 KPI cards + 5 section cards (Top Opportunities, Segment Breakdown, Recent Tasks, ICP Profiles, Revenue by Segment)
+- Account Insights: 4 KPI cards explaining account metrics
+- ICP Builder: "How AI Analysis Works" tooltip explaining Class A customer data usage
+- Playbooks: 4 task status KPI cards
+- Revenue: 4 revenue tracking KPI cards
+- Data Uploads: 4 data type cards explaining each upload type
+
+### Sample Data
+A synthetic Class A customer data file is available at `public/sample-data/class-a-customer-data-sample.csv` for demonstration purposes.
+
 ## Recent Changes (January 2024)
 
 - Initial project setup with complete database schema
@@ -102,3 +121,6 @@ npx tsx server/seed.ts
 - Backend API routes with database storage
 - Demo data seeding script
 - OpenAI integration via Replit AI Integrations
+- Comprehensive tooltips added across all dashboards for user self-education
+- ICP profile delete functionality with AlertDialog confirmation
+- Synthetic Class A customer data sample for feature demonstration
