@@ -396,18 +396,74 @@ export async function registerRoutes(
                     cat.importance <= 0.75 ? "Low margin, convenience" : "Consistent purchases",
       }));
 
-      const decisionLogic = profileCategories.map(cat => ({
-        category: cat.categoryName,
-        expectedPct: cat.expectedPct,
-        reasoning: cat.isRequired 
-          ? `Required category for ${segment} contractors. Top performers average ${cat.expectedPct}% with consistent purchasing patterns.`
-          : cat.importance >= 1.5
-          ? `Strategic growth opportunity. Customers with higher ${cat.categoryName} spending show increased lifetime value.`
-          : `Baseline category set at ${cat.expectedPct}% based on Class A customer averages.`,
-        confidence: (cat.isRequired || classACustomers.length >= 3) ? "high" as const : 
-                   classACustomers.length >= 2 ? "medium" as const : "low" as const,
-        dataPoints: classACustomers.length,
-      }));
+      const categoryDataPointsMap: Record<string, Array<{
+        accountName: string;
+        accountId: number;
+        categoryPct: number;
+        revenue: number;
+        isClassA: boolean;
+      }>> = {};
+
+      for (const { account, metrics } of classACustomers) {
+        const accountGaps = await storage.getAccountCategoryGaps(account.id);
+        const revenue = metrics?.last12mRevenue ? parseFloat(metrics.last12mRevenue) : 0;
+        
+        for (const gap of accountGaps) {
+          const catInfo = productCats.find(c => c.id === gap.categoryId);
+          const catName = catInfo?.name || "Unknown";
+          if (!categoryDataPointsMap[catName]) {
+            categoryDataPointsMap[catName] = [];
+          }
+          categoryDataPointsMap[catName].push({
+            accountName: account.name,
+            accountId: account.id,
+            categoryPct: gap.actualPct ? parseFloat(gap.actualPct) : 0,
+            revenue: revenue,
+            isClassA: true,
+          });
+        }
+      }
+
+      const decisionLogic = profileCategories.map(cat => {
+        const dataPointsList = categoryDataPointsMap[cat.categoryName] || [];
+        const avgActualPct = dataPointsList.length > 0
+          ? Math.round(dataPointsList.reduce((sum, dp) => sum + dp.categoryPct, 0) / dataPointsList.length * 10) / 10
+          : cat.expectedPct;
+        const minPct = dataPointsList.length > 0
+          ? Math.round(Math.min(...dataPointsList.map(dp => dp.categoryPct)) * 10) / 10
+          : cat.expectedPct;
+        const maxPct = dataPointsList.length > 0
+          ? Math.round(Math.max(...dataPointsList.map(dp => dp.categoryPct)) * 10) / 10
+          : cat.expectedPct;
+        
+        return {
+          category: cat.categoryName,
+          expectedPct: cat.expectedPct,
+          reasoning: cat.isRequired 
+            ? `Required category for ${segment} contractors. Class A customers average ${avgActualPct}% (range: ${minPct}%-${maxPct}%).`
+            : cat.importance >= 1.5
+            ? `Strategic growth opportunity. Customers with higher ${cat.categoryName} spending show increased lifetime value. Class A average: ${avgActualPct}%.`
+            : `Baseline category set at ${cat.expectedPct}% based on Class A customer averages (actual avg: ${avgActualPct}%).`,
+          confidence: (cat.isRequired || classACustomers.length >= 3) ? "high" as const : 
+                     classACustomers.length >= 2 ? "medium" as const : "low" as const,
+          dataPoints: classACustomers.length,
+          dataPointsDetail: dataPointsList.map(dp => ({
+            accountName: dp.accountName,
+            accountId: dp.accountId,
+            actualPct: Math.round(dp.categoryPct * 10) / 10,
+            revenue: Math.round(dp.revenue),
+          })),
+          statistics: {
+            avgActualPct,
+            minPct,
+            maxPct,
+            targetPct: cat.expectedPct,
+            variance: dataPointsList.length > 0
+              ? Math.round((avgActualPct - cat.expectedPct) * 10) / 10
+              : 0,
+          },
+        };
+      });
 
       const allGaps = await Promise.all(
         segmentAccounts.map(async (acc) => {

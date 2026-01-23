@@ -24,6 +24,11 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -39,6 +44,7 @@ import {
   FileText,
   Clock,
   ChevronRight,
+  ChevronDown,
   Loader2,
   Info,
   HelpCircle,
@@ -121,6 +127,19 @@ interface DataInsights {
       reasoning: string;
       confidence: "high" | "medium" | "low";
       dataPoints: number;
+      dataPointsDetail: Array<{
+        accountName: string;
+        accountId: number;
+        actualPct: number;
+        revenue: number;
+      }>;
+      statistics: {
+        avgActualPct: number;
+        minPct: number;
+        maxPct: number;
+        targetPct: number;
+        variance: number;
+      };
     }>;
     isEstimate?: boolean;
     note?: string;
@@ -881,24 +900,103 @@ export default function ICPBuilder() {
             <CardContent>
               <div className="space-y-4">
                 {dataInsights.decisionLogic.items.map((logic) => (
-                  <div key={logic.category} className="p-4 rounded-lg border">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <span className="font-semibold">{logic.category}</span>
-                          <Badge className="bg-primary/10 text-primary border-primary/20">
-                            Target: {logic.expectedPct}%
-                          </Badge>
-                          {getConfidenceBadge(logic.confidence)}
+                  <Collapsible key={logic.category}>
+                    <div className="p-4 rounded-lg border">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="font-semibold">{logic.category}</span>
+                            <Badge className="bg-primary/10 text-primary border-primary/20">
+                              Target: {logic.expectedPct}%
+                            </Badge>
+                            {getConfidenceBadge(logic.confidence)}
+                          </div>
+                          <p className="text-sm text-muted-foreground">{logic.reasoning}</p>
                         </div>
-                        <p className="text-sm text-muted-foreground">{logic.reasoning}</p>
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">Based on</p>
+                          <p className="font-medium">{logic.dataPoints} data points</p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-xs text-muted-foreground">Based on</p>
-                        <p className="font-medium">{logic.dataPoints} data points</p>
-                      </div>
+                      
+                      {logic.dataPointsDetail && logic.dataPointsDetail.length > 0 && (
+                        <>
+                          <CollapsibleTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="mt-3 w-full justify-between text-muted-foreground hover:text-foreground"
+                              data-testid={`toggle-datapoints-${logic.category.replace(/\s+/g, '-').toLowerCase()}`}
+                            >
+                              <span className="flex items-center gap-2">
+                                <Database className="h-3 w-3" />
+                                View Class A Customer Data ({logic.dataPointsDetail.length} accounts)
+                              </span>
+                              <ChevronDown className="h-4 w-4 transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                            </Button>
+                          </CollapsibleTrigger>
+                          
+                          <CollapsibleContent className="mt-3">
+                            <div className="bg-muted/30 rounded-lg p-4 space-y-4">
+                              <div className="grid grid-cols-4 gap-4 pb-3 border-b">
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Avg Actual %</p>
+                                  <p className="text-lg font-semibold">{logic.statistics.avgActualPct}%</p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Range</p>
+                                  <p className="text-lg font-semibold">{logic.statistics.minPct}% - {logic.statistics.maxPct}%</p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Target</p>
+                                  <p className="text-lg font-semibold">{logic.statistics.targetPct}%</p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Variance</p>
+                                  <p className={`text-lg font-semibold ${logic.statistics.variance >= 0 ? 'text-green-600' : 'text-destructive'}`}>
+                                    {logic.statistics.variance >= 0 ? '+' : ''}{logic.statistics.variance}%
+                                  </p>
+                                </div>
+                              </div>
+                              
+                              <div>
+                                <p className="text-sm font-medium mb-2">Class A Customer Breakdown</p>
+                                <div className="space-y-2">
+                                  {logic.dataPointsDetail.map((dp) => (
+                                    <div 
+                                      key={dp.accountId} 
+                                      className="flex items-center justify-between p-2 rounded-md bg-background"
+                                      data-testid={`datapoint-${dp.accountId}`}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <Users className="h-3 w-3 text-muted-foreground" />
+                                        <span className="text-sm font-medium">{dp.accountName}</span>
+                                      </div>
+                                      <div className="flex items-center gap-4">
+                                        <div className="text-right">
+                                          <p className="text-xs text-muted-foreground">Category %</p>
+                                          <p className="text-sm font-medium">{dp.actualPct}%</p>
+                                        </div>
+                                        <div className="text-right">
+                                          <p className="text-xs text-muted-foreground">Revenue</p>
+                                          <p className="text-sm font-medium">{formatCurrency(dp.revenue)}</p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                              
+                              <p className="text-xs text-muted-foreground pt-2 border-t">
+                                These Class A customers (revenue ≥ minimum threshold) inform the ICP target percentage. 
+                                Higher variance suggests the category may need segment-specific adjustments.
+                              </p>
+                            </div>
+                          </CollapsibleContent>
+                        </>
+                      )}
                     </div>
-                  </div>
+                  </Collapsible>
                 ))}
               </div>
             </CardContent>
