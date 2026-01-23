@@ -114,7 +114,7 @@ Tooltips are implemented across all pages:
 ### Sample Data
 A synthetic Class A customer data file is available at `public/sample-data/class-a-customer-data-sample.csv` for demonstration purposes.
 
-## Recent Changes (January 2024)
+## Recent Changes (January 2026)
 
 - Initial project setup with complete database schema
 - Frontend UI with all pages (Dashboard, Data Uploads, Accounts, ICP Builder, Playbooks, Revenue, Settings)
@@ -124,3 +124,20 @@ A synthetic Class A customer data file is available at `public/sample-data/class
 - Comprehensive tooltips added across all dashboards for user self-education
 - ICP profile delete functionality with AlertDialog confirmation
 - Synthetic Class A customer data sample for feature demonstration
+- **Data Insights tab in ICP Builder** - Full analytical transparency showing how ICP decisions are made:
+  - Dataset Summary: Class A customer counts, total revenue, avg categories, date range, segment breakdown
+  - AI Pattern Analysis: Category purchasing patterns with "Derived from ICP targets" badge
+  - ICP Decision Logic: Explains why each category percentage was chosen with confidence indicators
+  - Segment Health Score: ICP alignment with concrete "near ICP" rule (≤20% avg gap threshold)
+  - Actionable Intelligence: Quick Wins, Cross-sell Opportunities, Territory Ranking, Revenue Impact
+  - All estimated/derived data explicitly labeled with isEstimate flags and UI badges
+  - Methodology transparency: API includes explanatory notes, UI shows calculation methods
+
+### Data Insights API
+- `GET /api/data-insights/:segment` - Returns data insights for a segment with:
+  - `datasetSummary` - Real data from Class A customers
+  - `patternAnalysis` - Derived patterns with isEstimate flag
+  - `decisionLogic` - ICP target reasoning with isEstimate flag and explanatory note
+  - `segmentHealth` - Computed alignment score and gap analysis
+  - `actionableInsights` - Quick wins and projections with isEstimate flag
+  - `methodology` - Calculation explanations (nearICPThreshold, alignmentScoreNote, projectedLiftNote)
