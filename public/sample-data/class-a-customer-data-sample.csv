@@ -1,6 +1,6 @@
-Customer ID,Customer Name,Segment,Region,Territory Manager,Annual Revenue,Order Count,HVAC Equipment %,Refrigerant & Supplies %,Ductwork & Fittings %,Controls & Thermostats %,Water Heaters %,Pipe & Fittings %,Tools & Safety %
-CA001,Precision Climate Systems,HVAC,Northeast,Sarah Mitchell,285000,156,42,18,14,10,8,5,3
-CA002,ThermoMax Contractors,HVAC,Southeast,James Rodriguez,198000,128,38,20,12,8,10,8,4
-CA003,Elite Plumbing Solutions,Plumbing,Midwest,Michael Chen,175000,142,0,0,0,0,18,62,8
-CA004,Commercial Mechanical Inc,Mechanical,West,Jennifer Adams,320000,198,32,15,10,12,8,18,5
-CA005,Premium HVAC Services,HVAC,Northeast,Sarah Mitchell,245000,167,44,17,13,9,9,5,3
+Customer ID,Customer Name,Segment,Region,Territory Manager,Years as Customer,Annual Revenue,Order Count,Avg Order Value,HVAC Equipment %,Refrigerant & Supplies %,Ductwork & Fittings %,Controls & Thermostats %,Water Heaters %,Pipe & Fittings %,PVF %,Fixtures %,Drainage %,Tools & Safety %,Last Order Date,Payment Terms,Credit Limit
+CA001,Precision Climate Systems,HVAC,Northeast,Sarah Mitchell,8,285000,156,1827,42,18,14,10,8,0,0,0,0,8,2026-01-15,Net 30,350000
+CA002,ThermoMax Contractors,HVAC,Southeast,James Rodriguez,5,198000,128,1547,38,20,12,8,10,0,0,0,0,12,2026-01-18,Net 30,250000
+CA003,Elite Plumbing Solutions,Plumbing,Midwest,Michael Chen,12,175000,142,1232,0,0,0,0,18,35,22,15,6,4,2026-01-20,Net 45,200000
+CA004,Commercial Mechanical Inc,Mechanical,West,Jennifer Adams,6,320000,198,1616,28,12,15,8,12,10,5,5,0,5,2026-01-12,Net 30,400000
+CA005,Premium HVAC Services,HVAC,Northeast,Sarah Mitchell,10,245000,167,1467,44,17,13,9,9,0,0,0,0,8,2026-01-19,Net 30,300000
