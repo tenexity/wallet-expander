@@ -52,7 +52,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer,
   PieChart,
   Pie,
@@ -169,8 +169,10 @@ const BLOCK_LABELS: Record<string, string> = {
 export default function Dashboard() {
   const [, navigate] = useLocation();
   const [blockOrder, setBlockOrder] = useState<string[]>(DEFAULT_BLOCK_ORDER);
+  const [blockWidths, setBlockWidths] = useState<Record<string, BlockWidth>>(DEFAULT_BLOCK_WIDTHS);
+  const [collapsedBlocks, setCollapsedBlocks] = useState<Set<string>>(new Set());
   
-  // Load saved order from localStorage
+  // Load saved order, widths, and collapsed states from localStorage
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
@@ -181,6 +183,28 @@ export default function Dashboard() {
         }
       } catch (e) {
         console.error("Failed to parse saved block order");
+      }
+    }
+    
+    const savedWidths = localStorage.getItem(BLOCK_WIDTHS_KEY);
+    if (savedWidths) {
+      try {
+        const parsed = JSON.parse(savedWidths);
+        setBlockWidths({ ...DEFAULT_BLOCK_WIDTHS, ...parsed });
+      } catch (e) {
+        console.error("Failed to parse saved block widths");
+      }
+    }
+    
+    const savedCollapsed = localStorage.getItem(COLLAPSED_BLOCKS_KEY);
+    if (savedCollapsed) {
+      try {
+        const parsed = JSON.parse(savedCollapsed);
+        if (Array.isArray(parsed)) {
+          setCollapsedBlocks(new Set(parsed));
+        }
+      } catch (e) {
+        console.error("Failed to parse saved collapsed blocks");
       }
     }
   }, []);
@@ -621,7 +645,7 @@ export default function Dashboard() {
                         <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip
+                    <RechartsTooltip
                       formatter={(value: number) => [value, "Accounts"]}
                       contentStyle={{
                         backgroundColor: "hsl(var(--popover))",
@@ -760,7 +784,7 @@ export default function Dashboard() {
                       tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
                       axisLine={{ stroke: "hsl(var(--border))" }}
                     />
-                    <Tooltip
+                    <RechartsTooltip
                       formatter={(value: number) => [formatCurrency(value), "Revenue"]}
                       contentStyle={{
                         backgroundColor: "hsl(var(--popover))",
