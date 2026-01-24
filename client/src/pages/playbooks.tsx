@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useSearch } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -107,6 +108,12 @@ export default function Playbooks() {
   const [showHowToUse, setShowHowToUse] = useState(false);
   const [expandedTasks, setExpandedTasks] = useState<Set<number>>(new Set());
   const { toast } = useToast();
+  const search = useSearch();
+  
+  // Parse URL parameters for task auto-selection
+  const params = new URLSearchParams(search);
+  const taskIdFromUrl = params.get("task");
+  const segmentFromUrl = params.get("segment");
 
   const { data: playbooks } = useQuery<Playbook[]>({
     queryKey: ["/api/playbooks"],
@@ -119,6 +126,17 @@ export default function Playbooks() {
   const { data: tasks, isLoading } = useQuery<Task[]>({
     queryKey: [tasksQueryKey],
   });
+
+  // Generate dialog segment state - can be pre-filled from URL
+  const [generateSegment, setGenerateSegment] = useState<string>("");
+  
+  // Handle URL parameters for task auto-selection and segment pre-fill
+  useEffect(() => {
+    if (segmentFromUrl) {
+      setGenerateSegment(segmentFromUrl);
+      setShowGenerateDialog(true);
+    }
+  }, [segmentFromUrl]);
 
   // Mock data for demonstration
   const mockTasks: Task[] = [
@@ -236,8 +254,22 @@ Can I send you our updated PVF catalog?`,
     },
   ];
 
-  const displayTasks = tasks || mockTasks;
-  const displayPlaybooks = playbooks || mockPlaybooks;
+  const displayTasks = useMemo(() => tasks || mockTasks, [tasks]);
+  const displayPlaybooks = useMemo(() => playbooks || mockPlaybooks, [playbooks]);
+
+  // Handle task auto-selection from URL parameter (run once when taskId and tasks are ready)
+  const [taskAutoSelected, setTaskAutoSelected] = useState(false);
+  useEffect(() => {
+    if (taskIdFromUrl && !taskAutoSelected && displayTasks.length > 0) {
+      const taskId = parseInt(taskIdFromUrl, 10);
+      const task = displayTasks.find(t => t.id === taskId);
+      if (task) {
+        setSelectedTask(task);
+        setExpandedTasks(new Set([taskId]));
+        setTaskAutoSelected(true);
+      }
+    }
+  }, [taskIdFromUrl, displayTasks, taskAutoSelected]);
 
   const filteredTasks = displayTasks.filter((task) => {
     const matchesSearch =
@@ -702,15 +734,15 @@ Can I send you our updated PVF catalog?`,
             </div>
             <div className="space-y-2">
               <Label>Target Segment</Label>
-              <Select defaultValue="all">
+              <Select value={generateSegment || "all"} onValueChange={setGenerateSegment}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select segment" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Segments</SelectItem>
-                  <SelectItem value="hvac">HVAC</SelectItem>
-                  <SelectItem value="plumbing">Plumbing</SelectItem>
-                  <SelectItem value="mechanical">Mechanical</SelectItem>
+                  <SelectItem value="HVAC">HVAC</SelectItem>
+                  <SelectItem value="Plumbing">Plumbing</SelectItem>
+                  <SelectItem value="Mechanical">Mechanical</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -109,6 +109,70 @@ export async function registerRoutes(
     }
   });
 
+  // ============ Daily Focus ============
+  app.get("/api/daily-focus", async (req, res) => {
+    try {
+      const allTasks = await storage.getTasks();
+      const allAccounts = await storage.getAccounts();
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      // Filter for tasks due today or overdue (not completed)
+      const focusTasks = allTasks
+        .filter(task => {
+          if (task.status === "completed" || task.status === "skipped") return false;
+          if (!task.dueDate) return false;
+          
+          const dueDate = new Date(task.dueDate);
+          dueDate.setHours(0, 0, 0, 0);
+          
+          // Due today or overdue (before today)
+          return dueDate <= today;
+        })
+        .map(task => {
+          const account = allAccounts.find(a => a.id === task.accountId);
+          const dueDate = new Date(task.dueDate!);
+          dueDate.setHours(0, 0, 0, 0);
+          
+          return {
+            id: task.id,
+            accountId: task.accountId,
+            accountName: account?.name || "Unknown Account",
+            assignedTm: task.assignedTm,
+            taskType: task.taskType,
+            title: task.title,
+            description: task.description,
+            status: task.status,
+            dueDate: task.dueDate,
+            isOverdue: dueDate < today,
+            gapCategories: safeParseGapCategories(task.gapCategories),
+          };
+        })
+        .sort((a, b) => {
+          // Overdue first, then by due date
+          if (a.isOverdue && !b.isOverdue) return -1;
+          if (!a.isOverdue && b.isOverdue) return 1;
+          return new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime();
+        });
+
+      res.json({
+        todayCount: focusTasks.filter(t => !t.isOverdue).length,
+        overdueCount: focusTasks.filter(t => t.isOverdue).length,
+        tasks: focusTasks.slice(0, 10), // Top 10 priority items
+      });
+    } catch (error) {
+      console.error("Error fetching daily focus:", error);
+      res.status(500).json({ message: "Failed to fetch daily focus" });
+    }
+  });
+
   // ============ Accounts ============
   app.get("/api/accounts", async (req, res) => {
     try {

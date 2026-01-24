@@ -262,10 +262,17 @@ export default function Revenue() {
             <Download className="mr-2 h-4 w-4" />
             Export Report
           </Button>
-          <Button onClick={() => setShowEnrollDialog(true)} data-testid="button-enroll-account">
-            <Plus className="mr-2 h-4 w-4" />
-            Enroll Account
-          </Button>
+          <TooltipComponent>
+            <TooltipTrigger asChild>
+              <Button onClick={() => setShowEnrollDialog(true)} data-testid="button-enroll-account">
+                <Plus className="mr-2 h-4 w-4" />
+                Enroll Account
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-[250px]">
+              Add an account to the revenue growth program to track incremental revenue and calculate rev-share fees (15% of revenue above baseline).
+            </TooltipContent>
+          </TooltipComponent>
         </div>
       </div>
 

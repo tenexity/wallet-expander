@@ -16,6 +16,16 @@ import {
   AlertCircle,
   ArrowRight,
   BarChart3,
+  Focus,
+  Phone,
+  Mail,
+  MapPin,
+  Clock,
+  ChevronRight,
+  CheckCircle2,
+  Circle,
+  Upload,
+  Sparkles,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -63,6 +73,30 @@ interface DashboardStats {
   }>;
 }
 
+interface DailyFocusData {
+  todayCount: number;
+  overdueCount: number;
+  tasks: Array<{
+    id: number;
+    accountId: number;
+    accountName: string;
+    assignedTm: string;
+    taskType: "call" | "email" | "visit";
+    title: string;
+    description: string;
+    status: string;
+    dueDate: string;
+    isOverdue: boolean;
+    gapCategories: string[];
+  }>;
+}
+
+const taskTypeIcons = {
+  call: Phone,
+  email: Mail,
+  visit: MapPin,
+};
+
 const CHART_COLORS = [
   "hsl(var(--chart-1))",
   "hsl(var(--chart-2))",
@@ -87,8 +121,16 @@ export default function Dashboard() {
     queryKey: ["/api/dashboard/stats"],
   });
 
+  const { data: dailyFocus, isLoading: isDailyFocusLoading } = useQuery<DailyFocusData>({
+    queryKey: ["/api/daily-focus"],
+  });
+
   const handleOpportunityClick = (row: DashboardStats["topOpportunities"][0]) => {
     navigate(`/accounts?account=${row.id}`);
+  };
+
+  const handleTaskClick = (taskId: number) => {
+    navigate(`/playbooks?task=${taskId}`);
   };
 
   const opportunityColumns = [
@@ -272,6 +314,45 @@ export default function Dashboard() {
     );
   }
 
+  // Calculate workflow progress
+  const workflowSteps = [
+    {
+      id: "data",
+      label: "Upload Data",
+      description: "Import accounts and order history",
+      completed: displayStats.totalAccounts > 0,
+      href: "/data-uploads",
+      icon: Upload,
+    },
+    {
+      id: "icp",
+      label: "Approve ICP",
+      description: "Define Ideal Customer Profiles",
+      completed: displayStats.icpProfiles.some(p => p.status === "approved"),
+      href: "/icp-builder",
+      icon: Target,
+    },
+    {
+      id: "playbooks",
+      label: "Generate Playbook",
+      description: "Create AI-powered sales tasks",
+      completed: displayStats.recentTasks.length > 0,
+      href: "/playbooks",
+      icon: Sparkles,
+    },
+    {
+      id: "revenue",
+      label: "Track Revenue",
+      description: "Enroll accounts for rev-share",
+      completed: displayStats.enrolledAccounts > 0,
+      href: "/revenue",
+      icon: TrendingUp,
+    },
+  ];
+  
+  const completedSteps = workflowSteps.filter(s => s.completed).length;
+  const allComplete = completedSteps === workflowSteps.length;
+
   return (
     <div className="p-6 space-y-6" data-testid="page-dashboard">
       <div className="flex items-center justify-between">
@@ -288,6 +369,78 @@ export default function Dashboard() {
           </Link>
         </Button>
       </div>
+
+      {/* Workflow Progress - Getting Started Guide */}
+      {!allComplete && (
+        <Card className="border-chart-1/20 bg-chart-1/5" data-testid="card-getting-started">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-base">Getting Started</CardTitle>
+                <Badge variant="outline" className="text-xs">
+                  {completedSteps}/{workflowSteps.length} complete
+                </Badge>
+              </div>
+              <InfoTooltip
+                content="Complete these steps to set up your sales intelligence workflow. Each step builds on the previous one to create a complete revenue growth system."
+                testId="tooltip-getting-started"
+              />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              {workflowSteps.map((step, index) => {
+                const StepIcon = step.icon;
+                const isNextStep = !step.completed && workflowSteps.slice(0, index).every(s => s.completed);
+                
+                return (
+                  <div key={step.id} className="flex items-center gap-4 flex-1">
+                    <Link href={step.href}>
+                      <div 
+                        className={`flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer ${
+                          step.completed 
+                            ? "bg-chart-2/10 border-chart-2/30" 
+                            : isNextStep
+                            ? "bg-primary/10 border-primary/30 hover-elevate"
+                            : "bg-muted/50 border-muted"
+                        }`}
+                        data-testid={`step-${step.id}`}
+                      >
+                        <div className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                          step.completed 
+                            ? "bg-chart-2 text-chart-2-foreground" 
+                            : isNextStep
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground"
+                        }`}>
+                          {step.completed ? (
+                            <CheckCircle2 className="h-4 w-4" />
+                          ) : (
+                            <StepIcon className="h-4 w-4" />
+                          )}
+                        </div>
+                        <div className="hidden md:block">
+                          <p className={`text-sm font-medium ${step.completed ? "text-chart-2" : ""}`}>
+                            {step.label}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {step.description}
+                          </p>
+                        </div>
+                      </div>
+                    </Link>
+                    {index < workflowSteps.length - 1 && (
+                      <div className={`hidden lg:block h-0.5 flex-1 ${
+                        step.completed ? "bg-chart-2/50" : "bg-muted"
+                      }`} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
@@ -325,6 +478,119 @@ export default function Dashboard() {
           tooltip="Additional revenue generated from enrolled accounts above their baseline. This is the basis for calculating rev-share fees (15% of incremental revenue)."
         />
       </div>
+
+      {/* Daily Focus Section */}
+      <Card className="border-primary/20 bg-primary/5" data-testid="card-daily-focus">
+        <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <Focus className="h-5 w-5" />
+            </div>
+            <div>
+              <CardTitle className="text-lg">Daily Focus</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Tasks requiring your attention today
+              </p>
+            </div>
+            <InfoTooltip
+              content="Your prioritized action list showing tasks due today and any overdue items from yesterday. Complete these first to stay on track with your sales goals."
+              testId="tooltip-daily-focus"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            {dailyFocus && dailyFocus.overdueCount > 0 && (
+              <Badge variant="destructive" className="gap-1" data-testid="badge-overdue-count">
+                <AlertCircle className="h-3 w-3" />
+                {dailyFocus.overdueCount} overdue
+              </Badge>
+            )}
+            {dailyFocus && dailyFocus.todayCount > 0 && (
+              <Badge variant="secondary" data-testid="badge-today-count">
+                {dailyFocus.todayCount} due today
+              </Badge>
+            )}
+            <Button variant="outline" size="sm" asChild data-testid="button-view-all-tasks">
+              <Link href="/playbooks">
+                View All Tasks
+                <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isDailyFocusLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex items-center gap-3 p-3 rounded-lg border bg-card">
+                  <Skeleton className="h-8 w-8 rounded-md" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-3 w-32" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : dailyFocus && dailyFocus.tasks.length > 0 ? (
+            <div className="space-y-2">
+              {dailyFocus.tasks.slice(0, 5).map((task) => {
+                const TaskIcon = taskTypeIcons[task.taskType] || Phone;
+                return (
+                  <div
+                    key={task.id}
+                    className="flex items-center gap-3 p-3 rounded-lg border bg-card hover-elevate cursor-pointer"
+                    onClick={() => handleTaskClick(task.id)}
+                    data-testid={`daily-focus-task-${task.id}`}
+                  >
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-md ${
+                      task.isOverdue ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
+                    }`}>
+                      <TaskIcon className="h-4 w-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium truncate">{task.title}</span>
+                        {task.isOverdue && (
+                          <Badge variant="destructive" className="text-xs">Overdue</Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>{task.accountName}</span>
+                        <span className="text-muted-foreground/50">•</span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {new Date(task.dueDate).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                );
+              })}
+              {dailyFocus.tasks.length > 5 && (
+                <Button variant="ghost" className="w-full" asChild>
+                  <Link href="/playbooks">
+                    View {dailyFocus.tasks.length - 5} more tasks
+                    <ArrowRight className="ml-1 h-4 w-4" />
+                  </Link>
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-chart-2/10 text-chart-2 mb-3">
+                <Target className="h-6 w-6" />
+              </div>
+              <p className="font-medium text-chart-2">All caught up!</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                No tasks due today. Generate a playbook to create new tasks.
+              </p>
+              <Button variant="outline" size="sm" className="mt-3" asChild>
+                <Link href="/playbooks">Go to Playbooks</Link>
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">

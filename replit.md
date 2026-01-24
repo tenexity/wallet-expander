@@ -183,3 +183,47 @@ A synthetic Class A customer data file is available at `public/sample-data/class
 - **tasks.assignedTmId**: Foreign key linking tasks to Territory Manager entities
 - Playbook generation automatically sets both fields when creating tasks
 - API supports filtering: `GET /api/tasks?playbookId={id}`
+
+### UX Improvements (January 2026)
+
+#### Daily Focus Section
+- **Dashboard** - New "Daily Focus" card showing tasks due today and overdue from yesterday
+- Clickable task items navigate directly to the playbooks page
+- Overdue badge with count and visual highlighting for urgent items
+- Empty state with guidance to generate playbooks when no tasks are due
+
+#### Getting Started Progress Indicator
+- **Dashboard** - "Getting Started" guide showing 4-step workflow progress
+- Steps: Upload Data → Approve ICP → Generate Playbook → Track Revenue
+- Visual indicators for completed/next steps with clickable links
+- Auto-hides when all steps are complete
+
+#### Sidebar Navigation Tooltips
+- All navigation items now show descriptive tooltips on hover
+- Explains what each section does to help new users orient themselves
+- 500ms delay to avoid tooltip noise during navigation
+
+#### Enhanced Cross-Navigation
+- **Accounts page** - "Generate Playbook" button appears for high-score accounts (≥70)
+- Button links directly to playbooks page with segment pre-filled
+- Tooltip explains the opportunity and encourages action
+
+#### Additional Tooltips
+- **ICP Builder** - "Approve" button tooltip explains what approval activates
+- **Revenue** - "Enroll Account" button tooltip explains the rev-share program
+- **Accounts** - "Enroll in Program" tooltip with bullet-point benefits
+
+### Daily Focus API
+- `GET /api/daily-focus` - Returns tasks due today or overdue with:
+  - `todayCount` - Number of tasks due today
+  - `overdueCount` - Number of overdue tasks
+  - `tasks` - Array of task details with `isOverdue` flag, limited to top 10
+
+### Playbooks URL Parameters
+- **?segment=VALUE** - Opens Generate Playbook dialog with segment pre-selected (e.g., `/playbooks?segment=HVAC`)
+- **?task=ID** - Auto-selects and expands the specified task
+
+### Sidebar Navigation
+- Uses SidebarMenuButton with built-in tooltip prop for hover descriptions
+- Navigation uses onClick with programmatic navigation via wouter's useLocation
+- SidebarMenuButton converted to forwardRef for proper ref handling with tooltips

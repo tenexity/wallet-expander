@@ -1,4 +1,4 @@
-import { useLocation, Link } from "wouter";
+import { useLocation } from "wouter";
 import {
   LayoutDashboard,
   Upload,
@@ -28,31 +28,37 @@ const mainNavItems = [
     title: "Dashboard",
     url: "/",
     icon: LayoutDashboard,
+    tooltip: "Overview of KPIs, top opportunities, and your daily focus tasks",
   },
   {
     title: "Data Uploads",
     url: "/data-uploads",
     icon: Upload,
+    tooltip: "Import accounts, products, categories, and order history from CSV files",
   },
   {
     title: "Accounts",
     url: "/accounts",
     icon: Users,
+    tooltip: "View all customer accounts with gap analysis and opportunity scores",
   },
   {
     title: "ICP Builder",
     url: "/icp-builder",
     icon: Target,
+    tooltip: "Define Ideal Customer Profiles for each segment using AI analysis",
   },
   {
     title: "Playbooks",
     url: "/playbooks",
     icon: ClipboardList,
+    tooltip: "Generate and manage AI-powered sales tasks with call scripts and emails",
   },
   {
     title: "Revenue Tracking",
     url: "/revenue",
     icon: TrendingUp,
+    tooltip: "Track enrolled accounts, incremental revenue, and calculate rev-share fees",
   },
 ];
 
@@ -61,11 +67,12 @@ const adminNavItems = [
     title: "Settings",
     url: "/settings",
     icon: Settings,
+    tooltip: "Configure scoring weights and manage Territory Managers",
   },
 ];
 
 export function AppSidebar() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
 
   return (
     <Sidebar>
@@ -88,14 +95,13 @@ export function AppSidebar() {
               {mainNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
-                    asChild
                     isActive={location === item.url}
+                    onClick={() => navigate(item.url)}
+                    tooltip={{ children: item.tooltip, side: "right" }}
                     data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}
                   >
-                    <Link href={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.title}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -109,14 +115,13 @@ export function AppSidebar() {
               {adminNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
-                    asChild
                     isActive={location === item.url}
+                    onClick={() => navigate(item.url)}
+                    tooltip={{ children: item.tooltip, side: "right" }}
                     data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}
                   >
-                    <Link href={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.title}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}

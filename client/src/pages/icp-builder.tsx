@@ -563,14 +563,21 @@ export default function ICPBuilder() {
                           Edit
                         </Button>
                         {selectedProfile.status === "draft" && (
-                          <Button
-                            size="sm"
-                            onClick={() => approveMutation.mutate(selectedProfile.id)}
-                            data-testid="button-approve-profile"
-                          >
-                            <CheckCircle className="mr-2 h-4 w-4" />
-                            Approve
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="sm"
+                                onClick={() => approveMutation.mutate(selectedProfile.id)}
+                                data-testid="button-approve-profile"
+                              >
+                                <CheckCircle className="mr-2 h-4 w-4" />
+                                Approve
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-[250px]">
+                              Approving this profile activates it for opportunity scoring. Accounts in this segment will be scored based on these category expectations.
+                            </TooltipContent>
+                          </Tooltip>
                         )}
                       </>
                     )}

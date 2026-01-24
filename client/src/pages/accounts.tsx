@@ -36,6 +36,7 @@ import {
   ArrowUpDown,
   Settings,
   ExternalLink,
+  Sparkles,
 } from "lucide-react";
 import { Link, useLocation, useSearch } from "wouter";
 import {
@@ -678,11 +679,29 @@ export default function Accounts() {
                   </div>
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex gap-3 flex-wrap">
                   <Button className="flex-1" data-testid="button-create-task">
                     <TrendingUp className="mr-2 h-4 w-4" />
                     Create Task
                   </Button>
+                  {selectedAccount.opportunityScore >= 70 && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <Button variant="default" asChild data-testid="button-generate-playbook">
+                            <Link href={`/playbooks?segment=${selectedAccount.segment}`}>
+                              <Sparkles className="mr-2 h-4 w-4" />
+                              Generate Playbook
+                            </Link>
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs" side="top">
+                        <p className="text-sm font-medium mb-1">High-Value Opportunity</p>
+                        <p className="text-xs">This account has a high opportunity score ({selectedAccount.opportunityScore}). Generate a playbook to create AI-powered call scripts and emails targeting their gap categories.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                   {!selectedAccount.enrolled && (
                     <Tooltip>
                       <TooltipTrigger asChild>
