@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,7 @@ import {
   Settings,
   ExternalLink,
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import {
   Tooltip,
   TooltipContent,
@@ -73,6 +73,7 @@ export default function Accounts() {
   const [regionFilter, setRegionFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("default");
   const [selectedAccount, setSelectedAccount] = useState<AccountWithMetrics | null>(null);
+  const searchParams = useSearch();
 
   const { data: accounts, isLoading } = useQuery<AccountWithMetrics[]>({
     queryKey: ["/api/accounts"],
@@ -195,8 +196,19 @@ export default function Accounts() {
   ];
 
   const displayAccounts = accounts || mockAccounts;
-  const segments = [...new Set(displayAccounts.map((a) => a.segment))];
-  const regions = [...new Set(displayAccounts.map((a) => a.region))];
+  const segments = Array.from(new Set(displayAccounts.map((a) => a.segment)));
+  const regions = Array.from(new Set(displayAccounts.map((a) => a.region)));
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    const accountId = params.get("account");
+    if (accountId && displayAccounts.length > 0) {
+      const account = displayAccounts.find((a) => a.id === parseInt(accountId));
+      if (account) {
+        setSelectedAccount(account);
+      }
+    }
+  }, [searchParams, displayAccounts]);
 
   const getRevenueImpact = (account: AccountWithMetrics) => {
     return account.gapCategories.reduce((sum, gap) => sum + gap.estimatedValue, 0);

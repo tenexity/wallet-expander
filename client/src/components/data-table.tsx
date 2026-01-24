@@ -21,14 +21,16 @@ interface DataTableProps<T> {
   isLoading?: boolean;
   emptyMessage?: string;
   testId?: string;
+  onRowClick?: (row: T) => void;
 }
 
-export function DataTable<T extends Record<string, unknown>>({
+export function DataTable<T>({
   columns,
   data,
   isLoading,
   emptyMessage = "No data available",
   testId,
+  onRowClick,
 }: DataTableProps<T>) {
   if (isLoading) {
     return (
@@ -84,12 +86,17 @@ export function DataTable<T extends Record<string, unknown>>({
         </TableHeader>
         <TableBody>
           {data.map((row, rowIndex) => (
-            <TableRow key={rowIndex} data-testid={`table-row-${rowIndex}`}>
+            <TableRow 
+              key={rowIndex} 
+              data-testid={`table-row-${rowIndex}`}
+              onClick={onRowClick ? () => onRowClick(row) : undefined}
+              className={onRowClick ? "cursor-pointer hover-elevate" : ""}
+            >
               {columns.map((column) => (
                 <TableCell key={column.key} className={column.className}>
                   {column.cell
                     ? column.cell(row)
-                    : (row[column.key] as React.ReactNode)}
+                    : ((row as Record<string, unknown>)[column.key] as React.ReactNode)}
                 </TableCell>
               ))}
             </TableRow>

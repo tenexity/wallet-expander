@@ -17,7 +17,7 @@ import {
   ArrowRight,
   BarChart3,
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import {
   BarChart,
   Bar,
@@ -82,9 +82,14 @@ function formatCurrency(value: number): string {
 }
 
 export default function Dashboard() {
+  const [, navigate] = useLocation();
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats"],
   });
+
+  const handleOpportunityClick = (row: DashboardStats["topOpportunities"][0]) => {
+    navigate(`/accounts?account=${row.id}`);
+  };
 
   const opportunityColumns = [
     {
@@ -345,6 +350,7 @@ export default function Dashboard() {
               columns={opportunityColumns}
               data={displayStats.topOpportunities}
               testId="table-opportunities"
+              onRowClick={handleOpportunityClick}
             />
           </CardContent>
         </Card>

@@ -9,6 +9,7 @@ import {
   insertProgramAccountSchema,
   insertDataUploadSchema,
   insertScoringWeightsSchema,
+  insertTerritoryManagerSchema,
   DEFAULT_SCORING_WEIGHTS,
 } from "@shared/schema";
 import { z } from "zod";
@@ -640,8 +641,14 @@ export async function registerRoutes(
   // ============ Tasks ============
   app.get("/api/tasks", async (req, res) => {
     try {
-      const allTasks = await storage.getTasks();
+      let allTasks = await storage.getTasks();
       const allAccounts = await storage.getAccounts();
+
+      // Optional filter by playbook
+      const playbookId = req.query.playbookId ? parseInt(req.query.playbookId as string) : null;
+      if (playbookId) {
+        allTasks = allTasks.filter(t => t.playbookId === playbookId);
+      }
 
       const tasksWithDetails = allTasks.map(task => {
         const account = allAccounts.find(a => a.id === task.accountId);
@@ -848,11 +855,19 @@ export async function registerRoutes(
         taskCount: generatedTasks.length,
       });
 
+      // Get territory managers to link tasks by name
+      const territoryManagers = await storage.getTerritoryManagers();
+
       // Create tasks in database and link to playbook
       for (const task of generatedTasks) {
+        // Try to find TM by name and link by ID
+        const tm = territoryManagers.find(t => t.name === task.assignedTm);
+        
         const createdTask = await storage.createTask({
           accountId: task.accountId,
+          playbookId: playbook.id,
           assignedTm: task.assignedTm,
+          assignedTmId: tm?.id || null,
           taskType: task.taskType,
           title: task.title,
           description: task.description,
@@ -862,7 +877,7 @@ export async function registerRoutes(
           dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 1 week from now
         });
         
-        // Link task to playbook
+        // Also link task to playbook via join table for backwards compatibility
         await storage.createPlaybookTask({
           playbookId: playbook.id,
           taskId: createdTask.id,
@@ -1076,6 +1091,59 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Update scoring weights error:", error);
       res.status(500).json({ message: "Failed to update scoring weights" });
+    }
+  });
+
+  // ============ Territory Managers ============
+  app.get("/api/territory-managers", async (req, res) => {
+    try {
+      const managers = await storage.getTerritoryManagers();
+      res.json(managers);
+    } catch (error) {
+      console.error("Get territory managers error:", error);
+      res.status(500).json({ message: "Failed to get territory managers" });
+    }
+  });
+
+  app.post("/api/territory-managers", async (req, res) => {
+    try {
+      const data = insertTerritoryManagerSchema.parse(req.body);
+      const manager = await storage.createTerritoryManager(data);
+      res.status(201).json(manager);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      console.error("Create territory manager error:", error);
+      res.status(500).json({ message: "Failed to create territory manager" });
+    }
+  });
+
+  app.put("/api/territory-managers/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const manager = await storage.updateTerritoryManager(id, req.body);
+      if (!manager) {
+        return res.status(404).json({ message: "Territory manager not found" });
+      }
+      res.json(manager);
+    } catch (error) {
+      console.error("Update territory manager error:", error);
+      res.status(500).json({ message: "Failed to update territory manager" });
+    }
+  });
+
+  app.delete("/api/territory-managers/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteTerritoryManager(id);
+      if (!success) {
+        return res.status(404).json({ message: "Territory manager not found" });
+      }
+      res.json({ message: "Territory manager deleted successfully" });
+    } catch (error) {
+      console.error("Delete territory manager error:", error);
+      res.status(500).json({ message: "Failed to delete territory manager" });
     }
   });
 

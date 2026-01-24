@@ -215,7 +215,9 @@ export type AccountCategoryGap = typeof accountCategoryGaps.$inferSelect;
 export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
   accountId: integer("account_id").notNull(),
+  playbookId: integer("playbook_id"),
   assignedTm: text("assigned_tm"),
+  assignedTmId: integer("assigned_tm_id"),
   taskType: text("task_type").notNull(), // call, email, visit
   title: text("title").notNull(),
   description: text("description"),
@@ -376,3 +378,21 @@ export const DEFAULT_SCORING_WEIGHTS = {
   revenuePotentialWeight: 30,
   categoryCountWeight: 30,
 };
+
+// ============ TERRITORY MANAGERS ============
+export const territoryManagers = pgTable("territory_managers", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  territories: text("territories").array(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const insertTerritoryManagerSchema = createInsertSchema(territoryManagers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertTerritoryManager = z.infer<typeof insertTerritoryManagerSchema>;
+export type TerritoryManager = typeof territoryManagers.$inferSelect;

@@ -49,6 +49,7 @@ import {
   User,
   MessageSquare,
   HelpCircle,
+  Target,
 } from "lucide-react";
 import {
   Tooltip,
@@ -70,6 +71,7 @@ interface Task {
   dueDate: string;
   completedAt?: string;
   outcome?: string;
+  playbookId?: number;
 }
 
 interface Playbook {
@@ -99,17 +101,23 @@ export default function Playbooks() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [selectedPlaybookId, setSelectedPlaybookId] = useState<number | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
+  const [showHowToUse, setShowHowToUse] = useState(false);
   const [expandedTasks, setExpandedTasks] = useState<Set<number>>(new Set());
   const { toast } = useToast();
 
-  const { data: tasks, isLoading } = useQuery<Task[]>({
-    queryKey: ["/api/tasks"],
-  });
-
   const { data: playbooks } = useQuery<Playbook[]>({
     queryKey: ["/api/playbooks"],
+  });
+
+  const tasksQueryKey = selectedPlaybookId 
+    ? `/api/tasks?playbookId=${selectedPlaybookId}`
+    : "/api/tasks";
+    
+  const { data: tasks, isLoading } = useQuery<Task[]>({
+    queryKey: [tasksQueryKey],
   });
 
   // Mock data for demonstration
@@ -130,6 +138,7 @@ Would you have 15 minutes this week to discuss how we can support your water hea
       gapCategories: ["Water Heaters", "Tools & Safety"],
       status: "pending",
       dueDate: "2024-01-25",
+      playbookId: 1,
     },
     {
       id: 2,
@@ -159,6 +168,7 @@ Best,
       gapCategories: ["Controls & Thermostats"],
       status: "in_progress",
       dueDate: "2024-01-26",
+      playbookId: 2,
     },
     {
       id: 3,
@@ -181,6 +191,7 @@ Key talking points:
       gapCategories: ["Water Heaters", "Ductwork"],
       status: "pending",
       dueDate: "2024-01-28",
+      playbookId: 1,
     },
     {
       id: 4,
@@ -202,6 +213,7 @@ Can I send you our updated PVF catalog?`,
       dueDate: "2024-01-20",
       completedAt: "2024-01-20",
       outcome: "Interested in quote for PVF, scheduled follow-up call",
+      playbookId: 2,
     },
   ];
 
@@ -236,6 +248,10 @@ Can I send you our updated PVF catalog?`,
     const matchesType = typeFilter === "all" || task.taskType === typeFilter;
     return matchesSearch && matchesStatus && matchesType;
   });
+
+  const selectedPlaybook = selectedPlaybookId 
+    ? displayPlaybooks.find(p => p.id === selectedPlaybookId)
+    : null;
 
   const toggleTaskExpanded = (taskId: number) => {
     const newExpanded = new Set(expandedTasks);
@@ -398,20 +414,41 @@ Can I send you our updated PVF catalog?`,
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 space-y-4">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Recent Playbooks</CardTitle>
+              <CardTitle className="text-base">Playbooks</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
+              <div
+                onClick={() => setSelectedPlaybookId(null)}
+                className={`p-3 rounded-md border cursor-pointer transition-colors ${
+                  selectedPlaybookId === null
+                    ? "bg-primary/10 border-primary"
+                    : "hover:bg-muted/50"
+                }`}
+                data-testid="button-all-tasks"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-sm">All Tasks</span>
+                  <Badge variant="secondary" className="text-xs">
+                    {displayTasks.length}
+                  </Badge>
+                </div>
+              </div>
               {displayPlaybooks.map((playbook) => (
                 <div
                   key={playbook.id}
-                  className="p-3 rounded-md border hover:bg-muted/50 cursor-pointer transition-colors"
+                  onClick={() => setSelectedPlaybookId(playbook.id)}
+                  className={`p-3 rounded-md border cursor-pointer transition-colors ${
+                    selectedPlaybookId === playbook.id
+                      ? "bg-primary/10 border-primary"
+                      : "hover:bg-muted/50"
+                  }`}
+                  data-testid={`playbook-item-${playbook.id}`}
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-medium text-sm">{playbook.name}</span>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Calendar className="h-3 w-3" />
@@ -434,11 +471,75 @@ Can I send you our updated PVF catalog?`,
               ))}
             </CardContent>
           </Card>
+
+          <Collapsible open={showHowToUse} onOpenChange={setShowHowToUse}>
+            <Card>
+              <CollapsibleTrigger asChild>
+                <CardHeader className="pb-3 cursor-pointer hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <HelpCircle className="h-4 w-4 text-primary" />
+                      How to Generate Playbooks
+                    </CardTitle>
+                    {showHowToUse ? (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </div>
+                </CardHeader>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="pt-0 space-y-3 text-sm">
+                  <p className="text-muted-foreground">
+                    Generate AI-powered playbooks that leverage your data analysis:
+                  </p>
+                  <ul className="space-y-2 text-muted-foreground">
+                    <li className="flex items-start gap-2">
+                      <Target className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                      <span><strong>Uses ICP Analysis:</strong> Tasks target accounts with the highest opportunity scores based on category gaps</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <User className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                      <span><strong>Personalized Scripts:</strong> AI generates call scripts and email templates tailored to each account's specific gaps</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <MessageSquare className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                      <span><strong>Focus by Segment:</strong> Filter by segment to create targeted campaigns for HVAC, Plumbing, or Mechanical accounts</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <ClipboardList className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                      <span><strong>Priority Categories:</strong> Choose which gap categories to focus on (Water Heaters, Controls, etc.)</span>
+                    </li>
+                  </ul>
+                  <Button 
+                    size="sm" 
+                    className="w-full mt-2" 
+                    onClick={() => setShowGenerateDialog(true)}
+                    data-testid="button-generate-from-help"
+                  >
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Generate Playbook
+                  </Button>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
         </div>
 
         <div className="lg:col-span-3">
           <Card>
             <CardHeader className="pb-3">
+              <div className="flex items-center justify-between mb-2">
+                <CardTitle className="text-base">
+                  {selectedPlaybook ? selectedPlaybook.name : "All Tasks"}
+                </CardTitle>
+                {selectedPlaybook && (
+                  <Badge variant="secondary">
+                    {filteredTasks.length} tasks
+                  </Badge>
+                )}
+              </div>
               <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

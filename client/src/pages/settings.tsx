@@ -19,8 +19,38 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import type { TerritoryManager } from "@shared/schema";
 import {
   Settings,
   Database,
@@ -33,11 +63,86 @@ import {
   AlertCircle,
   Sliders,
   FileText,
+  Users,
+  Plus,
+  Pencil,
+  Trash2,
 } from "lucide-react";
+
+const territoryManagerFormSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Invalid email address"),
+  territories: z.string(),
+  isActive: z.boolean().default(true),
+});
+
+type TerritoryManagerFormValues = z.infer<typeof territoryManagerFormSchema>;
 
 export default function SettingsPage() {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingManager, setEditingManager] = useState<TerritoryManager | null>(null);
+
+  const form = useForm<TerritoryManagerFormValues>({
+    resolver: zodResolver(territoryManagerFormSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      territories: "",
+      isActive: true,
+    },
+  });
+
+  const { data: territoryManagers = [], isLoading: isLoadingManagers } = useQuery<TerritoryManager[]>({
+    queryKey: ["/api/territory-managers"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: TerritoryManagerFormValues) => {
+      const territories = data.territories.split(",").map(t => t.trim()).filter(Boolean);
+      return apiRequest("POST", "/api/territory-managers", { ...data, territories });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/territory-managers"] });
+      setIsDialogOpen(false);
+      form.reset();
+      toast({ title: "Territory Manager created" });
+    },
+    onError: () => {
+      toast({ title: "Failed to create Territory Manager", variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: TerritoryManagerFormValues }) => {
+      const territories = data.territories.split(",").map(t => t.trim()).filter(Boolean);
+      return apiRequest("PUT", `/api/territory-managers/${id}`, { ...data, territories });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/territory-managers"] });
+      setIsDialogOpen(false);
+      setEditingManager(null);
+      form.reset();
+      toast({ title: "Territory Manager updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update Territory Manager", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest("DELETE", `/api/territory-managers/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/territory-managers"] });
+      toast({ title: "Territory Manager deleted" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete Territory Manager", variant: "destructive" });
+    },
+  });
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -47,6 +152,41 @@ export default function SettingsPage() {
       title: "Settings saved",
       description: "Your changes have been applied",
     });
+  };
+
+  const handleOpenDialog = (manager?: TerritoryManager) => {
+    if (manager) {
+      setEditingManager(manager);
+      form.reset({
+        name: manager.name,
+        email: manager.email,
+        territories: manager.territories?.join(", ") || "",
+        isActive: manager.isActive ?? true,
+      });
+    } else {
+      setEditingManager(null);
+      form.reset({
+        name: "",
+        email: "",
+        territories: "",
+        isActive: true,
+      });
+    }
+    setIsDialogOpen(true);
+  };
+
+  const handleSubmit = (data: TerritoryManagerFormValues) => {
+    if (editingManager) {
+      updateMutation.mutate({ id: editingManager.id, data });
+    } else {
+      createMutation.mutate(data);
+    }
+  };
+
+  const handleDelete = (id: number) => {
+    if (confirm("Are you sure you want to delete this Territory Manager?")) {
+      deleteMutation.mutate(id);
+    }
   };
 
   return (
@@ -78,6 +218,10 @@ export default function SettingsPage() {
           <TabsTrigger value="general" data-testid="tab-general">
             <Settings className="mr-2 h-4 w-4" />
             General
+          </TabsTrigger>
+          <TabsTrigger value="territory-managers" data-testid="tab-territory-managers">
+            <Users className="mr-2 h-4 w-4" />
+            Territory Managers
           </TabsTrigger>
           <TabsTrigger value="scoring" data-testid="tab-scoring">
             <Sliders className="mr-2 h-4 w-4" />
@@ -186,6 +330,92 @@ export default function SettingsPage() {
                 </div>
                 <Switch defaultChecked />
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="territory-managers" className="space-y-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <div>
+                <CardTitle className="text-base">Territory Managers</CardTitle>
+                <CardDescription>
+                  Manage territory managers and their assigned regions
+                </CardDescription>
+              </div>
+              <Button onClick={() => handleOpenDialog()} data-testid="button-add-tm">
+                <Plus className="mr-2 h-4 w-4" />
+                Add TM
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {isLoadingManagers ? (
+                <div className="flex items-center justify-center py-8">
+                  <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : territoryManagers.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No territory managers found. Click "Add TM" to create one.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Territories</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {territoryManagers.map((manager) => (
+                      <TableRow key={manager.id} data-testid={`row-tm-${manager.id}`}>
+                        <TableCell className="font-medium" data-testid={`text-tm-name-${manager.id}`}>
+                          {manager.name}
+                        </TableCell>
+                        <TableCell data-testid={`text-tm-email-${manager.id}`}>
+                          {manager.email}
+                        </TableCell>
+                        <TableCell data-testid={`text-tm-territories-${manager.id}`}>
+                          <div className="flex flex-wrap gap-1">
+                            {manager.territories?.map((territory, idx) => (
+                              <Badge key={idx} variant="secondary" className="text-xs">
+                                {territory}
+                              </Badge>
+                            )) || "-"}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={manager.isActive ? "default" : "secondary"}>
+                            {manager.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleOpenDialog(manager)}
+                              data-testid={`button-edit-tm-${manager.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleDelete(manager.id)}
+                              data-testid={`button-delete-tm-${manager.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -459,6 +689,112 @@ Output a structured profile with category expectations.`}
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {editingManager ? "Edit Territory Manager" : "Add Territory Manager"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingManager
+                ? "Update the territory manager's information."
+                : "Add a new territory manager to the system."}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="John Smith" data-testid="input-tm-name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="john@example.com"
+                        data-testid="input-tm-email"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="territories"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Territories</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Northeast, Southeast, Midwest"
+                        data-testid="input-tm-territories"
+                        {...field}
+                      />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      Comma-separated list of territories/regions
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="isActive"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between">
+                    <FormLabel>Active</FormLabel>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        data-testid="switch-tm-active"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
+                  data-testid="button-cancel-tm"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                  data-testid="button-submit-tm"
+                >
+                  {(createMutation.isPending || updateMutation.isPending) && (
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  {editingManager ? "Update" : "Create"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

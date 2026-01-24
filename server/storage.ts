@@ -17,10 +17,11 @@ import {
   type DataUpload, type InsertDataUpload,
   type Setting, type InsertSetting,
   type ScoringWeights, type InsertScoringWeights,
+  type TerritoryManager, type InsertTerritoryManager,
   users, accounts, products, productCategories, orders, orderItems,
   segmentProfiles, profileCategories, accountMetrics, accountCategoryGaps,
   tasks, playbooks, playbookTasks, programAccounts, programRevenueSnapshots,
-  dataUploads, settings, scoringWeights,
+  dataUploads, settings, scoringWeights, territoryManagers,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, gte, lte } from "drizzle-orm";
@@ -117,6 +118,13 @@ export interface IStorage {
   // Scoring Weights
   getScoringWeights(): Promise<ScoringWeights | undefined>;
   upsertScoringWeights(weights: InsertScoringWeights): Promise<ScoringWeights>;
+
+  // Territory Managers
+  getTerritoryManagers(): Promise<TerritoryManager[]>;
+  getTerritoryManager(id: number): Promise<TerritoryManager | undefined>;
+  createTerritoryManager(manager: InsertTerritoryManager): Promise<TerritoryManager>;
+  updateTerritoryManager(id: number, manager: Partial<InsertTerritoryManager>): Promise<TerritoryManager | undefined>;
+  deleteTerritoryManager(id: number): Promise<boolean>;
 
   // Dashboard stats
   getDashboardStats(): Promise<{
@@ -434,6 +442,31 @@ export class DatabaseStorage implements IStorage {
       updatedAt: sql`CURRENT_TIMESTAMP`,
     }).returning();
     return created;
+  }
+
+  // Territory Managers
+  async getTerritoryManagers(): Promise<TerritoryManager[]> {
+    return db.select().from(territoryManagers).orderBy(desc(territoryManagers.id));
+  }
+
+  async getTerritoryManager(id: number): Promise<TerritoryManager | undefined> {
+    const [manager] = await db.select().from(territoryManagers).where(eq(territoryManagers.id, id));
+    return manager;
+  }
+
+  async createTerritoryManager(manager: InsertTerritoryManager): Promise<TerritoryManager> {
+    const [created] = await db.insert(territoryManagers).values(manager).returning();
+    return created;
+  }
+
+  async updateTerritoryManager(id: number, manager: Partial<InsertTerritoryManager>): Promise<TerritoryManager | undefined> {
+    const [updated] = await db.update(territoryManagers).set(manager).where(eq(territoryManagers.id, id)).returning();
+    return updated;
+  }
+
+  async deleteTerritoryManager(id: number): Promise<boolean> {
+    const result = await db.delete(territoryManagers).where(eq(territoryManagers.id, id)).returning();
+    return result.length > 0;
   }
 
   // Dashboard stats
