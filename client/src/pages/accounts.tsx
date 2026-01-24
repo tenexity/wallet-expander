@@ -34,12 +34,20 @@ import {
   AlertTriangle,
   HelpCircle,
   ArrowUpDown,
+  Settings,
+  ExternalLink,
 } from "lucide-react";
+import { Link } from "wouter";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface AccountWithMetrics {
   id: number;
@@ -69,6 +77,22 @@ export default function Accounts() {
   const { data: accounts, isLoading } = useQuery<AccountWithMetrics[]>({
     queryKey: ["/api/accounts"],
   });
+
+  interface ScoringWeights {
+    gapSizeWeight: number;
+    revenuePotentialWeight: number;
+    categoryCountWeight: number;
+  }
+
+  const { data: scoringWeights } = useQuery<ScoringWeights>({
+    queryKey: ["/api/scoring-weights"],
+  });
+
+  const weights = scoringWeights || {
+    gapSizeWeight: 40,
+    revenuePotentialWeight: 30,
+    categoryCountWeight: 30,
+  };
 
   // Mock data for demonstration
   const mockAccounts: AccountWithMetrics[] = [
@@ -531,7 +555,27 @@ export default function Accounts() {
                   <Card>
                     <CardContent className="pt-4 flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-muted-foreground">Category Penetration</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-muted-foreground">Category Penetration</p>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button className="text-muted-foreground hover:text-foreground transition-colors" data-testid="tooltip-category-penetration">
+                                <HelpCircle className="h-3 w-3" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs" side="top">
+                              <p className="text-sm font-medium mb-2">How Category Penetration is Calculated</p>
+                              <div className="text-xs space-y-2">
+                                <p>Category Penetration measures how many of the ICP (Ideal Customer Profile) categories this account is actively purchasing from.</p>
+                                <div className="bg-muted/50 p-2 rounded">
+                                  <p className="font-medium">Formula:</p>
+                                  <p className="font-mono text-xs">(Categories with purchases / Total ICP categories) x 100</p>
+                                </div>
+                                <p>A higher percentage means the account is buying across more expected categories. A lower percentage indicates opportunities to expand their product mix.</p>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
                         <p className="text-2xl font-bold">
                           {selectedAccount.categoryPenetration}%
                         </p>
@@ -546,7 +590,39 @@ export default function Accounts() {
                   <Card>
                     <CardContent className="pt-4 flex items-center justify-between">
                       <div>
-                        <p className="text-sm text-muted-foreground">Opportunity Score</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-muted-foreground">Opportunity Score</p>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <button className="text-muted-foreground hover:text-foreground transition-colors" data-testid="tooltip-opportunity-score">
+                                <HelpCircle className="h-3 w-3" />
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80" side="top">
+                              <p className="text-sm font-medium mb-2">How Opportunity Score is Calculated</p>
+                              <div className="text-xs space-y-2">
+                                <p>The Opportunity Score is a weighted composite that identifies accounts with the highest potential for wallet share capture.</p>
+                                <div className="bg-muted/50 p-2 rounded space-y-1">
+                                  <p className="font-medium">Current Weighting:</p>
+                                  <div className="grid grid-cols-2 gap-1">
+                                    <span>Gap Size (% below ICP):</span>
+                                    <span className="font-semibold">{weights.gapSizeWeight}%</span>
+                                    <span>Revenue Potential:</span>
+                                    <span className="font-semibold">{weights.revenuePotentialWeight}%</span>
+                                    <span>Category Count:</span>
+                                    <span className="font-semibold">{weights.categoryCountWeight}%</span>
+                                  </div>
+                                </div>
+                                <p>Higher scores indicate greater opportunity for incremental revenue if enrolled.</p>
+                                <Link href="/scoring-settings" className="flex items-center gap-1 text-primary hover:underline mt-2" data-testid="link-scoring-settings">
+                                  <Settings className="h-3 w-3" />
+                                  Adjust weighting in Scoring Settings
+                                  <ExternalLink className="h-3 w-3" />
+                                </Link>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
                         <p className="text-2xl font-bold">
                           {selectedAccount.opportunityScore}
                         </p>

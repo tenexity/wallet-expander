@@ -348,3 +348,31 @@ export const insertSettingSchema = createInsertSchema(settings).omit({
 
 export type InsertSetting = z.infer<typeof insertSettingSchema>;
 export type Setting = typeof settings.$inferSelect;
+
+// ============ SCORING WEIGHTS ============
+export const scoringWeights = pgTable("scoring_weights", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().default("default"),
+  gapSizeWeight: numeric("gap_size_weight").notNull().default("40"),
+  revenuePotentialWeight: numeric("revenue_potential_weight").notNull().default("30"),
+  categoryCountWeight: numeric("category_count_weight").notNull().default("30"),
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`),
+  updatedBy: text("updated_by"),
+});
+
+export const insertScoringWeightsSchema = createInsertSchema(scoringWeights).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertScoringWeights = z.infer<typeof insertScoringWeightsSchema>;
+export type ScoringWeights = typeof scoringWeights.$inferSelect;
+
+// Default scoring weights configuration
+export const DEFAULT_SCORING_WEIGHTS = {
+  gapSizeWeight: 40,
+  revenuePotentialWeight: 30,
+  categoryCountWeight: 30,
+};

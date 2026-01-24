@@ -16,10 +16,11 @@ import {
   type ProgramRevenueSnapshot, type InsertProgramRevenueSnapshot,
   type DataUpload, type InsertDataUpload,
   type Setting, type InsertSetting,
+  type ScoringWeights, type InsertScoringWeights,
   users, accounts, products, productCategories, orders, orderItems,
   segmentProfiles, profileCategories, accountMetrics, accountCategoryGaps,
   tasks, playbooks, playbookTasks, programAccounts, programRevenueSnapshots,
-  dataUploads, settings,
+  dataUploads, settings, scoringWeights,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, gte, lte } from "drizzle-orm";
@@ -112,6 +113,10 @@ export interface IStorage {
   getSettings(): Promise<Setting[]>;
   getSetting(key: string): Promise<Setting | undefined>;
   upsertSetting(setting: InsertSetting): Promise<Setting>;
+
+  // Scoring Weights
+  getScoringWeights(): Promise<ScoringWeights | undefined>;
+  upsertScoringWeights(weights: InsertScoringWeights): Promise<ScoringWeights>;
 
   // Dashboard stats
   getDashboardStats(): Promise<{
@@ -409,6 +414,25 @@ export class DatabaseStorage implements IStorage {
     const [created] = await db.insert(settings).values(setting)
       .onConflictDoUpdate({ target: settings.key, set: { value: setting.value, updatedAt: sql`CURRENT_TIMESTAMP` } })
       .returning();
+    return created;
+  }
+
+  // Scoring Weights
+  async getScoringWeights(): Promise<ScoringWeights | undefined> {
+    const [weights] = await db.select().from(scoringWeights).where(eq(scoringWeights.isActive, true)).limit(1);
+    return weights;
+  }
+
+  async upsertScoringWeights(weights: InsertScoringWeights): Promise<ScoringWeights> {
+    // First deactivate any existing active weights
+    await db.update(scoringWeights).set({ isActive: false }).where(eq(scoringWeights.isActive, true));
+    
+    // Insert new weights
+    const [created] = await db.insert(scoringWeights).values({
+      ...weights,
+      isActive: true,
+      updatedAt: sql`CURRENT_TIMESTAMP`,
+    }).returning();
     return created;
   }
 

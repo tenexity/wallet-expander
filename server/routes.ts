@@ -8,6 +8,8 @@ import {
   insertPlaybookSchema,
   insertProgramAccountSchema,
   insertDataUploadSchema,
+  insertScoringWeightsSchema,
+  DEFAULT_SCORING_WEIGHTS,
 } from "@shared/schema";
 import { z } from "zod";
 import { analyzeSegment, generatePlaybookTasks } from "./ai-service";
@@ -1011,6 +1013,69 @@ export async function registerRoutes(
       res.json(products);
     } catch (error) {
       res.status(500).json({ message: "Failed to get products" });
+    }
+  });
+
+  // ============ Scoring Weights ============
+  app.get("/api/scoring-weights", async (req, res) => {
+    try {
+      const weights = await storage.getScoringWeights();
+      if (!weights) {
+        // Return default weights if none configured
+        res.json({
+          id: 0,
+          name: "default",
+          gapSizeWeight: DEFAULT_SCORING_WEIGHTS.gapSizeWeight,
+          revenuePotentialWeight: DEFAULT_SCORING_WEIGHTS.revenuePotentialWeight,
+          categoryCountWeight: DEFAULT_SCORING_WEIGHTS.categoryCountWeight,
+          description: "Default opportunity score calculation weights",
+          isActive: true,
+        });
+      } else {
+        res.json({
+          ...weights,
+          gapSizeWeight: parseFloat(weights.gapSizeWeight),
+          revenuePotentialWeight: parseFloat(weights.revenuePotentialWeight),
+          categoryCountWeight: parseFloat(weights.categoryCountWeight),
+        });
+      }
+    } catch (error) {
+      console.error("Get scoring weights error:", error);
+      res.status(500).json({ message: "Failed to get scoring weights" });
+    }
+  });
+
+  app.put("/api/scoring-weights", async (req, res) => {
+    try {
+      const { gapSizeWeight, revenuePotentialWeight, categoryCountWeight, description } = req.body;
+      
+      // Validate weights sum to 100
+      const total = gapSizeWeight + revenuePotentialWeight + categoryCountWeight;
+      if (Math.abs(total - 100) > 0.01) {
+        return res.status(400).json({ 
+          message: `Weights must sum to 100%. Current total: ${total}%` 
+        });
+      }
+
+      const weights = await storage.upsertScoringWeights({
+        name: "default",
+        gapSizeWeight: gapSizeWeight.toString(),
+        revenuePotentialWeight: revenuePotentialWeight.toString(),
+        categoryCountWeight: categoryCountWeight.toString(),
+        description,
+        isActive: true,
+        updatedBy: "admin",
+      });
+      
+      res.json({
+        ...weights,
+        gapSizeWeight: parseFloat(weights.gapSizeWeight),
+        revenuePotentialWeight: parseFloat(weights.revenuePotentialWeight),
+        categoryCountWeight: parseFloat(weights.categoryCountWeight),
+      });
+    } catch (error) {
+      console.error("Update scoring weights error:", error);
+      res.status(500).json({ message: "Failed to update scoring weights" });
     }
   });
 
