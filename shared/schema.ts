@@ -233,6 +233,9 @@ export const tasks = pgTable("tasks", {
 export const insertTaskSchema = createInsertSchema(tasks).omit({
   id: true,
   createdAt: true,
+}).extend({
+  // Accept string dates from frontend and coerce to Date
+  dueDate: z.union([z.date(), z.string().transform((s) => new Date(s))]).optional(),
 });
 
 export type InsertTask = z.infer<typeof insertTaskSchema>;
