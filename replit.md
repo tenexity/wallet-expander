@@ -141,3 +141,20 @@ A synthetic Class A customer data file is available at `public/sample-data/class
   - `segmentHealth` - Computed alignment score and gap analysis
   - `actionableInsights` - Quick wins and projections with isEstimate flag
   - `methodology` - Calculation explanations (nearICPThreshold, alignmentScoreNote, projectedLiftNote)
+
+### Scoring Settings
+- **Scoring Settings Page** (`/scoring-settings`) - Customize opportunity score weighting factors
+  - Gap Size Weight (default 40%): Impact of category gaps vs ICP targets
+  - Revenue Potential Weight (default 30%): Estimated dollar value of gap categories
+  - Category Count Weight (default 30%): Number of missing categories
+  - Weights must sum to 100% (validation on save)
+  - Reset to defaults functionality
+
+### Opportunity Score & Category Penetration Transparency
+- **Account Dialog** - Interactive help icons on metric cards:
+  - **Opportunity Score** (Popover): Shows current weighting factors with link to Scoring Settings
+  - **Category Penetration** (Tooltip): Explains formula (Categories purchased / Total ICP categories × 100)
+
+### Scoring Weights API
+- `GET /api/scoring-weights` - Returns current scoring weights (defaults if none set)
+- `PUT /api/scoring-weights` - Updates weights with validation (must sum to 100%)
