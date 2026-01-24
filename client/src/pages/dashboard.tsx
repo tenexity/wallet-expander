@@ -1,4 +1,6 @@
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { KPICard } from "@/components/kpi-card";
 import { DataTable } from "@/components/data-table";
@@ -26,6 +28,8 @@ import {
   Circle,
   Upload,
   Sparkles,
+  GripVertical,
+  RotateCcw,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
@@ -115,8 +119,36 @@ function formatCurrency(value: number): string {
   return `$${value.toFixed(0)}`;
 }
 
+const STORAGE_KEY = "dashboard_block_order";
+
+const DEFAULT_BLOCK_ORDER = [
+  "daily-focus",
+  "top-opportunities",
+  "segment-breakdown",
+  "recent-tasks",
+  "icp-profiles",
+  "revenue-chart",
+];
+
 export default function Dashboard() {
   const [, navigate] = useLocation();
+  const [blockOrder, setBlockOrder] = useState<string[]>(DEFAULT_BLOCK_ORDER);
+  
+  // Load saved order from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length === DEFAULT_BLOCK_ORDER.length) {
+          setBlockOrder(parsed);
+        }
+      } catch (e) {
+        console.error("Failed to parse saved block order");
+      }
+    }
+  }, []);
+
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats"],
   });
@@ -131,6 +163,22 @@ export default function Dashboard() {
 
   const handleTaskClick = (taskId: number) => {
     navigate(`/playbooks?task=${taskId}`);
+  };
+
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+    
+    const items = Array.from(blockOrder);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+    
+    setBlockOrder(items);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  };
+
+  const resetLayout = () => {
+    setBlockOrder(DEFAULT_BLOCK_ORDER);
+    localStorage.removeItem(STORAGE_KEY);
   };
 
   const opportunityColumns = [
@@ -353,6 +401,366 @@ export default function Dashboard() {
   const completedSteps = workflowSteps.filter(s => s.completed).length;
   const allComplete = completedSteps === workflowSteps.length;
 
+  // Block render functions
+  const renderBlock = (blockId: string) => {
+    switch (blockId) {
+      case "daily-focus":
+        return (
+          <Card className="border-primary/20 bg-primary/5" data-testid="card-daily-focus">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                  <Focus className="h-5 w-5" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Daily Focus</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Tasks requiring your attention today
+                  </p>
+                </div>
+                <InfoTooltip
+                  content="Your prioritized action list showing tasks due today and any overdue items from yesterday. Complete these first to stay on track with your sales goals."
+                  testId="tooltip-daily-focus"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                {dailyFocus && dailyFocus.overdueCount > 0 && (
+                  <Badge variant="destructive" className="gap-1" data-testid="badge-overdue-count">
+                    <AlertCircle className="h-3 w-3" />
+                    {dailyFocus.overdueCount} overdue
+                  </Badge>
+                )}
+                {dailyFocus && dailyFocus.todayCount > 0 && (
+                  <Badge variant="secondary" data-testid="badge-today-count">
+                    {dailyFocus.todayCount} due today
+                  </Badge>
+                )}
+                <Button variant="outline" size="sm" asChild data-testid="button-view-all-tasks">
+                  <Link href="/playbooks">
+                    View All Tasks
+                    <ArrowRight className="ml-1 h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isDailyFocusLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center gap-3 p-3 rounded-lg border bg-card">
+                      <Skeleton className="h-8 w-8 rounded-md" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-48" />
+                        <Skeleton className="h-3 w-32" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : dailyFocus && dailyFocus.tasks.length > 0 ? (
+                <div className="space-y-2">
+                  {dailyFocus.tasks.slice(0, 5).map((task) => {
+                    const TaskIcon = taskTypeIcons[task.taskType] || Phone;
+                    return (
+                      <div
+                        key={task.id}
+                        className="flex items-center gap-3 p-3 rounded-lg border bg-card hover-elevate cursor-pointer"
+                        onClick={() => handleTaskClick(task.id)}
+                        data-testid={`daily-focus-task-${task.id}`}
+                      >
+                        <div className={`flex h-8 w-8 items-center justify-center rounded-md ${
+                          task.isOverdue ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
+                        }`}>
+                          <TaskIcon className="h-4 w-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium truncate">{task.title}</span>
+                            {task.isOverdue && (
+                              <Badge variant="destructive" className="text-xs">Overdue</Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <span>{task.accountName}</span>
+                            <span className="text-muted-foreground/50">•</span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {new Date(task.dueDate).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    );
+                  })}
+                  {dailyFocus.tasks.length > 5 && (
+                    <Button variant="ghost" className="w-full" asChild>
+                      <Link href="/playbooks">
+                        View {dailyFocus.tasks.length - 5} more tasks
+                        <ArrowRight className="ml-1 h-4 w-4" />
+                      </Link>
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-chart-2/10 text-chart-2 mb-3">
+                    <Target className="h-6 w-6" />
+                  </div>
+                  <p className="font-medium text-chart-2">All caught up!</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    No tasks due today. Generate a playbook to create new tasks.
+                  </p>
+                  <Button variant="outline" size="sm" className="mt-3" asChild>
+                    <Link href="/playbooks">Go to Playbooks</Link>
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+
+      case "top-opportunities":
+        return (
+          <Card className="lg:col-span-2">
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <div className="flex items-start gap-2">
+                <div>
+                  <CardTitle className="text-base">Top Opportunities</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Accounts with highest wallet share leakage
+                  </p>
+                </div>
+                <InfoTooltip
+                  content="Accounts ranked by opportunity score based on their category gaps vs ICP expectations. Higher scores indicate more potential revenue to capture from wallet share leakage."
+                  testId="tooltip-top-opportunities"
+                />
+              </div>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/accounts">View All</Link>
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <DataTable
+                columns={opportunityColumns}
+                data={displayStats.topOpportunities}
+                testId="table-opportunities"
+                onRowClick={handleOpportunityClick}
+              />
+            </CardContent>
+          </Card>
+        );
+
+      case "segment-breakdown":
+        return (
+          <Card>
+            <CardHeader>
+              <div className="flex items-start gap-2">
+                <div>
+                  <CardTitle className="text-base">Segment Breakdown</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Accounts by contractor type
+                  </p>
+                </div>
+                <InfoTooltip
+                  content="Distribution of your accounts across customer segments (HVAC, Plumbing, Mechanical). Each segment has its own ICP profile defining expected category mix."
+                  testId="tooltip-segment-breakdown"
+                />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={displayStats.segmentBreakdown}
+                      dataKey="count"
+                      nameKey="segment"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={70}
+                      paddingAngle={2}
+                    >
+                      {displayStats.segmentBreakdown.map((_, index) => (
+                        <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value: number) => [value, "Accounts"]}
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--popover))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "var(--radius)",
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="space-y-2 mt-4">
+                {displayStats.segmentBreakdown.map((item, index) => (
+                  <div key={item.segment} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
+                      />
+                      <span className="text-sm">{item.segment}</span>
+                    </div>
+                    <span className="text-sm text-muted-foreground">{item.count}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        );
+
+      case "recent-tasks":
+        return (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <div className="flex items-start gap-2">
+                <div>
+                  <CardTitle className="text-base">Recent Tasks</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Upcoming TM actions
+                  </p>
+                </div>
+                <InfoTooltip
+                  content="AI-generated sales tasks for Territory Managers including calls, emails, and site visits. Each task includes personalized scripts and talking points based on account gaps."
+                  testId="tooltip-recent-tasks"
+                />
+              </div>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/playbooks">View All</Link>
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <DataTable
+                columns={taskColumns}
+                data={displayStats.recentTasks}
+                testId="table-tasks"
+              />
+            </CardContent>
+          </Card>
+        );
+
+      case "icp-profiles":
+        return (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <div className="flex items-start gap-2">
+                <div>
+                  <CardTitle className="text-base">ICP Profiles</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Segment profile status
+                  </p>
+                </div>
+                <InfoTooltip
+                  content="Ideal Customer Profiles (ICPs) define expected category mix for each segment based on Class A customer data. Use AI analysis to refine profiles and approve them for scoring."
+                  testId="tooltip-icp-profiles"
+                />
+              </div>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/icp-builder">Manage</Link>
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {displayStats.icpProfiles.map((profile) => (
+                  <div
+                    key={profile.segment}
+                    className="flex items-center justify-between p-3 rounded-md bg-muted/50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <ProgressRing
+                        value={profile.status === "approved" ? 100 : 50}
+                        size={40}
+                        strokeWidth={4}
+                      />
+                      <div>
+                        <span className="font-medium">{profile.segment}</span>
+                        <p className="text-xs text-muted-foreground">
+                          {profile.accountCount} accounts
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant={profile.status === "approved" ? "default" : "secondary"}>
+                      {profile.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        );
+
+      case "revenue-chart":
+        return (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  Revenue by Segment
+                </CardTitle>
+                <InfoTooltip
+                  content="Total revenue contribution by customer segment. Compare segment performance to identify growth opportunities and track the impact of wallet share capture efforts."
+                  testId="tooltip-revenue-by-segment"
+                />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={displayStats.segmentBreakdown}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis
+                      dataKey="segment"
+                      tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                      axisLine={{ stroke: "hsl(var(--border))" }}
+                    />
+                    <YAxis
+                      tickFormatter={(value) => formatCurrency(value)}
+                      tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                      axisLine={{ stroke: "hsl(var(--border))" }}
+                    />
+                    <Tooltip
+                      formatter={(value: number) => [formatCurrency(value), "Revenue"]}
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--popover))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "var(--radius)",
+                      }}
+                    />
+                    <Bar dataKey="revenue" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  // Get the grid layout for different block types
+  const getBlockLayout = (blockId: string, index: number) => {
+    // Blocks that span 2 columns on larger screens
+    const wideBlocks = ["top-opportunities"];
+    // Blocks that take full width
+    const fullWidthBlocks = ["daily-focus", "revenue-chart"];
+    
+    if (fullWidthBlocks.includes(blockId)) {
+      return "col-span-full";
+    }
+    if (wideBlocks.includes(blockId)) {
+      return "lg:col-span-2";
+    }
+    return "";
+  };
+
   return (
     <div className="p-6 space-y-6" data-testid="page-dashboard">
       <div className="flex items-center justify-between">
@@ -362,12 +770,18 @@ export default function Dashboard() {
             Monitor wallet share opportunities and track revenue growth
           </p>
         </div>
-        <Button asChild data-testid="button-view-opportunities">
-          <Link href="/accounts">
-            View All Opportunities
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={resetLayout} data-testid="button-reset-layout">
+            <RotateCcw className="mr-2 h-4 w-4" />
+            Reset Layout
+          </Button>
+          <Button asChild data-testid="button-view-opportunities">
+            <Link href="/accounts">
+              View All Opportunities
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {/* Workflow Progress - Getting Started Guide */}
@@ -442,6 +856,7 @@ export default function Dashboard() {
         </Card>
       )}
 
+      {/* KPI Cards - Not draggable */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
           title="Total Accounts"
@@ -479,328 +894,46 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Daily Focus Section */}
-      <Card className="border-primary/20 bg-primary/5" data-testid="card-daily-focus">
-        <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Focus className="h-5 w-5" />
-            </div>
-            <div>
-              <CardTitle className="text-lg">Daily Focus</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Tasks requiring your attention today
-              </p>
-            </div>
-            <InfoTooltip
-              content="Your prioritized action list showing tasks due today and any overdue items from yesterday. Complete these first to stay on track with your sales goals."
-              testId="tooltip-daily-focus"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            {dailyFocus && dailyFocus.overdueCount > 0 && (
-              <Badge variant="destructive" className="gap-1" data-testid="badge-overdue-count">
-                <AlertCircle className="h-3 w-3" />
-                {dailyFocus.overdueCount} overdue
-              </Badge>
-            )}
-            {dailyFocus && dailyFocus.todayCount > 0 && (
-              <Badge variant="secondary" data-testid="badge-today-count">
-                {dailyFocus.todayCount} due today
-              </Badge>
-            )}
-            <Button variant="outline" size="sm" asChild data-testid="button-view-all-tasks">
-              <Link href="/playbooks">
-                View All Tasks
-                <ArrowRight className="ml-1 h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isDailyFocusLoading ? (
-            <div className="space-y-2">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center gap-3 p-3 rounded-lg border bg-card">
-                  <Skeleton className="h-8 w-8 rounded-md" />
-                  <div className="flex-1 space-y-2">
-                    <Skeleton className="h-4 w-48" />
-                    <Skeleton className="h-3 w-32" />
-                  </div>
-                </div>
+      {/* Draggable Dashboard Blocks */}
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <Droppable droppableId="dashboard-blocks">
+          {(provided) => (
+            <div
+              {...provided.droppableProps}
+              ref={provided.innerRef}
+              className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+            >
+              {blockOrder.map((blockId, index) => (
+                <Draggable key={blockId} draggableId={blockId} index={index}>
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.draggableProps}
+                      className={`${getBlockLayout(blockId, index)} ${
+                        snapshot.isDragging ? "z-50" : ""
+                      }`}
+                    >
+                      <div className="relative group">
+                        <div
+                          {...provided.dragHandleProps}
+                          className="absolute -left-2 top-4 z-10 flex items-center justify-center h-8 w-8 rounded-md bg-background border shadow-sm opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+                          data-testid={`drag-handle-${blockId}`}
+                        >
+                          <GripVertical className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                        <div className={snapshot.isDragging ? "ring-2 ring-primary rounded-lg" : ""}>
+                          {renderBlock(blockId)}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </Draggable>
               ))}
-            </div>
-          ) : dailyFocus && dailyFocus.tasks.length > 0 ? (
-            <div className="space-y-2">
-              {dailyFocus.tasks.slice(0, 5).map((task) => {
-                const TaskIcon = taskTypeIcons[task.taskType] || Phone;
-                return (
-                  <div
-                    key={task.id}
-                    className="flex items-center gap-3 p-3 rounded-lg border bg-card hover-elevate cursor-pointer"
-                    onClick={() => handleTaskClick(task.id)}
-                    data-testid={`daily-focus-task-${task.id}`}
-                  >
-                    <div className={`flex h-8 w-8 items-center justify-center rounded-md ${
-                      task.isOverdue ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
-                    }`}>
-                      <TaskIcon className="h-4 w-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium truncate">{task.title}</span>
-                        {task.isOverdue && (
-                          <Badge variant="destructive" className="text-xs">Overdue</Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span>{task.accountName}</span>
-                        <span className="text-muted-foreground/50">•</span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {new Date(task.dueDate).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                );
-              })}
-              {dailyFocus.tasks.length > 5 && (
-                <Button variant="ghost" className="w-full" asChild>
-                  <Link href="/playbooks">
-                    View {dailyFocus.tasks.length - 5} more tasks
-                    <ArrowRight className="ml-1 h-4 w-4" />
-                  </Link>
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-chart-2/10 text-chart-2 mb-3">
-                <Target className="h-6 w-6" />
-              </div>
-              <p className="font-medium text-chart-2">All caught up!</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                No tasks due today. Generate a playbook to create new tasks.
-              </p>
-              <Button variant="outline" size="sm" className="mt-3" asChild>
-                <Link href="/playbooks">Go to Playbooks</Link>
-              </Button>
+              {provided.placeholder}
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between gap-2">
-            <div className="flex items-start gap-2">
-              <div>
-                <CardTitle className="text-base">Top Opportunities</CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Accounts with highest wallet share leakage
-                </p>
-              </div>
-              <InfoTooltip
-                content="Accounts ranked by opportunity score based on their category gaps vs ICP expectations. Higher scores indicate more potential revenue to capture from wallet share leakage."
-                testId="tooltip-top-opportunities"
-              />
-            </div>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/accounts">View All</Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <DataTable
-              columns={opportunityColumns}
-              data={displayStats.topOpportunities}
-              testId="table-opportunities"
-              onRowClick={handleOpportunityClick}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-start gap-2">
-              <div>
-                <CardTitle className="text-base">Segment Breakdown</CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Accounts by contractor type
-                </p>
-              </div>
-              <InfoTooltip
-                content="Distribution of your accounts across customer segments (HVAC, Plumbing, Mechanical). Each segment has its own ICP profile defining expected category mix."
-                testId="tooltip-segment-breakdown"
-              />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={displayStats.segmentBreakdown}
-                    dataKey="count"
-                    nameKey="segment"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={40}
-                    outerRadius={70}
-                    paddingAngle={2}
-                  >
-                    {displayStats.segmentBreakdown.map((_, index) => (
-                      <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value: number) => [value, "Accounts"]}
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--popover))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "var(--radius)",
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="space-y-2 mt-4">
-              {displayStats.segmentBreakdown.map((item, index) => (
-                <div key={item.segment} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
-                    />
-                    <span className="text-sm">{item.segment}</span>
-                  </div>
-                  <span className="text-sm text-muted-foreground">{item.count}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2">
-            <div className="flex items-start gap-2">
-              <div>
-                <CardTitle className="text-base">Recent Tasks</CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Upcoming TM actions
-                </p>
-              </div>
-              <InfoTooltip
-                content="AI-generated sales tasks for Territory Managers including calls, emails, and site visits. Each task includes personalized scripts and talking points based on account gaps."
-                testId="tooltip-recent-tasks"
-              />
-            </div>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/playbooks">View All</Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <DataTable
-              columns={taskColumns}
-              data={displayStats.recentTasks}
-              testId="table-tasks"
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2">
-            <div className="flex items-start gap-2">
-              <div>
-                <CardTitle className="text-base">ICP Profiles</CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Segment profile status
-                </p>
-              </div>
-              <InfoTooltip
-                content="Ideal Customer Profiles (ICPs) define expected category mix for each segment based on Class A customer data. Use AI analysis to refine profiles and approve them for scoring."
-                testId="tooltip-icp-profiles"
-              />
-            </div>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/icp-builder">Manage</Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {displayStats.icpProfiles.map((profile) => (
-                <div
-                  key={profile.segment}
-                  className="flex items-center justify-between p-3 rounded-md bg-muted/50"
-                >
-                  <div className="flex items-center gap-3">
-                    <ProgressRing
-                      value={profile.status === "approved" ? 100 : 50}
-                      size={40}
-                      strokeWidth={4}
-                    />
-                    <div>
-                      <span className="font-medium">{profile.segment}</span>
-                      <p className="text-xs text-muted-foreground">
-                        {profile.accountCount} accounts
-                      </p>
-                    </div>
-                  </div>
-                  <Badge variant={profile.status === "approved" ? "default" : "secondary"}>
-                    {profile.status}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Revenue by Segment
-            </CardTitle>
-            <InfoTooltip
-              content="Total revenue contribution by customer segment. Compare segment performance to identify growth opportunities and track the impact of wallet share capture efforts."
-              testId="tooltip-revenue-by-segment"
-            />
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={displayStats.segmentBreakdown}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis
-                  dataKey="segment"
-                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                  axisLine={{ stroke: "hsl(var(--border))" }}
-                />
-                <YAxis
-                  tickFormatter={(value) => formatCurrency(value)}
-                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                  axisLine={{ stroke: "hsl(var(--border))" }}
-                />
-                <Tooltip
-                  formatter={(value: number) => [formatCurrency(value), "Revenue"]}
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--popover))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "var(--radius)",
-                  }}
-                />
-                <Bar dataKey="revenue" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
+        </Droppable>
+      </DragDropContext>
     </div>
   );
 }

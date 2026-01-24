@@ -396,3 +396,36 @@ export const insertTerritoryManagerSchema = createInsertSchema(territoryManagers
 
 export type InsertTerritoryManager = z.infer<typeof insertTerritoryManagerSchema>;
 export type TerritoryManager = typeof territoryManagers.$inferSelect;
+
+// ============ CUSTOM CATEGORY CONFIG ============
+export const customCategories = pgTable("custom_categories", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  displayOrder: integer("display_order").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const insertCustomCategorySchema = createInsertSchema(customCategories).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertCustomCategory = z.infer<typeof insertCustomCategorySchema>;
+export type CustomCategory = typeof customCategories.$inferSelect;
+
+// ============ DASHBOARD LAYOUT CONFIG ============
+export const dashboardLayouts = pgTable("dashboard_layouts", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id"),
+  blockOrder: jsonb("block_order"),
+  updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const insertDashboardLayoutSchema = createInsertSchema(dashboardLayouts).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertDashboardLayout = z.infer<typeof insertDashboardLayoutSchema>;
+export type DashboardLayout = typeof dashboardLayouts.$inferSelect;

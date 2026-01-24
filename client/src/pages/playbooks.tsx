@@ -51,6 +51,8 @@ import {
   MessageSquare,
   HelpCircle,
   Target,
+  BookOpen,
+  Info,
 } from "lucide-react";
 import {
   Tooltip,
@@ -84,6 +86,13 @@ interface Playbook {
   completedCount: number;
 }
 
+interface CustomCategory {
+  id: number;
+  name: string;
+  displayOrder: number;
+  isActive: boolean;
+}
+
 const taskTypeIcons = {
   call: Phone,
   email: Mail,
@@ -105,10 +114,16 @@ export default function Playbooks() {
   const [selectedPlaybookId, setSelectedPlaybookId] = useState<number | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
-  const [showHowToUse, setShowHowToUse] = useState(false);
+  const [showHelpDialog, setShowHelpDialog] = useState(false);
   const [expandedTasks, setExpandedTasks] = useState<Set<number>>(new Set());
   const { toast } = useToast();
   const search = useSearch();
+  
+  // Generate dialog form state
+  const [playbookName, setPlaybookName] = useState("");
+  const [generateSegment, setGenerateSegment] = useState<string>("all");
+  const [topN, setTopN] = useState<number>(5);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   
   // Parse URL parameters for task auto-selection
   const params = new URLSearchParams(search);
@@ -127,16 +142,42 @@ export default function Playbooks() {
     queryKey: [tasksQueryKey],
   });
 
-  // Generate dialog segment state - can be pre-filled from URL
-  const [generateSegment, setGenerateSegment] = useState<string>("");
-  
-  // Handle URL parameters for task auto-selection and segment pre-fill
+  // Fetch custom categories for the dialog
+  const { data: customCategories } = useQuery<CustomCategory[]>({
+    queryKey: ["/api/custom-categories"],
+  });
+
+  // Seed default categories if none exist
+  useEffect(() => {
+    if (customCategories && customCategories.length === 0) {
+      apiRequest("POST", "/api/custom-categories/seed-defaults").catch(console.error);
+    }
+  }, [customCategories]);
+
+  // Handle URL parameters for segment pre-fill
   useEffect(() => {
     if (segmentFromUrl) {
       setGenerateSegment(segmentFromUrl);
       setShowGenerateDialog(true);
     }
   }, [segmentFromUrl]);
+
+  // Use a guard to prevent repeated auto-selection
+  const [hasAutoSelected, setHasAutoSelected] = useState(false);
+
+  // Handle URL task auto-selection with memoized task
+  const taskToAutoSelect = useMemo(() => {
+    if (!taskIdFromUrl || !tasks || hasAutoSelected) return null;
+    const taskId = parseInt(taskIdFromUrl);
+    return tasks.find(t => t.id === taskId);
+  }, [taskIdFromUrl, tasks, hasAutoSelected]);
+
+  useEffect(() => {
+    if (taskToAutoSelect && !hasAutoSelected) {
+      setExpandedTasks(new Set([taskToAutoSelect.id]));
+      setHasAutoSelected(true);
+    }
+  }, [taskToAutoSelect, hasAutoSelected]);
 
   // Mock data for demonstration
   const mockTasks: Task[] = [
@@ -148,15 +189,10 @@ export default function Playbooks() {
       taskType: "call",
       title: "Introduce Water Heater Line",
       description: "High-opportunity account missing water heater category",
-      script: `Hi [Contact], this is [Your Name] from Mark Supply. I noticed you've been a great customer for pipe and fittings, and I wanted to reach out about our water heater line.
-
-We've recently expanded our Bradford White and Rheem inventory, and I think there's a great opportunity for you to consolidate your purchases with us.
-
-Would you have 15 minutes this week to discuss how we can support your water heater needs?`,
-      gapCategories: ["Water Heaters", "Tools & Safety"],
+      script: "Hi [Contact Name], this is [Your Name] from Mark Supply...",
+      gapCategories: ["Water Heaters"],
       status: "pending",
-      dueDate: "2024-01-25",
-      playbookId: 1,
+      dueDate: "2026-01-25",
     },
     {
       id: 2,
@@ -164,126 +200,47 @@ Would you have 15 minutes this week to discuss how we can support your water hea
       accountName: "Elite HVAC Services",
       assignedTm: "Sarah Johnson",
       taskType: "email",
-      title: "Controls & Thermostats Promotion",
-      description: "Send information about Q1 controls promotion",
-      script: `Subject: Exclusive Q1 Thermostat Promotion for Elite HVAC
-
-Hi [Contact],
-
-I hope the new year is treating you well! I wanted to reach out about an exclusive promotion we're running on Honeywell and Ecobee smart thermostats.
-
-Given your HVAC installation volume, I think you could save significantly by consolidating your thermostat purchases with us.
-
-Key benefits:
-- 15% off all smart thermostats through March
-- Same-day availability on most models
-- Free technical support
-
-Would you like me to send over a quote for your typical monthly volume?
-
-Best,
-[Your Name]`,
+      title: "Cross-sell Controls & Thermostats",
+      description: "HVAC contractor with gap in controls category",
+      script: "Subject: Boost Your Efficiency with Smart Controls...",
       gapCategories: ["Controls & Thermostats"],
       status: "in_progress",
-      dueDate: "2024-01-26",
-      playbookId: 2,
-    },
-    {
-      id: 3,
-      accountId: 3,
-      accountName: "Metro Mechanical",
-      assignedTm: "Mike Wilson",
-      taskType: "visit",
-      title: "Site Visit - Water Heater Opportunity",
-      description: "Schedule jobsite visit to assess water heater needs",
-      script: `Visit Objectives:
-1. Tour current jobsite to understand project scope
-2. Review their current water heater supplier and any pain points
-3. Present our commercial water heater options
-4. Discuss potential for bulk ordering and delivery scheduling
-
-Key talking points:
-- Our delivery flexibility
-- Technical support and warranty handling
-- Volume discount opportunities`,
-      gapCategories: ["Water Heaters", "Ductwork"],
-      status: "pending",
-      dueDate: "2024-01-28",
-      playbookId: 1,
-    },
-    {
-      id: 4,
-      accountId: 4,
-      accountName: "Premier Plumbing",
-      assignedTm: "John Smith",
-      taskType: "call",
-      title: "PVF Category Introduction",
-      description: "Discuss PVF product availability",
-      script: `Hi [Contact], this is [Your Name] from Mark Supply.
-
-I wanted to follow up on our recent orders and check in on how everything's going. While I have you, I also wanted to mention that we've significantly expanded our PVF inventory.
-
-I know you're currently sourcing these elsewhere, but we can now offer competitive pricing with the convenience of single-source ordering.
-
-Can I send you our updated PVF catalog?`,
-      gapCategories: ["PVF", "Tools"],
-      status: "completed",
-      dueDate: "2024-01-20",
-      completedAt: "2024-01-20",
-      outcome: "Interested in quote for PVF, scheduled follow-up call",
-      playbookId: 2,
+      dueDate: "2026-01-26",
     },
   ];
 
   const mockPlaybooks: Playbook[] = [
     {
       id: 1,
-      name: "Q1 2024 - Water Heater Push",
-      generatedBy: "Graham",
-      generatedAt: "2024-01-15",
+      name: "Q1 Water Heater Campaign",
+      generatedBy: "AI",
+      generatedAt: "2026-01-15",
       taskCount: 25,
       completedCount: 8,
     },
-    {
-      id: 2,
-      name: "January Week 3 Tasks",
-      generatedBy: "Graham",
-      generatedAt: "2024-01-14",
-      taskCount: 15,
-      completedCount: 12,
-    },
   ];
 
-  const displayTasks = useMemo(() => tasks || mockTasks, [tasks]);
-  const displayPlaybooks = useMemo(() => playbooks || mockPlaybooks, [playbooks]);
-
-  // Handle task auto-selection from URL parameter (run once when taskId and tasks are ready)
-  const [taskAutoSelected, setTaskAutoSelected] = useState(false);
-  useEffect(() => {
-    if (taskIdFromUrl && !taskAutoSelected && displayTasks.length > 0) {
-      const taskId = parseInt(taskIdFromUrl, 10);
-      const task = displayTasks.find(t => t.id === taskId);
-      if (task) {
-        setSelectedTask(task);
-        setExpandedTasks(new Set([taskId]));
-        setTaskAutoSelected(true);
-      }
-    }
-  }, [taskIdFromUrl, displayTasks, taskAutoSelected]);
+  const displayTasks = tasks || mockTasks;
+  const displayPlaybooks = playbooks || mockPlaybooks;
+  
+  // Get active categories for the dialog
+  const activeCategories = customCategories?.filter(c => c.isActive) || [];
+  
+  // Default categories if none loaded
+  const defaultCategories = ["Water Heaters", "Controls", "PVF", "Tools", "Chinaware", "Brass and Fittings"];
+  const categoryOptions = activeCategories.length > 0 
+    ? activeCategories.map(c => c.name) 
+    : defaultCategories;
 
   const filteredTasks = displayTasks.filter((task) => {
     const matchesSearch =
-      task.accountName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      searchQuery === "" ||
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      task.assignedTm.toLowerCase().includes(searchQuery.toLowerCase());
+      task.accountName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || task.status === statusFilter;
     const matchesType = typeFilter === "all" || task.taskType === typeFilter;
     return matchesSearch && matchesStatus && matchesType;
   });
-
-  const selectedPlaybook = selectedPlaybookId 
-    ? displayPlaybooks.find(p => p.id === selectedPlaybookId)
-    : null;
 
   const toggleTaskExpanded = (taskId: number) => {
     const newExpanded = new Set(expandedTasks);
@@ -295,15 +252,66 @@ Can I send you our updated PVF catalog?`,
     setExpandedTasks(newExpanded);
   };
 
-  const handleGeneratePlaybook = async () => {
-    setIsGenerating(true);
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-    setIsGenerating(false);
-    setShowGenerateDialog(false);
-    toast({
-      title: "Playbook generated",
-      description: "AI has created 15 new tasks based on your criteria",
+  const toggleCategory = (category: string) => {
+    setSelectedCategories(prev => {
+      if (prev.includes(category)) {
+        return prev.filter(c => c !== category);
+      } else {
+        return [...prev, category];
+      }
     });
+  };
+
+  const handleGeneratePlaybook = async () => {
+    if (!playbookName.trim()) {
+      toast({
+        title: "Name required",
+        description: "Please enter a playbook name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const response = await apiRequest("POST", "/api/playbooks/generate", {
+        name: playbookName,
+        segment: generateSegment === "all" ? undefined : generateSegment,
+        topN: topN,
+        priorityCategories: selectedCategories.length > 0 ? selectedCategories : undefined,
+      });
+
+      const data = await response.json();
+      
+      // Invalidate queries to refresh the data
+      queryClient.invalidateQueries({ queryKey: ["/api/playbooks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      
+      setShowGenerateDialog(false);
+      setPlaybookName("");
+      setSelectedCategories([]);
+      setGenerateSegment("all");
+      setTopN(5);
+      
+      toast({
+        title: "Playbook generated",
+        description: `AI created ${data.tasksGenerated || 0} new tasks for "${data.playbook?.name || playbookName}"`,
+      });
+
+      // Auto-select the newly created playbook
+      if (data.playbook?.id) {
+        setSelectedPlaybookId(data.playbook.id);
+      }
+    } catch (error) {
+      console.error("Generate playbook error:", error);
+      toast({
+        title: "Generation failed",
+        description: "Failed to generate playbook. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleCompleteTask = (task: Task) => {
@@ -330,7 +338,7 @@ Can I send you our updated PVF catalog?`,
             Export
           </Button>
           <Button onClick={() => setShowGenerateDialog(true)} data-testid="button-generate-playbook">
-            <Sparkles className="mr-2 h-4 w-4" />
+            <Plus className="mr-2 h-4 w-4" />
             Generate Playbook
           </Button>
         </div>
@@ -356,7 +364,7 @@ Can I send you our updated PVF catalog?`,
                   </button>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
-                  <p className="text-sm">Total number of AI-generated sales tasks including calls, emails, and site visits. Each task includes a customized script or template.</p>
+                  <p className="text-sm">Total number of AI-generated sales tasks including calls, emails, and site visits.</p>
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -383,7 +391,7 @@ Can I send you our updated PVF catalog?`,
                   </button>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
-                  <p className="text-sm">Tasks waiting to be started by Territory Managers. These are ready for action with AI-generated scripts and talking points.</p>
+                  <p className="text-sm">Tasks waiting to be started by Territory Managers.</p>
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -410,7 +418,7 @@ Can I send you our updated PVF catalog?`,
                   </button>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
-                  <p className="text-sm">Tasks currently being worked on by Territory Managers. These represent active outreach efforts to capture wallet share.</p>
+                  <p className="text-sm">Tasks currently being worked on by Territory Managers.</p>
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -437,7 +445,7 @@ Can I send you our updated PVF catalog?`,
                   </button>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
-                  <p className="text-sm">Successfully completed tasks with recorded outcomes. Review these to track conversion rates and refine your outreach strategy.</p>
+                  <p className="text-sm">Successfully completed tasks with recorded outcomes.</p>
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -446,10 +454,21 @@ Can I send you our updated PVF catalog?`,
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Left column - Playbooks list */}
         <div className="lg:col-span-1 space-y-4">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Playbooks</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Playbooks</CardTitle>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowHelpDialog(true)}
+                  data-testid="button-help"
+                >
+                  <HelpCircle className="h-4 w-4" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-2">
               <div
@@ -468,124 +487,79 @@ Can I send you our updated PVF catalog?`,
                   </Badge>
                 </div>
               </div>
-              {displayPlaybooks.map((playbook) => (
-                <div
-                  key={playbook.id}
-                  onClick={() => setSelectedPlaybookId(playbook.id)}
-                  className={`p-3 rounded-md border cursor-pointer transition-colors ${
-                    selectedPlaybookId === playbook.id
-                      ? "bg-primary/10 border-primary"
-                      : "hover:bg-muted/50"
-                  }`}
-                  data-testid={`playbook-item-${playbook.id}`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium text-sm">{playbook.name}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Calendar className="h-3 w-3" />
-                    {playbook.generatedAt}
-                  </div>
-                  <div className="mt-2 flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-chart-2 rounded-full"
-                        style={{
-                          width: `${(playbook.completedCount / playbook.taskCount) * 100}%`,
-                        }}
-                      />
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                      {playbook.completedCount}/{playbook.taskCount}
-                    </span>
-                  </div>
+              
+              {displayPlaybooks.length === 0 ? (
+                <div className="py-4 text-center text-sm text-muted-foreground">
+                  <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No playbooks yet</p>
+                  <p className="text-xs mt-1">Click "Generate Playbook" to create one</p>
                 </div>
-              ))}
+              ) : (
+                displayPlaybooks.map((playbook) => (
+                  <div
+                    key={playbook.id}
+                    onClick={() => setSelectedPlaybookId(playbook.id)}
+                    className={`p-3 rounded-md border cursor-pointer transition-colors ${
+                      selectedPlaybookId === playbook.id
+                        ? "bg-primary/10 border-primary"
+                        : "hover:bg-muted/50"
+                    }`}
+                    data-testid={`playbook-item-${playbook.id}`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-medium text-sm truncate">{playbook.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Calendar className="h-3 w-3" />
+                      {playbook.generatedAt}
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <Badge variant="secondary" className="text-xs">
+                        {playbook.taskCount} tasks
+                      </Badge>
+                      {playbook.completedCount > 0 && (
+                        <Badge variant="outline" className="text-xs bg-chart-2/10 text-chart-2 border-chart-2/20">
+                          {playbook.completedCount} done
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
-
-          <Collapsible open={showHowToUse} onOpenChange={setShowHowToUse}>
-            <Card>
-              <CollapsibleTrigger asChild>
-                <CardHeader className="pb-3 cursor-pointer hover:bg-muted/30 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <HelpCircle className="h-4 w-4 text-primary" />
-                      How to Generate Playbooks
-                    </CardTitle>
-                    {showHowToUse ? (
-                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </div>
-                </CardHeader>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <CardContent className="pt-0 space-y-3 text-sm">
-                  <p className="text-muted-foreground">
-                    Generate AI-powered playbooks that leverage your data analysis:
-                  </p>
-                  <ul className="space-y-2 text-muted-foreground">
-                    <li className="flex items-start gap-2">
-                      <Target className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                      <span><strong>Uses ICP Analysis:</strong> Tasks target accounts with the highest opportunity scores based on category gaps</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <User className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                      <span><strong>Personalized Scripts:</strong> AI generates call scripts and email templates tailored to each account's specific gaps</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <MessageSquare className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                      <span><strong>Focus by Segment:</strong> Filter by segment to create targeted campaigns for HVAC, Plumbing, or Mechanical accounts</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <ClipboardList className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                      <span><strong>Priority Categories:</strong> Choose which gap categories to focus on (Water Heaters, Controls, etc.)</span>
-                    </li>
-                  </ul>
-                  <Button 
-                    size="sm" 
-                    className="w-full mt-2" 
-                    onClick={() => setShowGenerateDialog(true)}
-                    data-testid="button-generate-from-help"
-                  >
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Generate Playbook
-                  </Button>
-                </CardContent>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
         </div>
 
+        {/* Right column - Tasks */}
         <div className="lg:col-span-3">
           <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between mb-2">
-                <CardTitle className="text-base">
-                  {selectedPlaybook ? selectedPlaybook.name : "All Tasks"}
-                </CardTitle>
-                {selectedPlaybook && (
-                  <Badge variant="secondary">
-                    {filteredTasks.length} tasks
-                  </Badge>
-                )}
-              </div>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search tasks..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                    data-testid="input-search-tasks"
-                  />
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>
+                    {selectedPlaybookId 
+                      ? displayPlaybooks.find(p => p.id === selectedPlaybookId)?.name || "Tasks"
+                      : "All Tasks"
+                    }
+                  </CardTitle>
+                  <CardDescription>
+                    {filteredTasks.length} task{filteredTasks.length !== 1 ? "s" : ""}
+                    {selectedPlaybookId && " in this playbook"}
+                  </CardDescription>
                 </div>
                 <div className="flex gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search tasks..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 w-48"
+                      data-testid="input-search-tasks"
+                    />
+                  </div>
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-32" data-testid="select-status">
+                    <SelectTrigger className="w-32" data-testid="select-status-filter">
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -593,11 +567,10 @@ Can I send you our updated PVF catalog?`,
                       <SelectItem value="pending">Pending</SelectItem>
                       <SelectItem value="in_progress">In Progress</SelectItem>
                       <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="skipped">Skipped</SelectItem>
                     </SelectContent>
                   </Select>
                   <Select value={typeFilter} onValueChange={setTypeFilter}>
-                    <SelectTrigger className="w-32" data-testid="select-type">
+                    <SelectTrigger className="w-32" data-testid="select-type-filter">
                       <SelectValue placeholder="Type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -611,16 +584,24 @@ Can I send you our updated PVF catalog?`,
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              {filteredTasks.length === 0 ? (
+              {isLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-20 bg-muted/50 rounded-lg animate-pulse" />
+                  ))}
+                </div>
+              ) : filteredTasks.length === 0 ? (
                 <EmptyState
                   icon={ClipboardList}
                   title="No tasks found"
-                  description="Generate a playbook to create AI-powered tasks"
+                  description={selectedPlaybookId 
+                    ? "This playbook has no tasks yet"
+                    : "Generate a playbook to create AI-powered sales tasks"
+                  }
                   action={{
                     label: "Generate Playbook",
                     onClick: () => setShowGenerateDialog(true),
                   }}
-                  testId="empty-tasks"
                 />
               ) : (
                 filteredTasks.map((task) => (
@@ -629,74 +610,84 @@ Can I send you our updated PVF catalog?`,
                     open={expandedTasks.has(task.id)}
                     onOpenChange={() => toggleTaskExpanded(task.id)}
                   >
-                    <div className="border rounded-md">
-                      <CollapsibleTrigger asChild>
-                        <div className="p-4 cursor-pointer hover:bg-muted/50 transition-colors">
-                          <div className="flex items-center gap-4">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-muted">
-                              <TaskIcon type={task.taskType} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="font-medium">{task.title}</span>
-                                <Badge variant="outline" className="capitalize">
-                                  {task.taskType}
-                                </Badge>
-                              </div>
-                              <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                                <span>{task.accountName}</span>
-                                <span>•</span>
-                                <span>{task.assignedTm}</span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3">
+                    <div
+                      className={`border rounded-lg transition-colors ${
+                        expandedTasks.has(task.id) ? "border-primary/50" : ""
+                      }`}
+                      data-testid={`task-item-${task.id}`}
+                    >
+                      <CollapsibleTrigger className="w-full">
+                        <div className="flex items-center gap-4 p-4 hover:bg-muted/50 transition-colors cursor-pointer">
+                          <div
+                            className={`flex h-10 w-10 items-center justify-center rounded-md ${
+                              task.taskType === "call"
+                                ? "bg-chart-1/10 text-chart-1"
+                                : task.taskType === "email"
+                                ? "bg-chart-4/10 text-chart-4"
+                                : "bg-chart-5/10 text-chart-5"
+                            }`}
+                          >
+                            <TaskIcon type={task.taskType} />
+                          </div>
+                          <div className="flex-1 text-left">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{task.title}</span>
                               <Badge variant="outline" className={statusColors[task.status]}>
                                 {task.status.replace("_", " ")}
                               </Badge>
-                              <span className="text-sm text-muted-foreground">
-                                {task.dueDate}
+                            </div>
+                            <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
+                              <span>{task.accountName}</span>
+                              <span className="text-muted-foreground/50">•</span>
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                {new Date(task.dueDate).toLocaleDateString()}
                               </span>
-                              {expandedTasks.has(task.id) ? (
-                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              {task.assignedTm && (
+                                <>
+                                  <span className="text-muted-foreground/50">•</span>
+                                  <span className="flex items-center gap-1">
+                                    <User className="h-3 w-3" />
+                                    {task.assignedTm}
+                                  </span>
+                                </>
                               )}
                             </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {task.gapCategories?.slice(0, 2).map((cat) => (
+                              <Badge key={cat} variant="secondary" className="text-xs">
+                                {cat}
+                              </Badge>
+                            ))}
+                            {expandedTasks.has(task.id) ? (
+                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            )}
                           </div>
                         </div>
                       </CollapsibleTrigger>
                       <CollapsibleContent>
-                        <div className="px-4 pb-4 pt-0 border-t">
-                          <div className="pt-4 space-y-4">
+                        <div className="px-4 pb-4 pt-2 border-t bg-muted/30">
+                          <div className="space-y-4">
                             <div>
-                              <Label className="text-sm text-muted-foreground">Gap Categories</Label>
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {task.gapCategories.map((cat) => (
-                                  <Badge key={cat} variant="secondary" className="text-xs">
-                                    {cat}
-                                  </Badge>
-                                ))}
+                              <h4 className="font-medium text-sm mb-2 flex items-center gap-2">
+                                <MessageSquare className="h-4 w-4" />
+                                {task.taskType === "email" ? "Email Template" : "Call Script"}
+                              </h4>
+                              <div className="bg-background rounded-md p-3 text-sm whitespace-pre-wrap border">
+                                {task.script || task.description}
                               </div>
                             </div>
-                            <div>
-                              <Label className="text-sm text-muted-foreground">
-                                {task.taskType === "email" ? "Email Template" : "Script"}
-                              </Label>
-                              <pre className="mt-1 p-3 rounded-md bg-muted text-sm whitespace-pre-wrap font-mono">
-                                {task.script}
-                              </pre>
-                            </div>
-                            {task.outcome && (
-                              <div>
-                                <Label className="text-sm text-muted-foreground">Outcome</Label>
-                                <p className="mt-1 text-sm">{task.outcome}</p>
-                              </div>
-                            )}
-                            {task.status !== "completed" && task.status !== "skipped" && (
+                            {task.status !== "completed" && (
                               <div className="flex gap-2">
                                 <Button
                                   size="sm"
-                                  onClick={() => handleCompleteTask(task)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCompleteTask(task);
+                                  }}
                                   data-testid={`button-complete-${task.id}`}
                                 >
                                   <CheckCircle className="mr-2 h-4 w-4" />
@@ -719,6 +710,7 @@ Can I send you our updated PVF catalog?`,
         </div>
       </div>
 
+      {/* Generate Playbook Dialog */}
       <Dialog open={showGenerateDialog} onOpenChange={setShowGenerateDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -730,12 +722,17 @@ Can I send you our updated PVF catalog?`,
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Playbook Name</Label>
-              <Input placeholder="e.g., Q1 Water Heater Campaign" />
+              <Input 
+                placeholder="e.g., Q1 Water Heater Campaign" 
+                value={playbookName}
+                onChange={(e) => setPlaybookName(e.target.value)}
+                data-testid="input-playbook-name"
+              />
             </div>
             <div className="space-y-2">
               <Label>Target Segment</Label>
-              <Select value={generateSegment || "all"} onValueChange={setGenerateSegment}>
-                <SelectTrigger>
+              <Select value={generateSegment} onValueChange={setGenerateSegment}>
+                <SelectTrigger data-testid="select-segment">
                   <SelectValue placeholder="Select segment" />
                 </SelectTrigger>
                 <SelectContent>
@@ -748,18 +745,34 @@ Can I send you our updated PVF catalog?`,
             </div>
             <div className="space-y-2">
               <Label>Top N Accounts</Label>
-              <Input type="number" placeholder="25" defaultValue="25" />
+              <Input 
+                type="number" 
+                placeholder="5" 
+                value={topN}
+                onChange={(e) => setTopN(parseInt(e.target.value) || 5)}
+                min={1}
+                max={100}
+                data-testid="input-top-n"
+              />
             </div>
             <div className="space-y-2">
               <Label>Priority Categories</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Click to select categories to focus on (optional)
+              </p>
               <div className="flex flex-wrap gap-2">
-                {["Water Heaters", "Controls", "PVF", "Tools"].map((cat) => (
+                {categoryOptions.map((cat) => (
                   <Badge
                     key={cat}
-                    variant="outline"
-                    className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
+                    variant={selectedCategories.includes(cat) ? "default" : "outline"}
+                    className="cursor-pointer transition-colors"
+                    onClick={() => toggleCategory(cat)}
+                    data-testid={`category-${cat.replace(/\s+/g, '-').toLowerCase()}`}
                   >
                     {cat}
+                    {selectedCategories.includes(cat) && (
+                      <CheckCircle className="ml-1 h-3 w-3" />
+                    )}
                   </Badge>
                 ))}
               </div>
@@ -786,6 +799,67 @@ Can I send you our updated PVF catalog?`,
         </DialogContent>
       </Dialog>
 
+      {/* Help Dialog */}
+      <Dialog open={showHelpDialog} onOpenChange={setShowHelpDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5" />
+              How to Generate Playbooks
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-3">
+              <div className="flex gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-medium">
+                  1
+                </div>
+                <div>
+                  <p className="font-medium">Approve an ICP Profile</p>
+                  <p className="text-sm text-muted-foreground">
+                    Navigate to ICP Builder and approve at least one segment profile. This defines the ideal category mix for each customer type.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-medium">
+                  2
+                </div>
+                <div>
+                  <p className="font-medium">Click "Generate Playbook"</p>
+                  <p className="text-sm text-muted-foreground">
+                    Choose a target segment, select priority categories to focus on, and specify how many top accounts to include.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-medium">
+                  3
+                </div>
+                <div>
+                  <p className="font-medium">AI Generates Tasks</p>
+                  <p className="text-sm text-muted-foreground">
+                    The AI analyzes account gaps against ICP targets and creates personalized call scripts, email templates, and visit plans for each opportunity.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-lg bg-muted/50 p-4">
+              <div className="flex items-start gap-2">
+                <Info className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Playbooks are organized collections of tasks. Each playbook targets specific segments and categories, making it easy to track campaign progress and measure results.
+                </p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowHelpDialog(false)}>Got it</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Complete Task Dialog */}
       <Dialog open={!!selectedTask} onOpenChange={() => setSelectedTask(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

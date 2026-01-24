@@ -78,6 +78,278 @@ const territoryManagerFormSchema = z.object({
 
 type TerritoryManagerFormValues = z.infer<typeof territoryManagerFormSchema>;
 
+interface CustomCategory {
+  id: number;
+  name: string;
+  displayOrder: number;
+  isActive: boolean;
+}
+
+function CategoriesManager() {
+  const { toast } = useToast();
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [editingCategory, setEditingCategory] = useState<CustomCategory | null>(null);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+
+  const { data: categories = [], isLoading } = useQuery<CustomCategory[]>({
+    queryKey: ["/api/custom-categories"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const response = await apiRequest("POST", "/api/custom-categories", {
+        name,
+        displayOrder: categories.length + 1,
+        isActive: true,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/custom-categories"] });
+      setNewCategoryName("");
+      setIsAddDialogOpen(false);
+      toast({ title: "Category added", description: "New product category has been created." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create category", variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, ...data }: { id: number; name?: string; isActive?: boolean }) => {
+      const response = await apiRequest("PUT", `/api/custom-categories/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/custom-categories"] });
+      setEditingCategory(null);
+      toast({ title: "Category updated", description: "Product category has been updated." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update category", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/custom-categories/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/custom-categories"] });
+      toast({ title: "Category deleted", description: "Product category has been removed." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete category", variant: "destructive" });
+    },
+  });
+
+  const seedDefaultsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/custom-categories/seed-defaults");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/custom-categories"] });
+      toast({ title: "Categories seeded", description: "Default product categories have been added." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to seed default categories", variant: "destructive" });
+    },
+  });
+
+  const handleAddCategory = () => {
+    if (!newCategoryName.trim()) return;
+    createMutation.mutate(newCategoryName.trim());
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-base">Product Categories</CardTitle>
+            <CardDescription>
+              Define the product categories used for ICP analysis and playbook generation.
+              These categories are specific to your company's product catalog.
+            </CardDescription>
+          </div>
+          <div className="flex gap-2">
+            {categories.length === 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => seedDefaultsMutation.mutate()}
+                disabled={seedDefaultsMutation.isPending}
+                data-testid="button-seed-categories"
+              >
+                <RefreshCw className={`mr-2 h-4 w-4 ${seedDefaultsMutation.isPending ? "animate-spin" : ""}`} />
+                Load Defaults
+              </Button>
+            )}
+            <Button
+              size="sm"
+              onClick={() => setIsAddDialogOpen(true)}
+              data-testid="button-add-category"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Category
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-12 bg-muted/50 rounded animate-pulse" />
+            ))}
+          </div>
+        ) : categories.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p className="font-medium">No categories configured</p>
+            <p className="text-sm mt-1">Click "Load Defaults" to add standard categories or create your own.</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Category Name</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {categories.map((category) => (
+                <TableRow key={category.id} data-testid={`category-row-${category.id}`}>
+                  <TableCell>
+                    {editingCategory?.id === category.id ? (
+                      <Input
+                        value={editingCategory.name}
+                        onChange={(e) =>
+                          setEditingCategory({ ...editingCategory, name: e.target.value })
+                        }
+                        className="max-w-xs"
+                        data-testid={`input-edit-category-${category.id}`}
+                      />
+                    ) : (
+                      <span className="font-medium">{category.name}</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={category.isActive ? "default" : "secondary"}>
+                      {category.isActive ? "Active" : "Inactive"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      {editingCategory?.id === category.id ? (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEditingCategory(null)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() =>
+                              updateMutation.mutate({
+                                id: category.id,
+                                name: editingCategory.name,
+                              })
+                            }
+                            disabled={updateMutation.isPending}
+                          >
+                            Save
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setEditingCategory(category)}
+                            data-testid={`button-edit-category-${category.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() =>
+                              updateMutation.mutate({
+                                id: category.id,
+                                isActive: !category.isActive,
+                              })
+                            }
+                            data-testid={`button-toggle-category-${category.id}`}
+                          >
+                            {category.isActive ? (
+                              <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <CheckCircle className="h-4 w-4 text-chart-2" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => deleteMutation.mutate(category.id)}
+                            disabled={deleteMutation.isPending}
+                            data-testid={`button-delete-category-${category.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Product Category</DialogTitle>
+            <DialogDescription>
+              Create a new product category for ICP analysis and playbook generation.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Category Name</Label>
+              <Input
+                placeholder="e.g., Water Heaters, PVF, Controls"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                data-testid="input-new-category-name"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddCategory}
+              disabled={createMutation.isPending || !newCategoryName.trim()}
+              data-testid="button-create-category"
+            >
+              {createMutation.isPending && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
+              Create Category
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
@@ -234,6 +506,10 @@ export default function SettingsPage() {
           <TabsTrigger value="integrations" data-testid="tab-integrations">
             <Database className="mr-2 h-4 w-4" />
             Integrations
+          </TabsTrigger>
+          <TabsTrigger value="categories" data-testid="tab-categories">
+            <FileText className="mr-2 h-4 w-4" />
+            Categories
           </TabsTrigger>
         </TabsList>
 
@@ -687,6 +963,10 @@ Output a structured profile with category expectations.`}
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="categories" className="space-y-6">
+          <CategoriesManager />
         </TabsContent>
       </Tabs>
 

@@ -10,6 +10,7 @@ import {
   insertDataUploadSchema,
   insertScoringWeightsSchema,
   insertTerritoryManagerSchema,
+  insertCustomCategorySchema,
   DEFAULT_SCORING_WEIGHTS,
 } from "@shared/schema";
 import { z } from "zod";
@@ -1208,6 +1209,93 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Delete territory manager error:", error);
       res.status(500).json({ message: "Failed to delete territory manager" });
+    }
+  });
+
+  // ============ Custom Categories ============
+  app.get("/api/custom-categories", async (req, res) => {
+    try {
+      const categories = await storage.getCustomCategories();
+      res.json(categories);
+    } catch (error) {
+      console.error("Get custom categories error:", error);
+      res.status(500).json({ message: "Failed to get custom categories" });
+    }
+  });
+
+  app.post("/api/custom-categories", async (req, res) => {
+    try {
+      const parsed = insertCustomCategorySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid category data", errors: parsed.error.errors });
+      }
+      const category = await storage.createCustomCategory(parsed.data);
+      res.status(201).json(category);
+    } catch (error) {
+      console.error("Create custom category error:", error);
+      res.status(500).json({ message: "Failed to create custom category" });
+    }
+  });
+
+  app.put("/api/custom-categories/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const category = await storage.updateCustomCategory(id, req.body);
+      if (!category) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+      res.json(category);
+    } catch (error) {
+      console.error("Update custom category error:", error);
+      res.status(500).json({ message: "Failed to update custom category" });
+    }
+  });
+
+  app.delete("/api/custom-categories/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteCustomCategory(id);
+      if (!success) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+      res.json({ message: "Category deleted successfully" });
+    } catch (error) {
+      console.error("Delete custom category error:", error);
+      res.status(500).json({ message: "Failed to delete custom category" });
+    }
+  });
+
+  // Seed default categories if none exist
+  app.post("/api/custom-categories/seed-defaults", async (req, res) => {
+    try {
+      const existing = await storage.getCustomCategories();
+      if (existing.length > 0) {
+        return res.json({ message: "Categories already exist", categories: existing });
+      }
+
+      const defaults = [
+        { name: "Water Heaters", displayOrder: 1, isActive: true },
+        { name: "Controls & Thermostats", displayOrder: 2, isActive: true },
+        { name: "PVF", displayOrder: 3, isActive: true },
+        { name: "Tools", displayOrder: 4, isActive: true },
+        { name: "Chinaware", displayOrder: 5, isActive: true },
+        { name: "Brass and Fittings", displayOrder: 6, isActive: true },
+        { name: "HVAC Equipment", displayOrder: 7, isActive: true },
+        { name: "Refrigerant & Supplies", displayOrder: 8, isActive: true },
+        { name: "Ductwork & Fittings", displayOrder: 9, isActive: true },
+        { name: "Fixtures", displayOrder: 10, isActive: true },
+      ];
+
+      const created = [];
+      for (const cat of defaults) {
+        const category = await storage.createCustomCategory(cat);
+        created.push(category);
+      }
+      
+      res.status(201).json({ message: "Default categories created", categories: created });
+    } catch (error) {
+      console.error("Seed categories error:", error);
+      res.status(500).json({ message: "Failed to seed default categories" });
     }
   });
 

@@ -18,10 +18,11 @@ import {
   type Setting, type InsertSetting,
   type ScoringWeights, type InsertScoringWeights,
   type TerritoryManager, type InsertTerritoryManager,
+  type CustomCategory, type InsertCustomCategory,
   users, accounts, products, productCategories, orders, orderItems,
   segmentProfiles, profileCategories, accountMetrics, accountCategoryGaps,
   tasks, playbooks, playbookTasks, programAccounts, programRevenueSnapshots,
-  dataUploads, settings, scoringWeights, territoryManagers,
+  dataUploads, settings, scoringWeights, territoryManagers, customCategories,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, gte, lte } from "drizzle-orm";
@@ -133,6 +134,13 @@ export interface IStorage {
     totalRevenue: number;
     incrementalRevenue: number;
   }>;
+
+  // Custom Categories
+  getCustomCategories(): Promise<CustomCategory[]>;
+  getCustomCategory(id: number): Promise<CustomCategory | undefined>;
+  createCustomCategory(category: InsertCustomCategory): Promise<CustomCategory>;
+  updateCustomCategory(id: number, category: Partial<InsertCustomCategory>): Promise<CustomCategory | undefined>;
+  deleteCustomCategory(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -489,6 +497,31 @@ export class DatabaseStorage implements IStorage {
       totalRevenue,
       incrementalRevenue,
     };
+  }
+
+  // Custom Categories
+  async getCustomCategories(): Promise<CustomCategory[]> {
+    return db.select().from(customCategories).orderBy(customCategories.displayOrder);
+  }
+
+  async getCustomCategory(id: number): Promise<CustomCategory | undefined> {
+    const [category] = await db.select().from(customCategories).where(eq(customCategories.id, id));
+    return category;
+  }
+
+  async createCustomCategory(category: InsertCustomCategory): Promise<CustomCategory> {
+    const [created] = await db.insert(customCategories).values(category).returning();
+    return created;
+  }
+
+  async updateCustomCategory(id: number, category: Partial<InsertCustomCategory>): Promise<CustomCategory | undefined> {
+    const [updated] = await db.update(customCategories).set(category).where(eq(customCategories.id, id)).returning();
+    return updated;
+  }
+
+  async deleteCustomCategory(id: number): Promise<boolean> {
+    const result = await db.delete(customCategories).where(eq(customCategories.id, id)).returning();
+    return result.length > 0;
   }
 }
 
