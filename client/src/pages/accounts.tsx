@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,10 @@ import { DataTable } from "@/components/data-table";
 import { ScoreBadge } from "@/components/score-badge";
 import { ProgressRing } from "@/components/progress-ring";
 import { EmptyState } from "@/components/empty-state";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Select,
   SelectContent,
@@ -21,6 +25,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Search,
@@ -37,6 +43,9 @@ import {
   Settings,
   ExternalLink,
   Sparkles,
+  Phone,
+  Mail,
+  MapPin,
 } from "lucide-react";
 import { Link, useLocation, useSearch } from "wouter";
 import {
@@ -74,11 +83,70 @@ export default function Accounts() {
   const [regionFilter, setRegionFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("default");
   const [selectedAccount, setSelectedAccount] = useState<AccountWithMetrics | null>(null);
+  const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
+  const [taskType, setTaskType] = useState<string>("call");
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDescription, setTaskDescription] = useState("");
+  const [taskDueDate, setTaskDueDate] = useState("");
   const searchParams = useSearch();
+  const { toast } = useToast();
 
   const { data: accounts, isLoading } = useQuery<AccountWithMetrics[]>({
     queryKey: ["/api/accounts"],
   });
+
+  const createTaskMutation = useMutation({
+    mutationFn: async (taskData: {
+      accountId: number;
+      taskType: string;
+      title: string;
+      description: string;
+      assignedTm: string;
+      dueDate: string;
+      status: string;
+    }) => {
+      const response = await apiRequest("POST", "/api/tasks", taskData);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Task created",
+        description: "The task has been created successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/daily-focus"] });
+      setShowCreateTaskDialog(false);
+      resetTaskForm();
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create task. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetTaskForm = () => {
+    setTaskType("call");
+    setTaskTitle("");
+    setTaskDescription("");
+    setTaskDueDate("");
+  };
+
+  const handleCreateTask = () => {
+    if (!selectedAccount || !taskTitle.trim()) return;
+    
+    createTaskMutation.mutate({
+      accountId: selectedAccount.id,
+      taskType: taskType,
+      title: taskTitle,
+      description: taskDescription,
+      assignedTm: selectedAccount.assignedTm,
+      dueDate: taskDueDate || new Date().toISOString(),
+      status: "pending",
+    });
+  };
 
   interface ScoringWeights {
     gapSizeWeight: number;
@@ -680,10 +748,22 @@ export default function Accounts() {
                 </div>
 
                 <div className="flex gap-3 flex-wrap">
-                  <Button className="flex-1" data-testid="button-create-task">
-                    <TrendingUp className="mr-2 h-4 w-4" />
-                    Create Task
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        className="flex-1" 
+                        onClick={() => setShowCreateTaskDialog(true)}
+                        data-testid="button-create-task"
+                      >
+                        <TrendingUp className="mr-2 h-4 w-4" />
+                        Create Task
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs" side="top">
+                      <p className="text-sm font-medium mb-1">Create a Follow-up Task</p>
+                      <p className="text-xs">Schedule a call, email, or visit for this account to track your outreach activities and follow up on sales opportunities.</p>
+                    </TooltipContent>
+                  </Tooltip>
                   {selectedAccount.opportunityScore >= 70 && (
                     <Tooltip>
                       <TooltipTrigger asChild>

@@ -259,7 +259,7 @@ export default function Dashboard() {
       newCollapsed.add(blockId);
     }
     setCollapsedBlocks(newCollapsed);
-    localStorage.setItem(COLLAPSED_BLOCKS_KEY, JSON.stringify([...newCollapsed]));
+    localStorage.setItem(COLLAPSED_BLOCKS_KEY, JSON.stringify(Array.from(newCollapsed)));
   };
 
   const opportunityColumns = [
