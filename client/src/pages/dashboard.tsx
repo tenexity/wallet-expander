@@ -30,7 +30,21 @@ import {
   Sparkles,
   GripVertical,
   RotateCcw,
+  ChevronDown,
+  ChevronUp,
+  Columns,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Link, useLocation } from "wouter";
 import {
   BarChart,
@@ -120,6 +134,8 @@ function formatCurrency(value: number): string {
 }
 
 const STORAGE_KEY = "dashboard_block_order";
+const BLOCK_WIDTHS_KEY = "dashboard_block_widths";
+const COLLAPSED_BLOCKS_KEY = "dashboard_collapsed_blocks";
 
 const DEFAULT_BLOCK_ORDER = [
   "daily-focus",
@@ -129,6 +145,26 @@ const DEFAULT_BLOCK_ORDER = [
   "icp-profiles",
   "revenue-chart",
 ];
+
+type BlockWidth = 1 | 2 | 3;
+
+const DEFAULT_BLOCK_WIDTHS: Record<string, BlockWidth> = {
+  "daily-focus": 3,
+  "top-opportunities": 2,
+  "segment-breakdown": 1,
+  "recent-tasks": 1,
+  "icp-profiles": 1,
+  "revenue-chart": 3,
+};
+
+const BLOCK_LABELS: Record<string, string> = {
+  "daily-focus": "Daily Focus",
+  "top-opportunities": "Top Opportunities",
+  "segment-breakdown": "Segment Breakdown",
+  "recent-tasks": "Recent Tasks",
+  "icp-profiles": "ICP Profiles",
+  "revenue-chart": "Revenue Chart",
+};
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
