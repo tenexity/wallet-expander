@@ -238,7 +238,28 @@ export default function Dashboard() {
 
   const resetLayout = () => {
     setBlockOrder(DEFAULT_BLOCK_ORDER);
+    setBlockWidths(DEFAULT_BLOCK_WIDTHS);
+    setCollapsedBlocks(new Set());
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(BLOCK_WIDTHS_KEY);
+    localStorage.removeItem(COLLAPSED_BLOCKS_KEY);
+  };
+
+  const setBlockWidth = (blockId: string, width: BlockWidth) => {
+    const newWidths = { ...blockWidths, [blockId]: width };
+    setBlockWidths(newWidths);
+    localStorage.setItem(BLOCK_WIDTHS_KEY, JSON.stringify(newWidths));
+  };
+
+  const toggleCollapsed = (blockId: string) => {
+    const newCollapsed = new Set(collapsedBlocks);
+    if (newCollapsed.has(blockId)) {
+      newCollapsed.delete(blockId);
+    } else {
+      newCollapsed.add(blockId);
+    }
+    setCollapsedBlocks(newCollapsed);
+    localStorage.setItem(COLLAPSED_BLOCKS_KEY, JSON.stringify([...newCollapsed]));
   };
 
   const opportunityColumns = [
@@ -495,14 +516,18 @@ export default function Dashboard() {
                     {dailyFocus.todayCount} due today
                   </Badge>
                 )}
-                <Button variant="outline" size="sm" asChild data-testid="button-view-all-tasks">
-                  <Link href="/playbooks">
-                    View All Tasks
-                    <ArrowRight className="ml-1 h-4 w-4" />
-                  </Link>
-                </Button>
+                {!collapsedBlocks.has("daily-focus") && (
+                  <Button variant="outline" size="sm" asChild data-testid="button-view-all-tasks">
+                    <Link href="/playbooks">
+                      View All Tasks
+                      <ArrowRight className="ml-1 h-4 w-4" />
+                    </Link>
+                  </Button>
+                )}
+                {renderBlockControls("daily-focus")}
               </div>
             </CardHeader>
+            {!collapsedBlocks.has("daily-focus") && (
             <CardContent>
               {isDailyFocusLoading ? (
                 <div className="space-y-2">
@@ -576,12 +601,13 @@ export default function Dashboard() {
                 </div>
               )}
             </CardContent>
+            )}
           </Card>
         );
 
       case "top-opportunities":
         return (
-          <Card className="lg:col-span-2">
+          <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2">
               <div className="flex items-start gap-2">
                 <div>
@@ -595,10 +621,16 @@ export default function Dashboard() {
                   testId="tooltip-top-opportunities"
                 />
               </div>
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/accounts">View All</Link>
-              </Button>
+              <div className="flex items-center gap-2">
+                {!collapsedBlocks.has("top-opportunities") && (
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link href="/accounts">View All</Link>
+                  </Button>
+                )}
+                {renderBlockControls("top-opportunities")}
+              </div>
             </CardHeader>
+            {!collapsedBlocks.has("top-opportunities") && (
             <CardContent>
               <DataTable
                 columns={opportunityColumns}
@@ -607,13 +639,14 @@ export default function Dashboard() {
                 onRowClick={handleOpportunityClick}
               />
             </CardContent>
+            )}
           </Card>
         );
 
       case "segment-breakdown":
         return (
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
               <div className="flex items-start gap-2">
                 <div>
                   <CardTitle className="text-base">Segment Breakdown</CardTitle>
@@ -626,7 +659,9 @@ export default function Dashboard() {
                   testId="tooltip-segment-breakdown"
                 />
               </div>
+              {renderBlockControls("segment-breakdown")}
             </CardHeader>
+            {!collapsedBlocks.has("segment-breakdown") && (
             <CardContent>
               <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
@@ -671,6 +706,7 @@ export default function Dashboard() {
                 ))}
               </div>
             </CardContent>
+            )}
           </Card>
         );
 
@@ -690,10 +726,16 @@ export default function Dashboard() {
                   testId="tooltip-recent-tasks"
                 />
               </div>
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/playbooks">View All</Link>
-              </Button>
+              <div className="flex items-center gap-2">
+                {!collapsedBlocks.has("recent-tasks") && (
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link href="/playbooks">View All</Link>
+                  </Button>
+                )}
+                {renderBlockControls("recent-tasks")}
+              </div>
             </CardHeader>
+            {!collapsedBlocks.has("recent-tasks") && (
             <CardContent>
               <DataTable
                 columns={taskColumns}
@@ -701,6 +743,7 @@ export default function Dashboard() {
                 testId="table-tasks"
               />
             </CardContent>
+            )}
           </Card>
         );
 
@@ -720,10 +763,16 @@ export default function Dashboard() {
                   testId="tooltip-icp-profiles"
                 />
               </div>
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/icp-builder">Manage</Link>
-              </Button>
+              <div className="flex items-center gap-2">
+                {!collapsedBlocks.has("icp-profiles") && (
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link href="/icp-builder">Manage</Link>
+                  </Button>
+                )}
+                {renderBlockControls("icp-profiles")}
+              </div>
             </CardHeader>
+            {!collapsedBlocks.has("icp-profiles") && (
             <CardContent>
               <div className="space-y-4">
                 {displayStats.icpProfiles.map((profile) => (
@@ -751,13 +800,14 @@ export default function Dashboard() {
                 ))}
               </div>
             </CardContent>
+            )}
           </Card>
         );
 
       case "revenue-chart":
         return (
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <CardTitle className="text-base flex items-center gap-2">
                   <BarChart3 className="h-4 w-4" />
@@ -768,7 +818,9 @@ export default function Dashboard() {
                   testId="tooltip-revenue-by-segment"
                 />
               </div>
+              {renderBlockControls("revenue-chart")}
             </CardHeader>
+            {!collapsedBlocks.has("revenue-chart") && (
             <CardContent>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
@@ -797,6 +849,7 @@ export default function Dashboard() {
                 </ResponsiveContainer>
               </div>
             </CardContent>
+            )}
           </Card>
         );
 
@@ -806,19 +859,106 @@ export default function Dashboard() {
   };
 
   // Get the grid layout for different block types
-  const getBlockLayout = (blockId: string, index: number) => {
-    // Blocks that span 2 columns on larger screens
-    const wideBlocks = ["top-opportunities"];
-    // Blocks that take full width
-    const fullWidthBlocks = ["daily-focus", "revenue-chart"];
-    
-    if (fullWidthBlocks.includes(blockId)) {
-      return "col-span-full";
+  const getBlockLayout = (blockId: string) => {
+    const width = blockWidths[blockId] || 1;
+    switch (width) {
+      case 3:
+        return "lg:col-span-3";
+      case 2:
+        return "lg:col-span-2";
+      default:
+        return "";
     }
-    if (wideBlocks.includes(blockId)) {
-      return "lg:col-span-2";
-    }
-    return "";
+  };
+
+  const renderBlockControls = (blockId: string) => {
+    const isCollapsed = collapsedBlocks.has(blockId);
+    const currentWidth = blockWidths[blockId] || 1;
+
+    return (
+      <div className="flex items-center gap-1">
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7"
+                  data-testid={`resize-${blockId}`}
+                >
+                  <Columns className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p>Resize block width</p>
+            </TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem 
+              onClick={() => setBlockWidth(blockId, 1)}
+              className={currentWidth === 1 ? "bg-accent" : ""}
+              data-testid={`resize-${blockId}-1`}
+            >
+              <span className="flex items-center gap-2">
+                <div className="flex gap-0.5">
+                  <div className="w-2 h-4 bg-foreground rounded-sm" />
+                </div>
+                1 Column
+              </span>
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={() => setBlockWidth(blockId, 2)}
+              className={currentWidth === 2 ? "bg-accent" : ""}
+              data-testid={`resize-${blockId}-2`}
+            >
+              <span className="flex items-center gap-2">
+                <div className="flex gap-0.5">
+                  <div className="w-2 h-4 bg-foreground rounded-sm" />
+                  <div className="w-2 h-4 bg-foreground rounded-sm" />
+                </div>
+                2 Columns
+              </span>
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={() => setBlockWidth(blockId, 3)}
+              className={currentWidth === 3 ? "bg-accent" : ""}
+              data-testid={`resize-${blockId}-3`}
+            >
+              <span className="flex items-center gap-2">
+                <div className="flex gap-0.5">
+                  <div className="w-2 h-4 bg-foreground rounded-sm" />
+                  <div className="w-2 h-4 bg-foreground rounded-sm" />
+                  <div className="w-2 h-4 bg-foreground rounded-sm" />
+                </div>
+                3 Columns (Full Width)
+              </span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => toggleCollapsed(blockId)}
+              data-testid={`collapse-${blockId}`}
+            >
+              {isCollapsed ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronUp className="h-4 w-4" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            <p>{isCollapsed ? "Expand block" : "Collapse block"}</p>
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    );
   };
 
   return (
@@ -969,7 +1109,7 @@ export default function Dashboard() {
                     <div
                       ref={provided.innerRef}
                       {...provided.draggableProps}
-                      className={`${getBlockLayout(blockId, index)} ${
+                      className={`${getBlockLayout(blockId)} ${
                         snapshot.isDragging ? "z-50" : ""
                       }`}
                     >
