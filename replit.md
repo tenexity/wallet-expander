@@ -158,3 +158,28 @@ A synthetic Class A customer data file is available at `public/sample-data/class
 ### Scoring Weights API
 - `GET /api/scoring-weights` - Returns current scoring weights (defaults if none set)
 - `PUT /api/scoring-weights` - Updates weights with validation (must sum to 100%)
+
+### Dashboard Interactivity (January 2026)
+- **Top Opportunities Table** - Rows are now clickable, navigating to `/accounts?account={id}` to open the account detail dialog directly
+- Provides seamless drill-down from dashboard KPIs to detailed account analysis
+
+### Playbooks Page Redesign (January 2026)
+- **Two-panel layout**: Playbooks list on left, tasks for selected playbook on right
+- **Playbook filtering**: Clicking a playbook filters tasks via API query parameter `?playbookId={id}`
+- **"How to Generate Playbooks" section**: Collapsible instructional guide explaining:
+  - Navigate to ICP Builder and approve an ICP profile first
+  - Use the Generate Playbook button with segment, priority categories, and top N accounts
+  - AI analyzes approved ICP profiles, account gaps, and generates prioritized tasks
+- Tasks are linked to playbooks via `tasks.playbookId` field
+
+### Territory Manager Administration (January 2026)
+- **Settings Page** - New "Territory Manager Administration" section with full CRUD
+- Add/edit/delete Territory Managers with name, email, and territory assignments
+- TMs displayed in a table with inline editing and delete confirmation dialogs
+- Tasks can be linked to TMs via `assignedTmId` field (set during playbook generation)
+
+### Task Linkage Model
+- **tasks.playbookId**: Foreign key linking tasks to their source playbook
+- **tasks.assignedTmId**: Foreign key linking tasks to Territory Manager entities
+- Playbook generation automatically sets both fields when creating tasks
+- API supports filtering: `GET /api/tasks?playbookId={id}`
