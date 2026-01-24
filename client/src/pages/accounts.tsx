@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,7 @@ import {
   Target,
   AlertTriangle,
   HelpCircle,
+  ArrowUpDown,
 } from "lucide-react";
 import {
   Tooltip,
@@ -62,6 +63,7 @@ export default function Accounts() {
   const [searchQuery, setSearchQuery] = useState("");
   const [segmentFilter, setSegmentFilter] = useState<string>("all");
   const [regionFilter, setRegionFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("default");
   const [selectedAccount, setSelectedAccount] = useState<AccountWithMetrics | null>(null);
 
   const { data: accounts, isLoading } = useQuery<AccountWithMetrics[]>({
@@ -172,14 +174,34 @@ export default function Accounts() {
   const segments = [...new Set(displayAccounts.map((a) => a.segment))];
   const regions = [...new Set(displayAccounts.map((a) => a.region))];
 
-  const filteredAccounts = displayAccounts.filter((account) => {
-    const matchesSearch =
-      account.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      account.assignedTm.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesSegment = segmentFilter === "all" || account.segment === segmentFilter;
-    const matchesRegion = regionFilter === "all" || account.region === regionFilter;
-    return matchesSearch && matchesSegment && matchesRegion;
-  });
+  const getRevenueImpact = (account: AccountWithMetrics) => {
+    return account.gapCategories.reduce((sum, gap) => sum + gap.estimatedValue, 0);
+  };
+
+  const filteredAndSortedAccounts = useMemo(() => {
+    let result = displayAccounts.filter((account) => {
+      const matchesSearch =
+        account.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        account.assignedTm.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSegment = segmentFilter === "all" || account.segment === segmentFilter;
+      const matchesRegion = regionFilter === "all" || account.region === regionFilter;
+      return matchesSearch && matchesSegment && matchesRegion;
+    });
+
+    if (sortBy === "revenue-impact") {
+      result = [...result].sort((a, b) => getRevenueImpact(b) - getRevenueImpact(a));
+    } else if (sortBy === "opportunity-score") {
+      result = [...result].sort((a, b) => b.opportunityScore - a.opportunityScore);
+    } else if (sortBy === "revenue") {
+      result = [...result].sort((a, b) => b.last12mRevenue - a.last12mRevenue);
+    } else if (sortBy === "penetration-low") {
+      result = [...result].sort((a, b) => a.categoryPenetration - b.categoryPenetration);
+    }
+
+    return result;
+  }, [displayAccounts, searchQuery, segmentFilter, regionFilter, sortBy]);
+
+  const filteredAccounts = filteredAndSortedAccounts;
 
   const formatCurrency = (value: number) => {
     if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
@@ -408,7 +430,20 @@ export default function Accounts() {
                 data-testid="input-search-accounts"
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-44" data-testid="select-sort">
+                  <ArrowUpDown className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">Default Order</SelectItem>
+                  <SelectItem value="revenue-impact">Revenue Impact (High to Low)</SelectItem>
+                  <SelectItem value="opportunity-score">Opportunity Score</SelectItem>
+                  <SelectItem value="revenue">Current Revenue</SelectItem>
+                  <SelectItem value="penetration-low">Lowest Penetration</SelectItem>
+                </SelectContent>
+              </Select>
               <Select value={segmentFilter} onValueChange={setSegmentFilter}>
                 <SelectTrigger className="w-36" data-testid="select-segment">
                   <Filter className="h-4 w-4 mr-2" />
@@ -561,10 +596,23 @@ export default function Accounts() {
                     Create Task
                   </Button>
                   {!selectedAccount.enrolled && (
-                    <Button variant="outline" data-testid="button-enroll-account">
-                      <Target className="mr-2 h-4 w-4" />
-                      Enroll in Program
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" data-testid="button-enroll-account">
+                          <Target className="mr-2 h-4 w-4" />
+                          Enroll in Program
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs" side="top">
+                        <p className="text-sm font-medium mb-1">What does enrollment do?</p>
+                        <ul className="text-xs space-y-1 list-disc list-inside">
+                          <li>Adds this account to the revenue growth program</li>
+                          <li>Tracks incremental revenue from targeted categories</li>
+                          <li>Calculates rev-share fees based on captured wallet share</li>
+                          <li>Enables performance monitoring on the Revenue tab</li>
+                        </ul>
+                      </TooltipContent>
+                    </Tooltip>
                   )}
                 </div>
               </div>
