@@ -876,7 +876,7 @@ export default function Dashboard() {
     const currentWidth = blockWidths[blockId] || 1;
 
     return (
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 relative z-10">
         <DropdownMenu>
           <Tooltip>
             <TooltipTrigger asChild>
