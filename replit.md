@@ -116,6 +116,27 @@ A synthetic Class A customer data file is available at `public/sample-data/class
 
 ## Recent Changes (January 2026)
 
+### Draggable Dashboard & Custom Categories (Latest)
+- **Draggable Dashboard Blocks** - Dashboard blocks can be reordered via drag-and-drop using @hello-pangea/dnd
+  - Drag handles visible on each block for intuitive interaction
+  - Layout persisted in localStorage with reset option
+- **Custom Product Categories** - Settings > Categories tab allows full CRUD operations
+  - Add, edit, delete, and toggle active/inactive status for categories
+  - Seed default categories: Water Heaters, Controls, PVF, Tools, Chinaware, Brass and Fittings, HVAC Equipment, Refrigerant, Ductwork, Fixtures
+  - Categories stored in `custom_categories` database table
+- **AI Analysis Integration** - AI service uses custom categories for segment analysis
+  - Falls back to default product categories if no custom categories defined
+  - Categories used in ICP profile generation and playbook creation
+
+### Custom Categories API
+- `GET /api/custom-categories` - List all custom categories
+- `POST /api/custom-categories` - Create new category
+- `PUT /api/custom-categories/:id` - Update category
+- `DELETE /api/custom-categories/:id` - Delete category
+- `POST /api/custom-categories/seed-defaults` - Seed default categories
+
+---
+
 - Initial project setup with complete database schema
 - Frontend UI with all pages (Dashboard, Data Uploads, Accounts, ICP Builder, Playbooks, Revenue, Settings)
 - Backend API routes with database storage
