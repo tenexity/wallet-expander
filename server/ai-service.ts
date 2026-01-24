@@ -7,6 +7,14 @@ const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
+interface CategorySuggestion {
+  categoryName: string;
+  expectedPct: number;
+  importance: number;
+  isRequired: boolean;
+  notes: string;
+}
+
 const categorySuggestionSchema = z.object({
   categoryName: z.string(),
   expectedPct: z.number(),
@@ -14,6 +22,12 @@ const categorySuggestionSchema = z.object({
   isRequired: z.boolean().default(false),
   notes: z.string().default(""),
 });
+
+interface SegmentAnalysisResult {
+  description: string;
+  minAnnualRevenue: number;
+  categories: CategorySuggestion[];
+}
 
 const segmentAnalysisResultSchema = z.object({
   description: z.string(),
@@ -28,8 +42,6 @@ const taskGenerationResultSchema = z.object({
   script: z.string(),
 });
 
-type CategorySuggestion = z.infer<typeof categorySuggestionSchema>;
-type SegmentAnalysisResult = z.infer<typeof segmentAnalysisResultSchema>;
 type TaskGenerationResult = z.infer<typeof taskGenerationResultSchema>;
 
 function safeParseJSON<T>(content: string, schema: z.ZodSchema<T>, fallback: T): T {
@@ -48,7 +60,11 @@ function safeParseJSON<T>(content: string, schema: z.ZodSchema<T>, fallback: T):
 }
 
 export async function analyzeSegment(segment: string): Promise<SegmentAnalysisResult> {
-  const categories = await storage.getProductCategories();
+  // Use custom categories if available, otherwise fall back to product categories
+  const customCats = await storage.getCustomCategories();
+  const categories = customCats.length > 0 
+    ? customCats.filter(c => c.isActive).map(c => ({ name: c.name }))
+    : (await storage.getProductCategories()).map(c => ({ name: c.name }));
   const categoryNames = categories.map(c => c.name).join(", ");
 
   const prompt = `You are a sales analytics expert for a wholesale distributor serving ${segment} contractors.
@@ -96,32 +112,41 @@ Respond in JSON format:
       throw new Error("No response from AI");
     }
 
+    const fallbackCategories: CategorySuggestion[] = categories.slice(0, 5).map((cat, i) => ({
+      categoryName: cat.name,
+      expectedPct: Math.floor(80 / 5),
+      importance: i === 0 ? 1.5 : 1.0,
+      isRequired: i < 2,
+      notes: "",
+    }));
+    
     const fallback: SegmentAnalysisResult = {
       description: `Full-scope ${segment} contractor purchasing across major categories`,
       minAnnualRevenue: 50000,
-      categories: categories.slice(0, 5).map((cat, i) => ({
-        categoryName: cat.name,
-        expectedPct: Math.floor(80 / 5),
-        importance: i === 0 ? 1.5 : 1.0,
-        isRequired: i < 2,
-        notes: "",
-      })),
+      categories: fallbackCategories,
     };
 
-    return safeParseJSON(content, segmentAnalysisResultSchema, fallback);
+    return safeParseJSON(content, segmentAnalysisResultSchema, fallback) as SegmentAnalysisResult;
   } catch (error) {
     console.error("AI segment analysis error:", error);
-    const categories = await storage.getProductCategories();
+    // Use custom categories if available, otherwise fall back to product categories
+    const customCats = await storage.getCustomCategories();
+    const fallbackCats = customCats.length > 0 
+      ? customCats.filter(c => c.isActive).map(c => ({ name: c.name }))
+      : (await storage.getProductCategories()).map(c => ({ name: c.name }));
+    
+    const errorFallbackCategories: CategorySuggestion[] = fallbackCats.slice(0, 5).map((cat, i) => ({
+      categoryName: cat.name,
+      expectedPct: Math.floor(80 / 5),
+      importance: i === 0 ? 1.5 : 1.0,
+      isRequired: i < 2,
+      notes: "",
+    }));
+    
     return {
       description: `Full-scope ${segment} contractor purchasing across major categories`,
       minAnnualRevenue: 50000,
-      categories: categories.slice(0, 5).map((cat, i) => ({
-        categoryName: cat.name,
-        expectedPct: Math.floor(80 / 5),
-        importance: i === 0 ? 1.5 : 1.0,
-        isRequired: i < 2,
-        notes: "",
-      })),
+      categories: errorFallbackCategories,
     };
   }
 }
