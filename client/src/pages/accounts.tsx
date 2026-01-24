@@ -161,7 +161,7 @@ export default function Accounts() {
       accountId: selectedAccount.id,
       taskType: taskType,
       title: taskTitle.trim(),
-      description: taskDescription.trim() || null,
+      description: taskDescription.trim(),
       assignedTm: selectedAccount.assignedTm,
       dueDate: dueDateTimestamp,
       status: "pending",

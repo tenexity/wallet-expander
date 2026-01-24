@@ -116,7 +116,22 @@ A synthetic Class A customer data file is available at `public/sample-data/class
 
 ## Recent Changes (January 2026)
 
-### Draggable Dashboard & Custom Categories (Latest)
+### Resizable & Collapsible Dashboard Blocks + Account Task Creation (Latest)
+- **Resizable Dashboard Blocks** - Each dashboard block can be resized to 1, 2, or 3 columns wide
+  - Dropdown menu in block header with resize options
+  - Width settings persisted in localStorage
+  - Respects block order from drag-and-drop
+- **Collapsible Dashboard Blocks** - All dashboard blocks can be collapsed/expanded
+  - Toggle button in block header to show/hide content
+  - Collapsed state persisted in localStorage
+  - Only header visible when collapsed
+- **Create Task from Account** - Create follow-up tasks directly from account detail dialog
+  - Task type selection: Phone Call, Email, or Site Visit
+  - Title, description, and due date fields
+  - Automatically links task to selected account
+  - Tooltip explaining the Create Task button functionality
+
+### Draggable Dashboard & Custom Categories
 - **Draggable Dashboard Blocks** - Dashboard blocks can be reordered via drag-and-drop using @hello-pangea/dnd
   - Drag handles visible on each block for intuitive interaction
   - Layout persisted in localStorage with reset option
