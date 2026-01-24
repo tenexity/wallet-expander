@@ -135,17 +135,42 @@ export default function Accounts() {
   };
 
   const handleCreateTask = () => {
-    if (!selectedAccount || !taskTitle.trim()) return;
+    if (!selectedAccount) {
+      toast({
+        title: "Error",
+        description: "No account selected.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!taskTitle.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a task title.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Convert date string to ISO timestamp or use tomorrow's date as default
+    const dueDateTimestamp = taskDueDate 
+      ? new Date(taskDueDate).toISOString()
+      : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     
     createTaskMutation.mutate({
       accountId: selectedAccount.id,
       taskType: taskType,
-      title: taskTitle,
-      description: taskDescription,
+      title: taskTitle.trim(),
+      description: taskDescription.trim() || null,
       assignedTm: selectedAccount.assignedTm,
-      dueDate: taskDueDate || new Date().toISOString(),
+      dueDate: dueDateTimestamp,
       status: "pending",
     });
+  };
+
+  const openCreateTaskDialog = () => {
+    if (!selectedAccount) return;
+    setShowCreateTaskDialog(true);
   };
 
   interface ScoringWeights {
@@ -752,7 +777,7 @@ export default function Accounts() {
                     <TooltipTrigger asChild>
                       <Button 
                         className="flex-1" 
-                        onClick={() => setShowCreateTaskDialog(true)}
+                        onClick={openCreateTaskDialog}
                         data-testid="button-create-task"
                       >
                         <TrendingUp className="mr-2 h-4 w-4" />
@@ -805,6 +830,101 @@ export default function Accounts() {
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Task Dialog */}
+      <Dialog open={showCreateTaskDialog} onOpenChange={(open) => {
+        setShowCreateTaskDialog(open);
+        if (!open) resetTaskForm();
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create Task for {selectedAccount?.name}</DialogTitle>
+            <DialogDescription>
+              Schedule a follow-up activity for this account.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="task-type">Task Type</Label>
+              <Select value={taskType} onValueChange={setTaskType}>
+                <SelectTrigger data-testid="select-task-type">
+                  <SelectValue placeholder="Select task type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="call">
+                    <span className="flex items-center gap-2">
+                      <Phone className="h-4 w-4" />
+                      Phone Call
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="email">
+                    <span className="flex items-center gap-2">
+                      <Mail className="h-4 w-4" />
+                      Email
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="visit">
+                    <span className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      Site Visit
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="task-title">Title</Label>
+              <Input
+                id="task-title"
+                placeholder="e.g., Follow up on water heater quote"
+                value={taskTitle}
+                onChange={(e) => setTaskTitle(e.target.value)}
+                data-testid="input-task-title"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="task-description">Description (optional)</Label>
+              <Textarea
+                id="task-description"
+                placeholder="Add any notes or context for this task..."
+                value={taskDescription}
+                onChange={(e) => setTaskDescription(e.target.value)}
+                rows={3}
+                data-testid="input-task-description"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="task-due-date">Due Date</Label>
+              <Input
+                id="task-due-date"
+                type="date"
+                value={taskDueDate}
+                onChange={(e) => setTaskDueDate(e.target.value)}
+                data-testid="input-task-due-date"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowCreateTaskDialog(false);
+                resetTaskForm();
+              }}
+              data-testid="button-cancel-task"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreateTask}
+              disabled={!taskTitle.trim() || createTaskMutation.isPending}
+              data-testid="button-save-task"
+            >
+              {createTaskMutation.isPending ? "Creating..." : "Create Task"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
