@@ -1,4 +1,5 @@
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   Upload,
@@ -21,7 +22,13 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import tenexityLogo from "@assets/Tenexity_Logo_final_1769263645437.png";
+
+interface Setting {
+  key: string;
+  value: string | null;
+}
 
 const mainNavItems = [
   {
@@ -74,16 +81,39 @@ const adminNavItems = [
 export function AppSidebar() {
   const [location, navigate] = useLocation();
 
+  const { data: settingsData } = useQuery<Setting[]>({
+    queryKey: ["/api/settings"],
+  });
+
+  const getSettingValue = (key: string, defaultValue: string): string => {
+    const setting = settingsData?.find(s => s.key === key);
+    return setting?.value || defaultValue;
+  };
+
+  const appTitle = getSettingValue("appTitle", "AI VP Dashboard");
+  const companyName = getSettingValue("companyName", "Mark Supply");
+  const companyLogo = getSettingValue("companyLogo", "");
+
   return (
     <Sidebar>
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-            <TrendingUp className="h-5 w-5" />
-          </div>
+          {companyLogo ? (
+            <div className="flex h-10 w-10 items-center justify-center rounded-md overflow-hidden bg-sidebar-primary">
+              <img 
+                src={companyLogo} 
+                alt="Company logo" 
+                className="h-full w-full object-cover"
+              />
+            </div>
+          ) : (
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
+              <TrendingUp className="h-5 w-5" />
+            </div>
+          )}
           <div className="flex flex-col">
-            <span className="text-sm font-semibold text-sidebar-foreground">AI VP Dashboard</span>
-            <span className="text-xs text-sidebar-foreground/60">Mark Supply</span>
+            <span className="text-sm font-semibold text-sidebar-foreground">{appTitle}</span>
+            <span className="text-xs text-sidebar-foreground/60">{companyName}</span>
           </div>
         </div>
       </SidebarHeader>
@@ -129,7 +159,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="p-4">
+      <SidebarFooter className="p-4 space-y-4">
         <div className="flex items-center gap-3">
           <Avatar className="h-8 w-8">
             <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground text-xs">
@@ -143,6 +173,16 @@ export function AppSidebar() {
           <SidebarMenuButton size="sm" className="h-8 w-8 p-0" data-testid="button-logout">
             <LogOut className="h-4 w-4" />
           </SidebarMenuButton>
+        </div>
+        <div className="border-t border-sidebar-border pt-3">
+          <div className="flex items-center justify-center gap-2 text-xs text-sidebar-foreground/50">
+            <span>Created with care by</span>
+            <img 
+              src={tenexityLogo} 
+              alt="Tenexity" 
+              className="h-4 object-contain dark:invert"
+            />
+          </div>
         </div>
       </SidebarFooter>
     </Sidebar>

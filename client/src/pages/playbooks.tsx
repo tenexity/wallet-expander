@@ -115,6 +115,7 @@ export default function Playbooks() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
   const [showHelpDialog, setShowHelpDialog] = useState(false);
+  const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
   const [expandedTasks, setExpandedTasks] = useState<Set<number>>(new Set());
   const { toast } = useToast();
   const search = useSearch();
@@ -124,11 +125,24 @@ export default function Playbooks() {
   const [generateSegment, setGenerateSegment] = useState<string>("all");
   const [topN, setTopN] = useState<number>(5);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+
+  // Create task dialog form state
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [newTaskType, setNewTaskType] = useState<string>("call");
+  const [newTaskDescription, setNewTaskDescription] = useState("");
+  const [newTaskAccountId, setNewTaskAccountId] = useState<string>("");
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
   
   // Parse URL parameters for task auto-selection
   const params = new URLSearchParams(search);
   const taskIdFromUrl = params.get("task");
   const segmentFromUrl = params.get("segment");
+
+  interface Account {
+    id: number;
+    name: string;
+    segment: string | null;
+  }
 
   const { data: playbooks } = useQuery<Playbook[]>({
     queryKey: ["/api/playbooks"],
@@ -145,6 +159,11 @@ export default function Playbooks() {
   // Fetch custom categories for the dialog
   const { data: customCategories } = useQuery<CustomCategory[]>({
     queryKey: ["/api/custom-categories"],
+  });
+
+  // Fetch accounts for manual task creation
+  const { data: accounts } = useQuery<Account[]>({
+    queryKey: ["/api/accounts"],
   });
 
   // Seed default categories if none exist
@@ -316,6 +335,53 @@ export default function Playbooks() {
 
   const handleCompleteTask = (task: Task) => {
     setSelectedTask(task);
+  };
+
+  const handleCreateTask = async () => {
+    if (!newTaskTitle.trim() || !newTaskAccountId) {
+      toast({
+        title: "Missing information",
+        description: "Please provide a task title and select an account",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsCreatingTask(true);
+    try {
+      await apiRequest("POST", "/api/tasks", {
+        accountId: parseInt(newTaskAccountId),
+        playbookId: selectedPlaybookId,
+        taskType: newTaskType,
+        title: newTaskTitle,
+        description: newTaskDescription || undefined,
+        status: "pending",
+        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      queryClient.invalidateQueries({ queryKey: [tasksQueryKey] });
+      
+      setShowCreateTaskDialog(false);
+      setNewTaskTitle("");
+      setNewTaskType("call");
+      setNewTaskDescription("");
+      setNewTaskAccountId("");
+
+      toast({
+        title: "Task created",
+        description: "Manual task has been added to the playbook",
+      });
+    } catch (error) {
+      console.error("Create task error:", error);
+      toast({
+        title: "Failed to create task",
+        description: "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreatingTask(false);
+    }
   };
 
   const TaskIcon = ({ type }: { type: "call" | "email" | "visit" }) => {
@@ -547,7 +613,18 @@ export default function Playbooks() {
                     {selectedPlaybookId && " in this playbook"}
                   </CardDescription>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {selectedPlaybookId && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setShowCreateTaskDialog(true)}
+                      data-testid="button-add-task"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Task
+                    </Button>
+                  )}
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -895,6 +972,90 @@ export default function Playbooks() {
             >
               <CheckCircle className="mr-2 h-4 w-4" />
               Complete Task
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Task Dialog */}
+      <Dialog open={showCreateTaskDialog} onOpenChange={(open) => {
+        setShowCreateTaskDialog(open);
+        if (!open) {
+          setNewTaskTitle("");
+          setNewTaskType("call");
+          setNewTaskDescription("");
+          setNewTaskAccountId("");
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Task to Playbook</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Account</Label>
+              <Select value={newTaskAccountId} onValueChange={setNewTaskAccountId}>
+                <SelectTrigger data-testid="select-task-account">
+                  <SelectValue placeholder="Select an account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts?.map(account => (
+                    <SelectItem key={account.id} value={account.id.toString()}>
+                      {account.name} {account.segment && `(${account.segment})`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Task Type</Label>
+              <Select value={newTaskType} onValueChange={setNewTaskType}>
+                <SelectTrigger data-testid="select-new-task-type">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="call">Call</SelectItem>
+                  <SelectItem value="email">Email</SelectItem>
+                  <SelectItem value="visit">Site Visit</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Task Title</Label>
+              <Input 
+                placeholder="e.g., Follow up on water heater quote" 
+                value={newTaskTitle}
+                onChange={(e) => setNewTaskTitle(e.target.value)}
+                data-testid="input-new-task-title"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Description (optional)</Label>
+              <Textarea 
+                placeholder="Additional details about this task..."
+                value={newTaskDescription}
+                onChange={(e) => setNewTaskDescription(e.target.value)}
+                rows={3}
+                data-testid="input-new-task-description"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateTaskDialog(false)} disabled={isCreatingTask}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateTask} disabled={isCreatingTask || !newTaskTitle.trim() || !newTaskAccountId}>
+              {isCreatingTask ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Task
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

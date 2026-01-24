@@ -243,6 +243,169 @@ export async function registerRoutes(
     }
   });
 
+  // Enroll account in growth program and auto-generate playbook
+  app.post("/api/accounts/:id/enroll", async (req, res) => {
+    try {
+      const accountId = parseInt(req.params.id);
+      const account = await storage.getAccount(accountId);
+      
+      if (!account) {
+        return res.status(404).json({ message: "Account not found" });
+      }
+
+      // Check if already enrolled
+      const programAccounts = await storage.getProgramAccounts();
+      const alreadyEnrolled = programAccounts.find(pa => pa.accountId === accountId);
+      if (alreadyEnrolled) {
+        return res.status(400).json({ message: "Account is already enrolled" });
+      }
+
+      // Get account metrics for baseline
+      const metrics = await storage.getAccountMetrics(accountId);
+      const baselineRevenue = metrics ? parseFloat(metrics.last12mRevenue || "0") : 50000;
+
+      // Calculate baseline period (last 12 months)
+      const now = new Date();
+      const baselineEnd = now;
+      const baselineStart = new Date(now);
+      baselineStart.setFullYear(baselineStart.getFullYear() - 1);
+
+      // Enroll the account in the program
+      const programAccount = await storage.createProgramAccount({
+        accountId: accountId,
+        baselineStart: baselineStart,
+        baselineEnd: baselineEnd,
+        baselineRevenue: baselineRevenue.toString(),
+        baselineCategories: [],
+        shareRate: "0.10", // 10% default share rate
+        status: "active",
+      });
+
+      // Auto-generate playbook for the enrolled account
+      const gaps = await storage.getAccountCategoryGaps(accountId);
+      const categories = await storage.getProductCategories();
+
+      // Get top 3 gap categories for this account
+      const topGaps = gaps.slice(0, 3).map(g => {
+        const cat = categories.find(c => c.id === g.categoryId);
+        return cat?.name || "Unknown";
+      }).filter(name => name !== "Unknown");
+
+      let playbook = null;
+      if (topGaps.length > 0) {
+        // Create the playbook (generatedAt uses database default)
+        playbook = await storage.createPlaybook({
+          name: `${account.name} Growth Plan`,
+          generatedBy: "AI",
+          filtersUsed: {
+            accountId: accountId,
+            segment: account.segment,
+            priorityCategories: topGaps,
+          },
+        });
+
+        // Generate AI tasks for each gap category
+        for (const gapCategory of topGaps) {
+          // Randomly pick a task type
+          const taskTypes = ["call", "email", "visit"] as const;
+          const taskType = taskTypes[Math.floor(Math.random() * taskTypes.length)];
+          
+          // Calculate due date (7-14 days from now)
+          const daysFromNow = 7 + Math.floor(Math.random() * 7);
+          const dueDate = new Date();
+          dueDate.setDate(dueDate.getDate() + daysFromNow);
+
+          let script = "";
+          let title = "";
+          let description = "";
+
+          if (taskType === "call") {
+            title = `${account.name} ${gapCategory} Introduction`;
+            description = `Call to introduce ${gapCategory} product line and assess current purchasing patterns.`;
+            script = `Hi [Contact], this is [Your Name] from Mark Supply.
+
+I wanted to reach out about our ${gapCategory} product line. Based on your purchasing patterns, I believe there's an opportunity for us to better support your ${gapCategory} needs.
+
+Key Points:
+- We have a comprehensive ${gapCategory} selection
+- Competitive pricing with volume discounts
+- Same-day or next-day delivery available
+
+Would you have 15 minutes this week to discuss your ${gapCategory} requirements?`;
+          } else if (taskType === "email") {
+            title = `${gapCategory} Product Overview Email`;
+            description = `Send promotional email highlighting ${gapCategory} offerings and special pricing.`;
+            script = `Subject: Exclusive ${gapCategory} Offering for ${account.name}
+
+Hi [Contact],
+
+I hope this email finds you well! I wanted to reach out about our expanded ${gapCategory} inventory.
+
+Given your project volume, I think you could benefit from consolidating your ${gapCategory} purchases with us.
+
+Key benefits:
+- Special contractor pricing
+- Broad product selection
+- Reliable availability and fast delivery
+
+Would you be interested in receiving a custom quote for your typical ${gapCategory} orders?
+
+Best regards,
+[Your Name]`;
+          } else {
+            title = `${account.name} ${gapCategory} Site Visit`;
+            description = `On-site visit to assess ${gapCategory} needs and demonstrate products.`;
+            script = `VISIT OBJECTIVES:
+- Tour current projects to understand ${gapCategory} usage
+- Review their current supplier and identify pain points
+- Present our ${gapCategory} product range
+- Discuss delivery and support capabilities
+
+KEY TALKING POINTS:
+- Product selection and availability
+- Technical support and warranty handling
+- Volume discounts and pricing consistency
+- Delivery scheduling and jobsite logistics`;
+          }
+
+          await storage.createTask({
+            accountId: accountId,
+            playbookId: playbook.id,
+            assignedTm: account.assignedTm || null,
+            assignedTmId: null,
+            taskType: taskType,
+            title: title,
+            description: description,
+            script: script,
+            gapCategories: [gapCategory],
+            status: "pending",
+            dueDate: dueDate,
+          });
+        }
+
+        // Get task count for response
+        const playbookTasks = await storage.getTasks({ playbookId: playbook.id });
+        playbook = {
+          ...playbook,
+          taskCount: playbookTasks.length,
+        };
+      }
+
+      res.status(200).json({
+        success: true,
+        account: {
+          ...account,
+          enrolled: true,
+        },
+        programAccount,
+        playbook,
+      });
+    } catch (error) {
+      console.error("Enrollment error:", error);
+      res.status(500).json({ message: "Failed to enroll account" });
+    }
+  });
+
   // ============ Segment Profiles ============
   app.get("/api/segment-profiles", async (req, res) => {
     try {
@@ -1000,11 +1163,85 @@ export async function registerRoutes(
     try {
       const data = insertProgramAccountSchema.parse(req.body);
       const programAccount = await storage.createProgramAccount(data);
+      
+      // Auto-generate a playbook for this enrolled account
+      const account = await storage.getAccount(programAccount.accountId);
+      if (account) {
+        const categories = await storage.getProductCategories();
+        const metrics = await storage.getAccountMetrics(account.id);
+        const gaps = await storage.getAccountCategoryGaps(account.id);
+        
+        const gapCategories = gaps.map(g => {
+          const cat = categories.find(c => c.id === g.categoryId);
+          return cat?.name || "Unknown";
+        }).filter(Boolean);
+
+        if (gapCategories.length > 0) {
+          const accountData = [{
+            id: account.id,
+            name: account.name,
+            segment: account.segment || "Unknown",
+            assignedTm: account.assignedTm || "Unassigned",
+            revenue: metrics ? parseFloat(metrics.last12mRevenue || "0") : 100000,
+            gapCategories,
+          }];
+
+          // Generate AI-powered tasks for this account
+          const generatedTasks = await generatePlaybookTasks(accountData, []);
+
+          // Create playbook
+          const playbook = await storage.createPlaybook({
+            name: `${account.name} Growth Playbook`,
+            generatedBy: "AI",
+            filtersUsed: { accountId: account.id, enrolledAt: new Date().toISOString() },
+            taskCount: generatedTasks.length,
+          });
+
+          // Get territory managers to link tasks by name
+          const territoryManagers = await storage.getTerritoryManagers();
+
+          // Create tasks in database and link to playbook
+          for (const task of generatedTasks) {
+            const tm = territoryManagers.find(t => t.name === task.assignedTm);
+            
+            const createdTask = await storage.createTask({
+              accountId: task.accountId,
+              playbookId: playbook.id,
+              assignedTm: task.assignedTm,
+              assignedTmId: tm?.id || null,
+              taskType: task.taskType,
+              title: task.title,
+              description: task.description,
+              script: task.script,
+              gapCategories: task.gapCategories,
+              status: "pending",
+              dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            });
+            
+            await storage.createPlaybookTask({
+              playbookId: playbook.id,
+              taskId: createdTask.id,
+            });
+          }
+
+          // Return both program account and generated playbook info
+          return res.status(201).json({
+            ...programAccount,
+            playbook: {
+              id: playbook.id,
+              name: playbook.name,
+              tasksGenerated: generatedTasks.length,
+            },
+          });
+        }
+      }
+      
       res.status(201).json(programAccount);
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid data", errors: error.errors });
       }
+      console.error("Enroll account error:", error);
       res.status(500).json({ message: "Failed to enroll account" });
     }
   });
@@ -1065,6 +1302,16 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/settings/:key", async (req, res) => {
+    try {
+      const { key } = req.params;
+      const setting = await storage.getSetting(key);
+      res.json(setting || { key, value: null });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get setting" });
+    }
+  });
+
   app.put("/api/settings/:key", async (req, res) => {
     try {
       const { key } = req.params;
@@ -1073,6 +1320,29 @@ export async function registerRoutes(
       res.json(setting);
     } catch (error) {
       res.status(500).json({ message: "Failed to update setting" });
+    }
+  });
+
+  // Logo upload endpoint - handles base64 encoded images
+  app.post("/api/settings/logo", async (req, res) => {
+    try {
+      const { logo } = req.body;
+      if (!logo) {
+        return res.status(400).json({ message: "No logo provided" });
+      }
+      const setting = await storage.upsertSetting({ key: "companyLogo", value: logo });
+      res.json(setting);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to upload logo" });
+    }
+  });
+
+  app.delete("/api/settings/logo", async (req, res) => {
+    try {
+      await storage.upsertSetting({ key: "companyLogo", value: "" });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to remove logo" });
     }
   });
 

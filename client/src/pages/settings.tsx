@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,7 +67,15 @@ import {
   Plus,
   Pencil,
   Trash2,
+  Upload,
+  X,
+  Image,
 } from "lucide-react";
+
+interface Setting {
+  key: string;
+  value: string | null;
+}
 
 const territoryManagerFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -355,6 +363,11 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingManager, setEditingManager] = useState<TerritoryManager | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [companyName, setCompanyName] = useState("Mark Supply");
+  const [appTitle, setAppTitle] = useState("AI VP Dashboard");
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
 
   const form = useForm<TerritoryManagerFormValues>({
     resolver: zodResolver(territoryManagerFormSchema),
@@ -366,9 +379,74 @@ export default function SettingsPage() {
     },
   });
 
+  const { data: settingsData } = useQuery<Setting[]>({
+    queryKey: ["/api/settings"],
+  });
+
+  useEffect(() => {
+    if (settingsData) {
+      const companyNameSetting = settingsData.find(s => s.key === "companyName");
+      const appTitleSetting = settingsData.find(s => s.key === "appTitle");
+      const companyLogoSetting = settingsData.find(s => s.key === "companyLogo");
+      
+      if (companyNameSetting?.value) setCompanyName(companyNameSetting.value);
+      if (appTitleSetting?.value) setAppTitle(appTitleSetting.value);
+      if (companyLogoSetting?.value) setCompanyLogo(companyLogoSetting.value);
+    }
+  }, [settingsData]);
+
   const { data: territoryManagers = [], isLoading: isLoadingManagers } = useQuery<TerritoryManager[]>({
     queryKey: ["/api/territory-managers"],
   });
+
+  const saveSettingMutation = useMutation({
+    mutationFn: async ({ key, value }: { key: string; value: string }) => {
+      return apiRequest("PUT", `/api/settings/${key}`, { value });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+    },
+  });
+
+  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Invalid file type", description: "Please upload an image file", variant: "destructive" });
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Please upload an image smaller than 2MB", variant: "destructive" });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const base64 = e.target?.result as string;
+      setCompanyLogo(base64);
+      try {
+        await apiRequest("POST", "/api/settings/logo", { logo: base64 });
+        queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+        toast({ title: "Logo uploaded", description: "Your company logo has been updated" });
+      } catch {
+        toast({ title: "Upload failed", description: "Failed to upload logo", variant: "destructive" });
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveLogo = async () => {
+    setCompanyLogo(null);
+    try {
+      await apiRequest("DELETE", "/api/settings/logo");
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      toast({ title: "Logo removed", description: "Your company logo has been removed" });
+    } catch {
+      toast({ title: "Error", description: "Failed to remove logo", variant: "destructive" });
+    }
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: TerritoryManagerFormValues) => {
@@ -418,12 +496,24 @@ export default function SettingsPage() {
 
   const handleSave = async () => {
     setIsSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsSaving(false);
-    toast({
-      title: "Settings saved",
-      description: "Your changes have been applied",
-    });
+    try {
+      await Promise.all([
+        saveSettingMutation.mutateAsync({ key: "companyName", value: companyName }),
+        saveSettingMutation.mutateAsync({ key: "appTitle", value: appTitle }),
+      ]);
+      toast({
+        title: "Settings saved",
+        description: "Your changes have been applied",
+      });
+    } catch {
+      toast({
+        title: "Save failed",
+        description: "Failed to save settings",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleOpenDialog = (manager?: TerritoryManager) => {
@@ -518,19 +608,91 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle className="text-base">Company Information</CardTitle>
               <CardDescription>
-                Basic company and branding settings
+                Basic company and branding settings - these appear in the sidebar
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="company-name">Company Name</Label>
-                  <Input id="company-name" defaultValue="Mark Supply" />
+                  <Input 
+                    id="company-name" 
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    placeholder="Your Company Name"
+                    data-testid="input-company-name"
+                  />
+                  <p className="text-xs text-muted-foreground">Displays below the app title in the sidebar</p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="default-share-rate">Default Share Rate (%)</Label>
-                  <Input id="default-share-rate" type="number" defaultValue="15" />
+                  <Label htmlFor="app-title">App Title</Label>
+                  <Input 
+                    id="app-title" 
+                    value={appTitle}
+                    onChange={(e) => setAppTitle(e.target.value)}
+                    placeholder="AI VP Dashboard"
+                    data-testid="input-app-title"
+                  />
+                  <p className="text-xs text-muted-foreground">The main title shown in the sidebar</p>
                 </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Company Logo</Label>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Upload your company logo to replace the default icon in the sidebar. Recommended size: 80x80 pixels.
+                </p>
+                <div className="flex items-start gap-4">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-md border-2 border-dashed border-muted-foreground/25 bg-muted/50">
+                    {companyLogo ? (
+                      <img 
+                        src={companyLogo} 
+                        alt="Company logo" 
+                        className="h-full w-full object-cover rounded-md"
+                      />
+                    ) : (
+                      <Image className="h-8 w-8 text-muted-foreground/50" />
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      className="hidden"
+                      data-testid="input-logo-upload"
+                    />
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      data-testid="button-upload-logo"
+                    >
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload Logo
+                    </Button>
+                    {companyLogo && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={handleRemoveLogo}
+                        className="text-destructive hover:text-destructive"
+                        data-testid="button-remove-logo"
+                      >
+                        <X className="mr-2 h-4 w-4" />
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              <Separator />
+              
+              <div className="space-y-2">
+                <Label htmlFor="default-share-rate">Default Share Rate (%)</Label>
+                <Input id="default-share-rate" type="number" defaultValue="15" className="max-w-xs" />
               </div>
             </CardContent>
           </Card>

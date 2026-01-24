@@ -46,6 +46,7 @@ import {
   Phone,
   Mail,
   MapPin,
+  Loader2,
 } from "lucide-react";
 import { Link, useLocation, useSearch } from "wouter";
 import {
@@ -132,6 +133,46 @@ export default function Accounts() {
     setTaskTitle("");
     setTaskDescription("");
     setTaskDueDate("");
+  };
+
+  const [isEnrolling, setIsEnrolling] = useState(false);
+
+  const handleEnrollAccount = async () => {
+    if (!selectedAccount) return;
+    
+    setIsEnrolling(true);
+    try {
+      const response = await apiRequest("POST", `/api/accounts/${selectedAccount.id}/enroll`, {});
+      const data = await response.json();
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/enrolled-accounts"] });
+      
+      toast({
+        title: "Account enrolled",
+        description: `${selectedAccount.name} is now enrolled in the growth program`,
+      });
+
+      if (data.playbook) {
+        queryClient.invalidateQueries({ queryKey: ["/api/playbooks"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+        toast({
+          title: "Playbook generated",
+          description: `AI-powered playbook created with ${data.playbook.taskCount || 0} personalized tasks`,
+        });
+      }
+      
+      setSelectedAccount(null);
+    } catch (error) {
+      console.error("Enrollment error:", error);
+      toast({
+        title: "Enrollment failed",
+        description: "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setIsEnrolling(false);
+    }
   };
 
   const handleCreateTask = () => {
@@ -810,9 +851,23 @@ export default function Accounts() {
                   {!selectedAccount.enrolled && (
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="outline" data-testid="button-enroll-account">
-                          <Target className="mr-2 h-4 w-4" />
-                          Enroll in Program
+                        <Button 
+                          variant="outline" 
+                          data-testid="button-enroll-account"
+                          onClick={handleEnrollAccount}
+                          disabled={isEnrolling}
+                        >
+                          {isEnrolling ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Enrolling...
+                            </>
+                          ) : (
+                            <>
+                              <Target className="mr-2 h-4 w-4" />
+                              Enroll in Program
+                            </>
+                          )}
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent className="max-w-xs" side="top">
@@ -822,6 +877,7 @@ export default function Accounts() {
                           <li>Tracks incremental revenue from targeted categories</li>
                           <li>Calculates rev-share fees based on captured wallet share</li>
                           <li>Enables performance monitoring on the Revenue tab</li>
+                          <li>Automatically generates an AI-powered sales playbook</li>
                         </ul>
                       </TooltipContent>
                     </Tooltip>

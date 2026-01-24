@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +12,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
@@ -22,6 +24,8 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   TrendingUp,
   DollarSign,
@@ -34,6 +38,8 @@ import {
   ArrowDownRight,
   Percent,
   HelpCircle,
+  Loader2,
+  Sparkles,
 } from "lucide-react";
 import {
   Tooltip as TooltipComponent,
@@ -77,13 +83,32 @@ interface RevenueSnapshot {
   feeAmount: number;
 }
 
+interface Account {
+  id: number;
+  name: string;
+  segment: string | null;
+}
+
 export default function Revenue() {
   const [periodFilter, setPeriodFilter] = useState<string>("12m");
   const [showEnrollDialog, setShowEnrollDialog] = useState(false);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>("");
+  const [shareRate, setShareRate] = useState<string>("15");
+  const [baselinePeriod, setBaselinePeriod] = useState<string>("12m");
+  const [isEnrolling, setIsEnrolling] = useState(false);
+  const { toast } = useToast();
+  const [, navigate] = useLocation();
 
   const { data: enrolledAccounts, isLoading } = useQuery<EnrolledAccount[]>({
     queryKey: ["/api/program-accounts"],
   });
+
+  const { data: allAccounts } = useQuery<Account[]>({
+    queryKey: ["/api/accounts"],
+  });
+
+  const enrolledAccountIds = new Set(enrolledAccounts?.map(a => a.accountId) || []);
+  const availableAccounts = allAccounts?.filter(a => !enrolledAccountIds.has(a.id)) || [];
 
   // Mock data for demonstration
   const mockEnrolledAccounts: EnrolledAccount[] = [
@@ -543,33 +568,54 @@ export default function Revenue() {
         </CardContent>
       </Card>
 
-      <Dialog open={showEnrollDialog} onOpenChange={setShowEnrollDialog}>
+      <Dialog open={showEnrollDialog} onOpenChange={(open) => {
+        setShowEnrollDialog(open);
+        if (!open) {
+          setSelectedAccountId("");
+          setShareRate("15");
+          setBaselinePeriod("12m");
+        }
+      }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Enroll Account</DialogTitle>
+            <DialogTitle>Enroll Account in Growth Program</DialogTitle>
+            <DialogDescription>
+              When you enroll an account, an AI-powered playbook will be automatically generated with targeted tasks based on identified opportunity gaps.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Select Account</Label>
-              <Select>
-                <SelectTrigger>
+              <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+                <SelectTrigger data-testid="select-enroll-account">
                   <SelectValue placeholder="Choose an account" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="3">Metro Mechanical</SelectItem>
-                  <SelectItem value="4">Premier Plumbing</SelectItem>
-                  <SelectItem value="6">Superior Heating</SelectItem>
+                  {availableAccounts.length === 0 ? (
+                    <SelectItem value="_none" disabled>No accounts available</SelectItem>
+                  ) : (
+                    availableAccounts.map(account => (
+                      <SelectItem key={account.id} value={account.id.toString()}>
+                        {account.name} {account.segment && `(${account.segment})`}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>Rev-Share Rate (%)</Label>
-              <Input type="number" defaultValue="15" />
+              <Input 
+                type="number" 
+                value={shareRate} 
+                onChange={(e) => setShareRate(e.target.value)}
+                data-testid="input-share-rate"
+              />
             </div>
             <div className="space-y-2">
               <Label>Baseline Period</Label>
-              <Select defaultValue="12m">
-                <SelectTrigger>
+              <Select value={baselinePeriod} onValueChange={setBaselinePeriod}>
+                <SelectTrigger data-testid="select-baseline-period">
                   <SelectValue placeholder="Select period" />
                 </SelectTrigger>
                 <SelectContent>
@@ -578,14 +624,95 @@ export default function Revenue() {
                 </SelectContent>
               </Select>
             </div>
+            
+            <div className="bg-primary/5 border border-primary/20 rounded-md p-3">
+              <div className="flex items-start gap-2">
+                <Sparkles className="h-4 w-4 text-primary mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-medium text-primary">AI Playbook Auto-Generation</p>
+                  <p className="text-muted-foreground mt-1">
+                    A personalized growth playbook with sales tasks, call scripts, and email templates will be created automatically for this account.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEnrollDialog(false)}>
+            <Button variant="outline" onClick={() => setShowEnrollDialog(false)} disabled={isEnrolling}>
               Cancel
             </Button>
-            <Button onClick={() => setShowEnrollDialog(false)}>
-              <Target className="mr-2 h-4 w-4" />
-              Enroll Account
+            <Button 
+              onClick={async () => {
+                if (!selectedAccountId) {
+                  toast({ title: "Select an account", description: "Please select an account to enroll", variant: "destructive" });
+                  return;
+                }
+                
+                setIsEnrolling(true);
+                try {
+                  const months = baselinePeriod === "6m" ? 6 : 12;
+                  const baselineStart = new Date();
+                  baselineStart.setMonth(baselineStart.getMonth() - months);
+                  const baselineEnd = new Date();
+                  
+                  const response = await apiRequest("POST", "/api/program-accounts", {
+                    accountId: parseInt(selectedAccountId),
+                    baselineStart: baselineStart.toISOString(),
+                    baselineEnd: baselineEnd.toISOString(),
+                    baselineRevenue: "100000",
+                    shareRate: (parseFloat(shareRate) / 100).toString(),
+                    status: "active",
+                  });
+                  
+                  const data = await response.json();
+                  
+                  queryClient.invalidateQueries({ queryKey: ["/api/program-accounts"] });
+                  queryClient.invalidateQueries({ queryKey: ["/api/playbooks"] });
+                  queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+                  
+                  setShowEnrollDialog(false);
+                  
+                  if (data.playbook) {
+                    toast({
+                      title: "Account enrolled with playbook",
+                      description: `Created ${data.playbook.tasksGenerated} AI-generated tasks. View the playbook now?`,
+                      action: (
+                        <Button size="sm" variant="outline" onClick={() => navigate("/playbooks")}>
+                          View Playbook
+                        </Button>
+                      ),
+                    });
+                  } else {
+                    toast({
+                      title: "Account enrolled",
+                      description: "The account has been enrolled in the growth program.",
+                    });
+                  }
+                } catch (error) {
+                  console.error("Enrollment error:", error);
+                  toast({
+                    title: "Enrollment failed",
+                    description: "Failed to enroll account. Please try again.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setIsEnrolling(false);
+                }
+              }}
+              disabled={isEnrolling || !selectedAccountId}
+              data-testid="button-confirm-enroll"
+            >
+              {isEnrolling ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Enrolling...
+                </>
+              ) : (
+                <>
+                  <Target className="mr-2 h-4 w-4" />
+                  Enroll & Generate Playbook
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
