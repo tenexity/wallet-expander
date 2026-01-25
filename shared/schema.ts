@@ -460,3 +460,18 @@ export const insertRevShareTierSchema = createInsertSchema(revShareTiers).omit({
 
 export type InsertRevShareTier = z.infer<typeof insertRevShareTierSchema>;
 export type RevShareTier = typeof revShareTiers.$inferSelect;
+
+// ============ EMAIL SETTINGS (Stored in settings table as JSON) ============
+export const emailSettingsSchema = z.object({
+  enabled: z.boolean().default(false),
+  fromEmail: z.string().email().default("notifications@yourdomain.com"),
+  fromName: z.string().default("AI VP Dashboard"),
+  notifyOnNewTask: z.boolean().default(true),
+  notifyOnHighPriority: z.boolean().default(true),
+  dailyDigest: z.boolean().default(false),
+});
+
+export const updateEmailSettingsSchema = emailSettingsSchema.partial();
+
+export type EmailSettings = z.infer<typeof emailSettingsSchema>;
+export type UpdateEmailSettings = z.infer<typeof updateEmailSettingsSchema>;

@@ -12,10 +12,19 @@ import {
   insertTerritoryManagerSchema,
   insertCustomCategorySchema,
   insertRevShareTierSchema,
+  updateEmailSettingsSchema,
   DEFAULT_SCORING_WEIGHTS,
 } from "@shared/schema";
 import { z } from "zod";
 import { analyzeSegment, generatePlaybookTasks } from "./ai-service";
+import { 
+  getEmailSettings, 
+  saveEmailSettings, 
+  sendTestEmail, 
+  sendTaskNotification,
+  isEmailConfigured,
+  DEFAULT_EMAIL_SETTINGS,
+} from "./email-service";
 
 function safeParseGapCategories(gapCategories: unknown): string[] {
   if (Array.isArray(gapCategories)) {
@@ -913,6 +922,19 @@ KEY TALKING POINTS:
     try {
       const data = insertTaskSchema.parse(req.body);
       const task = await storage.createTask(data);
+      
+      // Send email notification if configured
+      if (task.assignedTmId) {
+        const territoryManager = await storage.getTerritoryManager(task.assignedTmId);
+        const account = await storage.getAccount(task.accountId);
+        if (territoryManager && account) {
+          // Fire and forget - don't block the response
+          sendTaskNotification(task, account, territoryManager).catch(err => {
+            console.error("Failed to send task notification:", err);
+          });
+        }
+      }
+      
       res.status(201).json(task);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1955,6 +1977,50 @@ KEY TALKING POINTS:
     } catch (error) {
       console.error("Seed default tier error:", error);
       res.status(500).json({ message: "Failed to seed default tier" });
+    }
+  });
+
+  // ============ Email Settings ============
+  app.get("/api/email/settings", async (req, res) => {
+    try {
+      const settings = await getEmailSettings();
+      res.json({
+        ...settings,
+        isConfigured: isEmailConfigured(),
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get email settings" });
+    }
+  });
+
+  app.patch("/api/email/settings", async (req, res) => {
+    try {
+      const validatedData = updateEmailSettingsSchema.parse(req.body);
+      const settings = await saveEmailSettings(validatedData);
+      res.json(settings);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid email settings", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update email settings" });
+    }
+  });
+
+  app.post("/api/email/test", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Email address required" });
+      }
+      
+      const result = await sendTestEmail(email);
+      if (result.success) {
+        res.json({ message: "Test email sent successfully", messageId: result.messageId });
+      } else {
+        res.status(400).json({ message: result.error || "Failed to send test email" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to send test email" });
     }
   });
 

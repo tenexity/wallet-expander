@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -892,6 +892,283 @@ function RevenueTrackingManager() {
   );
 }
 
+interface EmailSettings {
+  enabled: boolean;
+  fromEmail: string;
+  fromName: string;
+  notifyOnNewTask: boolean;
+  notifyOnHighPriority: boolean;
+  dailyDigest: boolean;
+  isConfigured: boolean;
+}
+
+function EmailSettingsManager() {
+  const { toast } = useToast();
+  const [testEmail, setTestEmail] = useState("");
+  const [fromEmail, setFromEmail] = useState("");
+  const [fromName, setFromName] = useState("");
+  const [hasEditedSender, setHasEditedSender] = useState(false);
+
+  const { data: emailSettings, isLoading } = useQuery<EmailSettings>({
+    queryKey: ["/api/email/settings"],
+  });
+
+  // Initialize local state when settings load
+  useEffect(() => {
+    if (emailSettings && !hasEditedSender) {
+      setFromEmail(emailSettings.fromEmail || "");
+      setFromName(emailSettings.fromName || "");
+    }
+  }, [emailSettings, hasEditedSender]);
+
+  const updateSettingsMutation = useMutation({
+    mutationFn: async (settings: Partial<EmailSettings>) => {
+      const response = await apiRequest("PATCH", "/api/email/settings", settings);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/email/settings"] });
+      toast({ title: "Email settings updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to update settings", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const sendTestEmailMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const response = await apiRequest("POST", "/api/email/test", { email });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Test email sent", description: "Check your inbox for the test email" });
+      setTestEmail("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to send test email", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleToggle = (key: keyof EmailSettings, value: boolean) => {
+    updateSettingsMutation.mutate({ [key]: value });
+  };
+
+  const handleSendTestEmail = () => {
+    if (!testEmail) {
+      toast({ title: "Enter an email address", variant: "destructive" });
+      return;
+    }
+    sendTestEmailMutation.mutate(testEmail);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="h-5 w-5" />
+            Email Configuration
+          </CardTitle>
+          <CardDescription>
+            Configure email notifications for task assignments and updates
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {!emailSettings?.isConfigured && (
+            <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
+              <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+              <div>
+                <p className="font-medium text-amber-800 dark:text-amber-200">Resend API Key Required</p>
+                <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                  To enable email notifications, you need to add a RESEND_API_KEY secret. 
+                  Get your API key from <a href="https://resend.com" target="_blank" rel="noopener noreferrer" className="underline">resend.com</a> and add it to your project secrets.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {emailSettings?.isConfigured && (
+            <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+              <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+              <div>
+                <p className="font-medium text-green-800 dark:text-green-200">Email Provider Connected</p>
+                <p className="text-sm text-green-700 dark:text-green-300">Resend is configured and ready to send emails</p>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="email-enabled">Enable Email Notifications</Label>
+                <p className="text-sm text-muted-foreground">Turn on to send email notifications</p>
+              </div>
+              <Switch
+                id="email-enabled"
+                checked={emailSettings?.enabled || false}
+                onCheckedChange={(checked) => handleToggle("enabled", checked)}
+                disabled={!emailSettings?.isConfigured}
+                data-testid="switch-email-enabled"
+              />
+            </div>
+
+            <Separator />
+
+            <div className="space-y-4">
+              <h4 className="font-medium">Sender Configuration</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="from-name">From Name</Label>
+                  <Input
+                    id="from-name"
+                    value={fromName}
+                    onChange={(e) => {
+                      setFromName(e.target.value);
+                      setHasEditedSender(true);
+                    }}
+                    placeholder="AI VP Dashboard"
+                    data-testid="input-from-name"
+                  />
+                  <p className="text-xs text-muted-foreground">Display name for sent emails</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="from-email">From Email</Label>
+                  <Input
+                    id="from-email"
+                    type="email"
+                    value={fromEmail}
+                    onChange={(e) => {
+                      setFromEmail(e.target.value);
+                      setHasEditedSender(true);
+                    }}
+                    placeholder="notifications@yourdomain.com"
+                    data-testid="input-from-email"
+                  />
+                  <p className="text-xs text-muted-foreground">Must be a verified domain in Resend</p>
+                </div>
+              </div>
+              {hasEditedSender && (
+                <Button
+                  onClick={() => {
+                    updateSettingsMutation.mutate({ fromEmail, fromName });
+                    setHasEditedSender(false);
+                  }}
+                  disabled={updateSettingsMutation.isPending}
+                  size="sm"
+                  data-testid="button-save-sender"
+                >
+                  {updateSettingsMutation.isPending && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
+                  Save Sender Settings
+                </Button>
+              )}
+            </div>
+
+            <Separator />
+
+            <div className="space-y-4">
+              <h4 className="font-medium">Notification Types</h4>
+              
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="notify-new-task">New Task Assignments</Label>
+                  <p className="text-sm text-muted-foreground">Notify TMs when tasks are assigned to them</p>
+                </div>
+                <Switch
+                  id="notify-new-task"
+                  checked={emailSettings?.notifyOnNewTask || false}
+                  onCheckedChange={(checked) => handleToggle("notifyOnNewTask", checked)}
+                  disabled={!emailSettings?.enabled}
+                  data-testid="switch-notify-new-task"
+                />
+              </div>
+
+              <div className="flex items-center justify-between opacity-60">
+                <div>
+                  <Label htmlFor="notify-high-priority" className="flex items-center gap-2">
+                    High Priority Alerts
+                    <Badge variant="outline" className="text-xs">Coming Soon</Badge>
+                  </Label>
+                  <p className="text-sm text-muted-foreground">Send urgent notifications for high-priority tasks</p>
+                </div>
+                <Switch
+                  id="notify-high-priority"
+                  checked={emailSettings?.notifyOnHighPriority || false}
+                  onCheckedChange={(checked) => handleToggle("notifyOnHighPriority", checked)}
+                  disabled={true}
+                  data-testid="switch-notify-high-priority"
+                />
+              </div>
+
+              <div className="flex items-center justify-between opacity-60">
+                <div>
+                  <Label htmlFor="daily-digest" className="flex items-center gap-2">
+                    Daily Digest
+                    <Badge variant="outline" className="text-xs">Coming Soon</Badge>
+                  </Label>
+                  <p className="text-sm text-muted-foreground">Send a daily summary of pending tasks</p>
+                </div>
+                <Switch
+                  id="daily-digest"
+                  checked={emailSettings?.dailyDigest || false}
+                  onCheckedChange={(checked) => handleToggle("dailyDigest", checked)}
+                  disabled={true}
+                  data-testid="switch-daily-digest"
+                />
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Test Email</CardTitle>
+          <CardDescription>
+            Send a test email to verify your configuration is working
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2">
+            <Input
+              type="email"
+              placeholder="Enter email address"
+              value={testEmail}
+              onChange={(e) => setTestEmail(e.target.value)}
+              className="flex-1"
+              data-testid="input-test-email"
+            />
+            <Button 
+              onClick={handleSendTestEmail}
+              disabled={!emailSettings?.isConfigured || sendTestEmailMutation.isPending}
+              data-testid="button-send-test-email"
+            >
+              {sendTestEmailMutation.isPending ? (
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Mail className="mr-2 h-4 w-4" />
+              )}
+              Send Test
+            </Button>
+          </div>
+          {!emailSettings?.isConfigured && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Add your RESEND_API_KEY secret to enable test emails
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function CategoriesManager() {
   const { toast } = useToast();
   const [newCategoryName, setNewCategoryName] = useState("");
@@ -1474,6 +1751,10 @@ export default function SettingsPage() {
           <TabsTrigger value="revenue-tracking" data-testid="tab-revenue-tracking">
             <DollarSign className="mr-2 h-4 w-4" />
             Revenue Tracking
+          </TabsTrigger>
+          <TabsTrigger value="email" data-testid="tab-email">
+            <Mail className="mr-2 h-4 w-4" />
+            Email
           </TabsTrigger>
         </TabsList>
 
@@ -2165,6 +2446,10 @@ Output a structured profile with category expectations.`}
 
         <TabsContent value="revenue-tracking" className="space-y-6">
           <RevenueTrackingManager />
+        </TabsContent>
+
+        <TabsContent value="email" className="space-y-6">
+          <EmailSettingsManager />
         </TabsContent>
       </Tabs>
 
