@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, DragEvent } from "react";
+import { useState, useEffect, useCallback, DragEvent, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { KPICard } from "@/components/kpi-card";
@@ -9,6 +9,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { InfoTooltip } from "@/components/info-tooltip";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import {
   DollarSign,
   Users,
@@ -37,6 +46,13 @@ import {
   RectangleVertical,
   GraduationCap,
   Trophy,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Settings2,
+  Columns,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import {
   Popover,
@@ -94,6 +110,52 @@ interface DashboardStats {
     accountCount: number;
   }>;
 }
+
+interface AccountWithMetrics {
+  id: number;
+  name: string;
+  segment: string;
+  region: string;
+  assignedTm: string;
+  status: string;
+  last12mRevenue: number;
+  categoryPenetration: number;
+  opportunityScore: number;
+  gapCategories: Array<{
+    name: string;
+    gapPct: number;
+    estimatedValue: number;
+  }>;
+  enrolled: boolean;
+}
+
+interface EnrolledAccount {
+  id: number;
+  accountId: number;
+  accountName: string;
+  segment: string;
+  enrolledAt: string;
+  baselineRevenue: number;
+  currentRevenue: number;
+  incrementalRevenue: number;
+  shareRate: number;
+  status: "active" | "paused" | "graduated";
+}
+
+type OpportunitySortKey = "opportunityScore" | "name" | "segment" | "region" | "last12mRevenue" | "categoryPenetration" | "enrolled";
+type SortDirection = "asc" | "desc";
+
+const OPPORTUNITY_COLUMNS_STORAGE_KEY = "dashboard_opportunity_columns";
+
+const ALL_OPPORTUNITY_COLUMNS = [
+  { key: "name", label: "Account", default: true },
+  { key: "segment", label: "Segment", default: true },
+  { key: "region", label: "Region", default: false },
+  { key: "last12mRevenue", label: "Revenue (12M)", default: false },
+  { key: "categoryPenetration", label: "Penetration", default: false },
+  { key: "opportunityScore", label: "Score", default: true },
+  { key: "enrolled", label: "Status", default: true },
+] as const;
 
 interface GraduationReadyData {
   count: number;
@@ -219,6 +281,33 @@ export default function Dashboard() {
   const [isLayoutLocked, setIsLayoutLocked] = useState(false);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
+  
+  // Opportunity table sorting state (default: score descending)
+  const [opportunitySortKey, setOpportunitySortKey] = useState<OpportunitySortKey>("opportunityScore");
+  const [opportunitySortDir, setOpportunitySortDir] = useState<SortDirection>("desc");
+  
+  // Column visibility state for opportunity table
+  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => {
+    // Initialize with defaults first (SSR-safe)
+    return new Set(
+      ALL_OPPORTUNITY_COLUMNS.filter((col) => col.default).map((col) => col.key)
+    );
+  });
+  
+  // Load saved column visibility from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(OPPORTUNITY_COLUMNS_STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setVisibleColumns(new Set(parsed));
+        }
+      } catch (e) {
+        console.error("Failed to parse saved column visibility");
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const savedLayout = localStorage.getItem(LAYOUT_STORAGE_KEY);
@@ -270,9 +359,102 @@ export default function Dashboard() {
     queryKey: ["/api/program-accounts/graduation-ready"],
   });
 
-  const handleOpportunityClick = (row: DashboardStats["topOpportunities"][0]) => {
-    navigate(`/accounts?account=${row.id}`);
-  };
+  // Fetch accounts data for the enhanced Top Opportunities table
+  const { data: accounts } = useQuery<AccountWithMetrics[]>({
+    queryKey: ["/api/accounts"],
+  });
+
+  // Fetch enrolled accounts for revenue by segment
+  const { data: enrolledAccounts } = useQuery<EnrolledAccount[]>({
+    queryKey: ["/api/program-accounts"],
+  });
+
+  // Toggle column visibility
+  const toggleColumnVisibility = useCallback((columnKey: string) => {
+    setVisibleColumns(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(columnKey)) {
+        // Don't allow hiding all columns - keep at least one
+        if (newSet.size > 1) {
+          newSet.delete(columnKey);
+        }
+      } else {
+        newSet.add(columnKey);
+      }
+      localStorage.setItem(OPPORTUNITY_COLUMNS_STORAGE_KEY, JSON.stringify(Array.from(newSet)));
+      return newSet;
+    });
+  }, []);
+
+  // Handle sort column click
+  const handleSortClick = useCallback((key: OpportunitySortKey) => {
+    if (opportunitySortKey === key) {
+      setOpportunitySortDir(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setOpportunitySortKey(key);
+      setOpportunitySortDir(key === "opportunityScore" ? "desc" : "asc");
+    }
+  }, [opportunitySortKey]);
+
+  // Sorted and limited accounts for Top Opportunities (top 10)
+  const sortedTopOpportunities = useMemo(() => {
+    if (!accounts) return [];
+    
+    const sorted = [...accounts].sort((a, b) => {
+      let comparison = 0;
+      switch (opportunitySortKey) {
+        case "opportunityScore":
+          comparison = a.opportunityScore - b.opportunityScore;
+          break;
+        case "name":
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case "segment":
+          comparison = a.segment.localeCompare(b.segment);
+          break;
+        case "region":
+          comparison = a.region.localeCompare(b.region);
+          break;
+        case "last12mRevenue":
+          comparison = a.last12mRevenue - b.last12mRevenue;
+          break;
+        case "categoryPenetration":
+          comparison = a.categoryPenetration - b.categoryPenetration;
+          break;
+        case "enrolled":
+          comparison = (a.enrolled ? 1 : 0) - (b.enrolled ? 1 : 0);
+          break;
+        default:
+          comparison = 0;
+      }
+      return opportunitySortDir === "asc" ? comparison : -comparison;
+    });
+    
+    return sorted.slice(0, 10);
+  }, [accounts, opportunitySortKey, opportunitySortDir]);
+
+  // Revenue by segment from enrolled accounts
+  const revenueBySegment = useMemo(() => {
+    if (!enrolledAccounts || enrolledAccounts.length === 0) return null;
+    
+    const segmentMap = new Map<string, { segment: string; revenue: number; count: number }>();
+    
+    enrolledAccounts.forEach(account => {
+      const existing = segmentMap.get(account.segment);
+      if (existing) {
+        existing.revenue += account.currentRevenue;
+        existing.count += 1;
+      } else {
+        segmentMap.set(account.segment, {
+          segment: account.segment,
+          revenue: account.currentRevenue,
+          count: 1,
+        });
+      }
+    });
+    
+    return Array.from(segmentMap.values());
+  }, [enrolledAccounts]);
 
   const handleTaskClick = (taskId: number) => {
     navigate(`/playbooks?task=${taskId}`);
@@ -395,54 +577,97 @@ export default function Dashboard() {
     localStorage.setItem(COLLAPSED_BLOCKS_KEY, JSON.stringify(Array.from(newCollapsed)));
   };
 
-  const opportunityColumns = [
-    {
-      key: "name",
-      header: "Account",
-      cell: (row: DashboardStats["topOpportunities"][0]) => (
-        <div className="flex flex-col gap-0.5">
-          <span className="font-medium">{row.name}</span>
-          <Badge variant="outline" className="w-fit text-xs">
-            {row.segment}
+  // Render sortable header with icon
+  const renderSortableHeader = (key: OpportunitySortKey, label: string) => (
+    <button
+      className="flex items-center gap-1 hover:text-foreground transition-colors text-left"
+      onClick={() => handleSortClick(key)}
+      data-testid={`sort-${key}`}
+    >
+      {label}
+      {opportunitySortKey === key ? (
+        opportunitySortDir === "asc" ? (
+          <ArrowUp className="h-3 w-3" />
+        ) : (
+          <ArrowDown className="h-3 w-3" />
+        )
+      ) : (
+        <ArrowUpDown className="h-3 w-3 opacity-50" />
+      )}
+    </button>
+  );
+
+  // Build columns based on visibility
+  const opportunityColumns = useMemo(() => {
+    const allColumns = [
+      {
+        key: "name",
+        header: renderSortableHeader("name", "Account"),
+        cell: (row: AccountWithMetrics) => (
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <Users className="h-4 w-4" />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-medium">{row.name}</span>
+              <span className="text-xs text-muted-foreground">{row.assignedTm}</span>
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "segment",
+        header: renderSortableHeader("segment", "Segment"),
+        cell: (row: AccountWithMetrics) => (
+          <Badge variant="outline">{row.segment}</Badge>
+        ),
+      },
+      {
+        key: "region",
+        header: renderSortableHeader("region", "Region"),
+        cell: (row: AccountWithMetrics) => (
+          <span className="text-muted-foreground">{row.region}</span>
+        ),
+      },
+      {
+        key: "last12mRevenue",
+        header: renderSortableHeader("last12mRevenue", "Revenue (12M)"),
+        cell: (row: AccountWithMetrics) => (
+          <span className="font-semibold">{formatCurrency(row.last12mRevenue)}</span>
+        ),
+      },
+      {
+        key: "categoryPenetration",
+        header: renderSortableHeader("categoryPenetration", "Penetration"),
+        cell: (row: AccountWithMetrics) => (
+          <ProgressRing
+            value={row.categoryPenetration}
+            size={36}
+            strokeWidth={4}
+            testId={`penetration-${row.id}`}
+          />
+        ),
+      },
+      {
+        key: "opportunityScore",
+        header: renderSortableHeader("opportunityScore", "Score"),
+        cell: (row: AccountWithMetrics) => (
+          <ScoreBadge score={row.opportunityScore} testId={`score-${row.id}`} />
+        ),
+      },
+      {
+        key: "enrolled",
+        header: renderSortableHeader("enrolled", "Status"),
+        cell: (row: AccountWithMetrics) => (
+          <Badge variant={row.enrolled ? "default" : "secondary"}>
+            {row.enrolled ? "Enrolled" : "Not Enrolled"}
           </Badge>
-        </div>
-      ),
-    },
-    {
-      key: "opportunityScore",
-      header: "Score",
-      cell: (row: DashboardStats["topOpportunities"][0]) => (
-        <ScoreBadge score={row.opportunityScore} testId={`score-${row.id}`} />
-      ),
-    },
-    {
-      key: "estimatedValue",
-      header: "Est. Value",
-      cell: (row: DashboardStats["topOpportunities"][0]) => (
-        <span className="font-semibold text-chart-2">
-          {formatCurrency(row.estimatedValue)}
-        </span>
-      ),
-    },
-    {
-      key: "gapCategories",
-      header: "Gap Categories",
-      cell: (row: DashboardStats["topOpportunities"][0]) => (
-        <div className="flex flex-wrap gap-1">
-          {row.gapCategories.slice(0, 2).map((cat) => (
-            <Badge key={cat} variant="secondary" className="text-xs">
-              {cat}
-            </Badge>
-          ))}
-          {row.gapCategories.length > 2 && (
-            <Badge variant="secondary" className="text-xs">
-              +{row.gapCategories.length - 2}
-            </Badge>
-          )}
-        </div>
-      ),
-    },
-  ];
+        ),
+      },
+    ];
+    
+    return allColumns.filter(col => visibleColumns.has(col.key));
+  }, [visibleColumns, opportunitySortKey, opportunitySortDir]);
 
   const taskColumns = [
     {
@@ -951,22 +1176,60 @@ export default function Dashboard() {
             {renderBlockHeader(
               blockId,
               "Top Opportunities",
-              "Accounts with highest wallet share leakage",
-              "Accounts ranked by opportunity score based on their category gaps vs ICP expectations. Higher scores indicate more potential revenue to capture from wallet share leakage.",
+              `Top 10 accounts by ${ALL_OPPORTUNITY_COLUMNS.find(c => c.key === opportunitySortKey)?.label || "Score"}`,
+              "Accounts ranked by opportunity score based on their category gaps vs ICP expectations. Higher scores indicate more potential revenue to capture from wallet share leakage. Click column headers to sort.",
               !isCollapsed && (
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href="/accounts">View All</Link>
-                </Button>
+                <div className="flex items-center gap-1">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" data-testid="button-columns-visibility">
+                        <Columns className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuLabel>Show Columns</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {ALL_OPPORTUNITY_COLUMNS.map((col) => (
+                        <DropdownMenuCheckboxItem
+                          key={col.key}
+                          checked={visibleColumns.has(col.key)}
+                          onCheckedChange={() => toggleColumnVisibility(col.key)}
+                          data-testid={`toggle-column-${col.key}`}
+                        >
+                          {col.label}
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <Button variant="ghost" size="sm" asChild data-testid="button-view-all-opportunities">
+                    <Link href="/accounts">View All</Link>
+                  </Button>
+                </div>
               )
             )}
             {!isCollapsed && (
               <CardContent className="flex-1 overflow-y-auto overflow-x-auto">
-                <DataTable
-                  columns={opportunityColumns}
-                  data={displayStats.topOpportunities}
-                  testId="table-opportunities"
-                  onRowClick={handleOpportunityClick}
-                />
+                {sortedTopOpportunities.length > 0 ? (
+                  <DataTable
+                    columns={opportunityColumns}
+                    data={sortedTopOpportunities}
+                    testId="table-opportunities"
+                    onRowClick={(row: AccountWithMetrics) => navigate(`/accounts?account=${row.id}`)}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-3">
+                      <Users className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <p className="font-medium">No accounts found</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Upload account data to see opportunities
+                    </p>
+                    <Button variant="outline" size="sm" className="mt-3" asChild>
+                      <Link href="/data-uploads">Upload Data</Link>
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             )}
           </Card>
@@ -1103,42 +1366,64 @@ export default function Dashboard() {
         );
 
       case "revenue-chart":
+        // Use revenue data from enrolled accounts if available, otherwise fall back to dashboard stats
+        const chartData = revenueBySegment || displayStats.segmentBreakdown;
         return (
           <Card className="h-full flex flex-col overflow-hidden">
             {renderBlockHeader(
               blockId,
               "Revenue by Segment",
-              undefined,
-              "Total revenue contribution by customer segment. Compare segment performance to identify growth opportunities and track the impact of wallet share capture efforts."
+              revenueBySegment ? "From enrolled accounts" : "All accounts",
+              "Revenue contribution by customer segment from enrolled accounts. This data is connected to Revenue Tracking. Enroll more accounts to see more detailed segment breakdown.",
+              !isCollapsed && (
+                <Button variant="ghost" size="sm" asChild data-testid="button-view-revenue">
+                  <Link href="/revenue">View Details</Link>
+                </Button>
+              )
             )}
             {!isCollapsed && (
               <CardContent className="flex-1 overflow-y-auto overflow-x-auto">
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={displayStats.segmentBreakdown}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis
-                        dataKey="segment"
-                        tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                        axisLine={{ stroke: "hsl(var(--border))" }}
-                      />
-                      <YAxis
-                        tickFormatter={(value) => formatCurrency(value)}
-                        tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                        axisLine={{ stroke: "hsl(var(--border))" }}
-                      />
-                      <RechartsTooltip
-                        formatter={(value: number) => [formatCurrency(value), "Revenue"]}
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--popover))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "var(--radius)",
-                        }}
-                      />
-                      <Bar dataKey="revenue" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                {chartData && chartData.length > 0 ? (
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis
+                          dataKey="segment"
+                          tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                          axisLine={{ stroke: "hsl(var(--border))" }}
+                        />
+                        <YAxis
+                          tickFormatter={(value) => formatCurrency(value)}
+                          tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                          axisLine={{ stroke: "hsl(var(--border))" }}
+                        />
+                        <RechartsTooltip
+                          formatter={(value: number) => [formatCurrency(value), "Revenue"]}
+                          contentStyle={{
+                            backgroundColor: "hsl(var(--popover))",
+                            border: "1px solid hsl(var(--border))",
+                            borderRadius: "var(--radius)",
+                          }}
+                        />
+                        <Bar dataKey="revenue" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-3">
+                      <DollarSign className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <p className="font-medium">No revenue data</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Enroll accounts to track revenue by segment
+                    </p>
+                    <Button variant="outline" size="sm" className="mt-3" asChild>
+                      <Link href="/revenue">Go to Revenue Tracking</Link>
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             )}
           </Card>

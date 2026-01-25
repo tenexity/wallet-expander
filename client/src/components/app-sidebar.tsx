@@ -39,6 +39,12 @@ const mainNavItems = [
     tooltip: "Overview of KPIs, top opportunities, and your daily focus tasks",
   },
   {
+    title: "Revenue Tracking",
+    url: "/revenue",
+    icon: TrendingUp,
+    tooltip: "Track enrolled accounts, incremental revenue, and calculate rev-share fees",
+  },
+  {
     title: "Workflow Guide",
     url: "/workflow-guide",
     icon: GitBranch,
@@ -61,12 +67,6 @@ const mainNavItems = [
     url: "/playbooks",
     icon: ClipboardList,
     tooltip: "Generate and manage AI-powered sales tasks with call scripts and emails",
-  },
-  {
-    title: "Revenue Tracking",
-    url: "/revenue",
-    icon: TrendingUp,
-    tooltip: "Track enrolled accounts, incremental revenue, and calculate rev-share fees",
   },
 ];
 
