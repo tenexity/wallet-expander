@@ -26,6 +26,11 @@ The application follows a client-server architecture.
     - "Getting Started" progress indicator to guide new users.
     - Enhanced cross-navigation allowing drill-down from dashboard KPIs to detailed account analysis and pre-filled playbook generation.
     - Dynamic branding settings (Company Name, Application Title, Company Logo) persisted in the database and updated in real-time.
+    - **Workflow Guide:** Visual swim lane chart showing Setup (one-time), Monthly, Weekly, and Daily workflows with clickable steps that navigate directly to corresponding features.
+
+**Navigation Structure:**
+- **Main Section:** Dashboard, Workflow Guide, Accounts, ICP Builder, Playbooks, Revenue Tracking
+- **Admin Section:** Data Uploads, Settings
 
 **Backend:**
 - **Technology:** Express.js with Node.js.
