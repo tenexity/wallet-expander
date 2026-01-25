@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, DragEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { KPICard } from "@/components/kpi-card";
 import { DataTable } from "@/components/data-table";
@@ -25,21 +24,15 @@ import {
   Clock,
   ChevronRight,
   CheckCircle2,
-  Circle,
   Upload,
   Sparkles,
-  GripVertical,
   RotateCcw,
   ChevronDown,
   ChevronUp,
-  Columns,
+  Lock,
+  Unlock,
+  Move,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
@@ -58,6 +51,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
+import "react-grid-layout/css/styles.css";
 
 interface DashboardStats {
   totalAccounts: number;
@@ -133,29 +127,33 @@ function formatCurrency(value: number): string {
   return `$${value.toFixed(0)}`;
 }
 
-const STORAGE_KEY = "dashboard_block_order";
-const BLOCK_WIDTHS_KEY = "dashboard_block_widths";
+const LAYOUT_STORAGE_KEY = "dashboard_grid_layout";
 const COLLAPSED_BLOCKS_KEY = "dashboard_collapsed_blocks";
+const LAYOUT_LOCKED_KEY = "dashboard_layout_locked";
 
-const DEFAULT_BLOCK_ORDER = [
-  "daily-focus",
-  "top-opportunities",
-  "segment-breakdown",
-  "recent-tasks",
-  "icp-profiles",
-  "revenue-chart",
+const GRID_COLS = 12;
+const ROW_HEIGHT = 80;
+
+interface LayoutItem {
+  i: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  minW?: number;
+  minH?: number;
+  maxW?: number;
+  maxH?: number;
+}
+
+const DEFAULT_LAYOUT: LayoutItem[] = [
+  { i: "daily-focus", x: 0, y: 0, w: 12, h: 4, minW: 6, minH: 3 },
+  { i: "top-opportunities", x: 0, y: 4, w: 8, h: 5, minW: 4, minH: 4 },
+  { i: "segment-breakdown", x: 8, y: 4, w: 4, h: 5, minW: 3, minH: 4 },
+  { i: "recent-tasks", x: 0, y: 9, w: 4, h: 5, minW: 3, minH: 4 },
+  { i: "icp-profiles", x: 4, y: 9, w: 4, h: 5, minW: 3, minH: 4 },
+  { i: "revenue-chart", x: 8, y: 9, w: 4, h: 5, minW: 4, minH: 4 },
 ];
-
-type BlockWidth = 1 | 2 | 3;
-
-const DEFAULT_BLOCK_WIDTHS: Record<string, BlockWidth> = {
-  "daily-focus": 3,
-  "top-opportunities": 2,
-  "segment-breakdown": 1,
-  "recent-tasks": 1,
-  "icp-profiles": 1,
-  "revenue-chart": 3,
-};
 
 const BLOCK_LABELS: Record<string, string> = {
   "daily-focus": "Daily Focus",
@@ -168,34 +166,25 @@ const BLOCK_LABELS: Record<string, string> = {
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
-  const [blockOrder, setBlockOrder] = useState<string[]>(DEFAULT_BLOCK_ORDER);
-  const [blockWidths, setBlockWidths] = useState<Record<string, BlockWidth>>(DEFAULT_BLOCK_WIDTHS);
+  const [layout, setLayout] = useState<LayoutItem[]>(DEFAULT_LAYOUT);
   const [collapsedBlocks, setCollapsedBlocks] = useState<Set<string>>(new Set());
-  
-  // Load saved order, widths, and collapsed states from localStorage
+  const [isLayoutLocked, setIsLayoutLocked] = useState(false);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
+    const savedLayout = localStorage.getItem(LAYOUT_STORAGE_KEY);
+    if (savedLayout) {
       try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length === DEFAULT_BLOCK_ORDER.length) {
-          setBlockOrder(parsed);
+        const parsed = JSON.parse(savedLayout);
+        if (Array.isArray(parsed) && parsed.length === DEFAULT_LAYOUT.length) {
+          setLayout(parsed);
         }
       } catch (e) {
-        console.error("Failed to parse saved block order");
+        console.error("Failed to parse saved layout");
       }
     }
-    
-    const savedWidths = localStorage.getItem(BLOCK_WIDTHS_KEY);
-    if (savedWidths) {
-      try {
-        const parsed = JSON.parse(savedWidths);
-        setBlockWidths({ ...DEFAULT_BLOCK_WIDTHS, ...parsed });
-      } catch (e) {
-        console.error("Failed to parse saved block widths");
-      }
-    }
-    
+
     const savedCollapsed = localStorage.getItem(COLLAPSED_BLOCKS_KEY);
     if (savedCollapsed) {
       try {
@@ -206,6 +195,11 @@ export default function Dashboard() {
       } catch (e) {
         console.error("Failed to parse saved collapsed blocks");
       }
+    }
+
+    const savedLocked = localStorage.getItem(LAYOUT_LOCKED_KEY);
+    if (savedLocked) {
+      setIsLayoutLocked(savedLocked === "true");
     }
   }, []);
 
@@ -225,30 +219,93 @@ export default function Dashboard() {
     navigate(`/playbooks?task=${taskId}`);
   };
 
-  const handleDragEnd = (result: DropResult) => {
-    if (!result.destination) return;
+  const saveLayout = useCallback((newLayout: LayoutItem[]) => {
+    setLayout(newLayout);
+    localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(newLayout));
+  }, []);
+
+  const handleDragStart = (e: DragEvent<HTMLDivElement>, blockId: string) => {
+    if (isLayoutLocked) {
+      e.preventDefault();
+      return;
+    }
+    setDraggedId(blockId);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", blockId);
+    // Set a ghost image for visual feedback
+    const target = e.currentTarget.closest('[data-testid^="grid-block-"]') as HTMLElement;
+    if (target) {
+      e.dataTransfer.setDragImage(target, 50, 50);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedId(null);
+    setDragOverId(null);
+  };
+
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDragEnter = (e: DragEvent<HTMLDivElement>, blockId: string) => {
+    e.preventDefault();
+    if (draggedId && draggedId !== blockId) {
+      setDragOverId(blockId);
+    }
+  };
+
+  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
+    // Only clear if leaving the actual element, not children
+    const relatedTarget = e.relatedTarget as HTMLElement;
+    if (!e.currentTarget.contains(relatedTarget)) {
+      setDragOverId(null);
+    }
+  };
+
+  const handleDrop = (e: DragEvent<HTMLDivElement>, targetId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const sourceId = e.dataTransfer.getData("text/plain");
     
-    const items = Array.from(blockOrder);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
+    if (!sourceId || sourceId === targetId || isLayoutLocked) {
+      setDraggedId(null);
+      setDragOverId(null);
+      return;
+    }
+
+    setLayout(prevLayout => {
+      const newLayout = [...prevLayout];
+      const draggedIndex = newLayout.findIndex(item => item.i === sourceId);
+      const targetIndex = newLayout.findIndex(item => item.i === targetId);
+      
+      if (draggedIndex !== -1 && targetIndex !== -1) {
+        const [draggedItem] = newLayout.splice(draggedIndex, 1);
+        newLayout.splice(targetIndex, 0, draggedItem);
+        localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(newLayout));
+        return newLayout;
+      }
+      return prevLayout;
+    });
     
-    setBlockOrder(items);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    setDraggedId(null);
+    setDragOverId(null);
   };
 
   const resetLayout = () => {
-    setBlockOrder(DEFAULT_BLOCK_ORDER);
-    setBlockWidths(DEFAULT_BLOCK_WIDTHS);
+    setLayout(DEFAULT_LAYOUT);
     setCollapsedBlocks(new Set());
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(BLOCK_WIDTHS_KEY);
+    setIsLayoutLocked(false);
+    localStorage.removeItem(LAYOUT_STORAGE_KEY);
     localStorage.removeItem(COLLAPSED_BLOCKS_KEY);
+    localStorage.removeItem(LAYOUT_LOCKED_KEY);
   };
 
-  const setBlockWidth = (blockId: string, width: BlockWidth) => {
-    const newWidths = { ...blockWidths, [blockId]: width };
-    setBlockWidths(newWidths);
-    localStorage.setItem(BLOCK_WIDTHS_KEY, JSON.stringify(newWidths));
+  const toggleLayoutLock = () => {
+    const newLocked = !isLayoutLocked;
+    setIsLayoutLocked(newLocked);
+    localStorage.setItem(LAYOUT_LOCKED_KEY, String(newLocked));
   };
 
   const toggleCollapsed = (blockId: string) => {
@@ -354,48 +411,47 @@ export default function Dashboard() {
     },
   ];
 
-  // Mock data for demonstration
   const mockStats: DashboardStats = {
     totalAccounts: 487,
-    enrolledAccounts: 124,
+    enrolledAccounts: 142,
     totalRevenue: 8540000,
-    incrementalRevenue: 342000,
+    incrementalRevenue: 1240000,
     topOpportunities: [
       {
         id: 1,
         name: "ABC Plumbing Co",
-        segment: "Plumbing",
-        opportunityScore: 87,
+        segment: "HVAC",
+        opportunityScore: 92,
         estimatedValue: 45000,
-        gapCategories: ["Water Heaters", "Tools & Safety"],
+        gapCategories: ["Ductwork", "Controls", "Insulation"],
       },
       {
         id: 2,
         name: "Elite HVAC Services",
         segment: "HVAC",
-        opportunityScore: 82,
+        opportunityScore: 88,
         estimatedValue: 38000,
-        gapCategories: ["Controls", "Pipe & Fittings"],
+        gapCategories: ["Copper Fittings", "Valves"],
       },
       {
         id: 3,
         name: "Metro Mechanical",
         segment: "Mechanical",
-        opportunityScore: 76,
-        estimatedValue: 32000,
-        gapCategories: ["Water Heaters", "Ductwork"],
+        opportunityScore: 85,
+        estimatedValue: 52000,
+        gapCategories: ["Pumps", "Motors", "Bearings"],
       },
       {
         id: 4,
         name: "Premier Plumbing",
         segment: "Plumbing",
-        opportunityScore: 71,
-        estimatedValue: 28000,
-        gapCategories: ["PVF", "Tools"],
+        opportunityScore: 78,
+        estimatedValue: 31000,
+        gapCategories: ["Fixtures", "Water Heaters"],
       },
       {
         id: 5,
-        name: "Climate Control Inc",
+        name: "Quality Climate Control",
         segment: "HVAC",
         opportunityScore: 68,
         estimatedValue: 25000,
@@ -443,7 +499,6 @@ export default function Dashboard() {
     );
   }
 
-  // Calculate workflow progress
   const workflowSteps = [
     {
       id: "data",
@@ -478,24 +533,84 @@ export default function Dashboard() {
       icon: TrendingUp,
     },
   ];
-  
+
   const completedSteps = workflowSteps.filter(s => s.completed).length;
   const allComplete = completedSteps === workflowSteps.length;
 
-  // Block render functions
+  const renderBlockHeader = (blockId: string, title: string, subtitle?: string, tooltipContent?: string, actions?: React.ReactNode) => {
+    const isCollapsed = collapsedBlocks.has(blockId);
+    
+    return (
+      <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+        <div className="flex items-start gap-2 flex-1 min-w-0">
+          <div className="min-w-0">
+            <CardTitle className="text-base truncate">{title}</CardTitle>
+            {subtitle && (
+              <p className="text-sm text-muted-foreground mt-1 truncate">
+                {subtitle}
+              </p>
+            )}
+          </div>
+          {tooltipContent && (
+            <InfoTooltip
+              content={tooltipContent}
+              testId={`tooltip-${blockId}`}
+            />
+          )}
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          {actions}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => toggleCollapsed(blockId)}
+                data-testid={`collapse-${blockId}`}
+              >
+                {isCollapsed ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronUp className="h-4 w-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p>{isCollapsed ? "Expand block" : "Collapse block"}</p>
+            </TooltipContent>
+          </Tooltip>
+          {!isLayoutLocked && (
+            <div 
+              className="drag-handle cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded" 
+              data-testid={`drag-handle-${blockId}`}
+              draggable
+              onDragStart={(e) => handleDragStart(e, blockId)}
+              onDragEnd={handleDragEnd}
+            >
+              <Move className="h-4 w-4 text-muted-foreground" />
+            </div>
+          )}
+        </div>
+      </CardHeader>
+    );
+  };
+
   const renderBlock = (blockId: string) => {
+    const isCollapsed = collapsedBlocks.has(blockId);
+    
     switch (blockId) {
       case "daily-focus":
         return (
-          <Card className="border-primary/20 bg-primary/5" data-testid="card-daily-focus">
+          <Card className="h-full border-primary/20 bg-primary/5 overflow-hidden" data-testid="card-daily-focus">
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shrink-0">
                   <Focus className="h-5 w-5" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <CardTitle className="text-lg">Daily Focus</CardTitle>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-muted-foreground truncate">
                     Tasks requiring your attention today
                   </p>
                 </div>
@@ -504,7 +619,7 @@ export default function Dashboard() {
                   testId="tooltip-daily-focus"
                 />
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 {dailyFocus && dailyFocus.overdueCount > 0 && (
                   <Badge variant="destructive" className="gap-1" data-testid="badge-overdue-count">
                     <AlertCircle className="h-3 w-3" />
@@ -516,7 +631,7 @@ export default function Dashboard() {
                     {dailyFocus.todayCount} due today
                   </Badge>
                 )}
-                {!collapsedBlocks.has("daily-focus") && (
+                {!isCollapsed && (
                   <Button variant="outline" size="sm" asChild data-testid="button-view-all-tasks">
                     <Link href="/playbooks">
                       View All Tasks
@@ -524,331 +639,312 @@ export default function Dashboard() {
                     </Link>
                   </Button>
                 )}
-                {renderBlockControls("daily-focus")}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => toggleCollapsed(blockId)}
+                      data-testid={`collapse-${blockId}`}
+                    >
+                      {isCollapsed ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronUp className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p>{isCollapsed ? "Expand block" : "Collapse block"}</p>
+                  </TooltipContent>
+                </Tooltip>
+                {!isLayoutLocked && (
+                  <div 
+                    className="drag-handle cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded" 
+                    data-testid={`drag-handle-${blockId}`}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, blockId)}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <Move className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                )}
               </div>
             </CardHeader>
-            {!collapsedBlocks.has("daily-focus") && (
-            <CardContent>
-              {isDailyFocusLoading ? (
-                <div className="space-y-2">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="flex items-center gap-3 p-3 rounded-lg border bg-card">
-                      <Skeleton className="h-8 w-8 rounded-md" />
-                      <div className="flex-1 space-y-2">
-                        <Skeleton className="h-4 w-48" />
-                        <Skeleton className="h-3 w-32" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : dailyFocus && dailyFocus.tasks.length > 0 ? (
-                <div className="space-y-2">
-                  {dailyFocus.tasks.slice(0, 5).map((task) => {
-                    const TaskIcon = taskTypeIcons[task.taskType] || Phone;
-                    return (
-                      <div
-                        key={task.id}
-                        className="flex items-center gap-3 p-3 rounded-lg border bg-card hover-elevate cursor-pointer"
-                        onClick={() => handleTaskClick(task.id)}
-                        data-testid={`daily-focus-task-${task.id}`}
-                      >
-                        <div className={`flex h-8 w-8 items-center justify-center rounded-md ${
-                          task.isOverdue ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
-                        }`}>
-                          <TaskIcon className="h-4 w-4" />
+            {!isCollapsed && (
+              <CardContent className="overflow-auto">
+                {isDailyFocusLoading ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="flex items-center gap-3 p-3 rounded-lg border bg-card">
+                        <Skeleton className="h-8 w-8 rounded-md" />
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-4 w-48" />
+                          <Skeleton className="h-3 w-32" />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium truncate">{task.title}</span>
-                            {task.isOverdue && (
-                              <Badge variant="destructive" className="text-xs">Overdue</Badge>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <span>{task.accountName}</span>
-                            <span className="text-muted-foreground/50">•</span>
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {new Date(task.dueDate).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </div>
-                    );
-                  })}
-                  {dailyFocus.tasks.length > 5 && (
-                    <Button variant="ghost" className="w-full" asChild>
-                      <Link href="/playbooks">
-                        View {dailyFocus.tasks.length - 5} more tasks
-                        <ArrowRight className="ml-1 h-4 w-4" />
-                      </Link>
-                    </Button>
-                  )}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-chart-2/10 text-chart-2 mb-3">
-                    <Target className="h-6 w-6" />
+                    ))}
                   </div>
-                  <p className="font-medium text-chart-2">All caught up!</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    No tasks due today. Generate a playbook to create new tasks.
-                  </p>
-                  <Button variant="outline" size="sm" className="mt-3" asChild>
-                    <Link href="/playbooks">Go to Playbooks</Link>
-                  </Button>
-                </div>
-              )}
-            </CardContent>
+                ) : dailyFocus && dailyFocus.tasks.length > 0 ? (
+                  <div className="space-y-2">
+                    {dailyFocus.tasks.slice(0, 5).map((task) => {
+                      const TaskIcon = taskTypeIcons[task.taskType] || Phone;
+                      return (
+                        <div
+                          key={task.id}
+                          className="flex items-center gap-3 p-3 rounded-lg border bg-card hover-elevate cursor-pointer"
+                          onClick={() => handleTaskClick(task.id)}
+                          data-testid={`daily-focus-task-${task.id}`}
+                        >
+                          <div className={`flex h-8 w-8 items-center justify-center rounded-md ${
+                            task.isOverdue ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
+                          }`}>
+                            <TaskIcon className="h-4 w-4" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium truncate">{task.title}</span>
+                              {task.isOverdue && (
+                                <Badge variant="destructive" className="text-xs">Overdue</Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <span>{task.accountName}</span>
+                              <span className="text-muted-foreground/50">•</span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {new Date(task.dueDate).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      );
+                    })}
+                    {dailyFocus.tasks.length > 5 && (
+                      <Button variant="ghost" className="w-full" asChild>
+                        <Link href="/playbooks">
+                          View {dailyFocus.tasks.length - 5} more tasks
+                          <ArrowRight className="ml-1 h-4 w-4" />
+                        </Link>
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-chart-2/10 text-chart-2 mb-3">
+                      <Target className="h-6 w-6" />
+                    </div>
+                    <p className="font-medium text-chart-2">All caught up!</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      No tasks due today. Generate a playbook to create new tasks.
+                    </p>
+                    <Button variant="outline" size="sm" className="mt-3" asChild>
+                      <Link href="/playbooks">Go to Playbooks</Link>
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
             )}
           </Card>
         );
 
       case "top-opportunities":
         return (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-2">
-              <div className="flex items-start gap-2">
-                <div>
-                  <CardTitle className="text-base">Top Opportunities</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Accounts with highest wallet share leakage
-                  </p>
-                </div>
-                <InfoTooltip
-                  content="Accounts ranked by opportunity score based on their category gaps vs ICP expectations. Higher scores indicate more potential revenue to capture from wallet share leakage."
-                  testId="tooltip-top-opportunities"
+          <Card className="h-full overflow-hidden">
+            {renderBlockHeader(
+              blockId,
+              "Top Opportunities",
+              "Accounts with highest wallet share leakage",
+              "Accounts ranked by opportunity score based on their category gaps vs ICP expectations. Higher scores indicate more potential revenue to capture from wallet share leakage.",
+              !isCollapsed && (
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/accounts">View All</Link>
+                </Button>
+              )
+            )}
+            {!isCollapsed && (
+              <CardContent className="overflow-auto">
+                <DataTable
+                  columns={opportunityColumns}
+                  data={displayStats.topOpportunities}
+                  testId="table-opportunities"
+                  onRowClick={handleOpportunityClick}
                 />
-              </div>
-              <div className="flex items-center gap-2">
-                {!collapsedBlocks.has("top-opportunities") && (
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href="/accounts">View All</Link>
-                  </Button>
-                )}
-                {renderBlockControls("top-opportunities")}
-              </div>
-            </CardHeader>
-            {!collapsedBlocks.has("top-opportunities") && (
-            <CardContent>
-              <DataTable
-                columns={opportunityColumns}
-                data={displayStats.topOpportunities}
-                testId="table-opportunities"
-                onRowClick={handleOpportunityClick}
-              />
-            </CardContent>
+              </CardContent>
             )}
           </Card>
         );
 
       case "segment-breakdown":
         return (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-2">
-              <div className="flex items-start gap-2">
-                <div>
-                  <CardTitle className="text-base">Segment Breakdown</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Accounts by contractor type
-                  </p>
-                </div>
-                <InfoTooltip
-                  content="Distribution of your accounts across customer segments (HVAC, Plumbing, Mechanical). Each segment has its own ICP profile defining expected category mix."
-                  testId="tooltip-segment-breakdown"
-                />
-              </div>
-              {renderBlockControls("segment-breakdown")}
-            </CardHeader>
-            {!collapsedBlocks.has("segment-breakdown") && (
-            <CardContent>
-              <div className="h-48">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={displayStats.segmentBreakdown}
-                      dataKey="count"
-                      nameKey="segment"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={40}
-                      outerRadius={70}
-                      paddingAngle={2}
-                    >
-                      {displayStats.segmentBreakdown.map((_, index) => (
-                        <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip
-                      formatter={(value: number) => [value, "Accounts"]}
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--popover))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "var(--radius)",
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="space-y-2 mt-4">
-                {displayStats.segmentBreakdown.map((item, index) => (
-                  <div key={item.segment} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
+          <Card className="h-full overflow-hidden">
+            {renderBlockHeader(
+              blockId,
+              "Segment Breakdown",
+              "Accounts by contractor type",
+              "Distribution of your accounts across customer segments (HVAC, Plumbing, Mechanical). Each segment has its own ICP profile defining expected category mix."
+            )}
+            {!isCollapsed && (
+              <CardContent className="overflow-auto">
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={displayStats.segmentBreakdown}
+                        dataKey="count"
+                        nameKey="segment"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={40}
+                        outerRadius={70}
+                        paddingAngle={2}
+                      >
+                        {displayStats.segmentBreakdown.map((_, index) => (
+                          <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip
+                        formatter={(value: number) => [value, "Accounts"]}
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--popover))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "var(--radius)",
+                        }}
                       />
-                      <span className="text-sm">{item.segment}</span>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="space-y-2 mt-4">
+                  {displayStats.segmentBreakdown.map((item, index) => (
+                    <div key={item.segment} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
+                        />
+                        <span className="text-sm">{item.segment}</span>
+                      </div>
+                      <span className="text-sm text-muted-foreground">{item.count}</span>
                     </div>
-                    <span className="text-sm text-muted-foreground">{item.count}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
+                  ))}
+                </div>
+              </CardContent>
             )}
           </Card>
         );
 
       case "recent-tasks":
         return (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-2">
-              <div className="flex items-start gap-2">
-                <div>
-                  <CardTitle className="text-base">Recent Tasks</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Upcoming TM actions
-                  </p>
-                </div>
-                <InfoTooltip
-                  content="AI-generated sales tasks for Territory Managers including calls, emails, and site visits. Each task includes personalized scripts and talking points based on account gaps."
-                  testId="tooltip-recent-tasks"
+          <Card className="h-full overflow-hidden">
+            {renderBlockHeader(
+              blockId,
+              "Recent Tasks",
+              "Upcoming TM actions",
+              "AI-generated sales tasks for Territory Managers including calls, emails, and site visits. Each task includes personalized scripts and talking points based on account gaps.",
+              !isCollapsed && (
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/playbooks">View All</Link>
+                </Button>
+              )
+            )}
+            {!isCollapsed && (
+              <CardContent className="overflow-auto">
+                <DataTable
+                  columns={taskColumns}
+                  data={displayStats.recentTasks}
+                  testId="table-tasks"
                 />
-              </div>
-              <div className="flex items-center gap-2">
-                {!collapsedBlocks.has("recent-tasks") && (
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href="/playbooks">View All</Link>
-                  </Button>
-                )}
-                {renderBlockControls("recent-tasks")}
-              </div>
-            </CardHeader>
-            {!collapsedBlocks.has("recent-tasks") && (
-            <CardContent>
-              <DataTable
-                columns={taskColumns}
-                data={displayStats.recentTasks}
-                testId="table-tasks"
-              />
-            </CardContent>
+              </CardContent>
             )}
           </Card>
         );
 
       case "icp-profiles":
         return (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-2">
-              <div className="flex items-start gap-2">
-                <div>
-                  <CardTitle className="text-base">ICP Profiles</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Segment profile status
-                  </p>
-                </div>
-                <InfoTooltip
-                  content="Ideal Customer Profiles (ICPs) define expected category mix for each segment based on Class A customer data. Use AI analysis to refine profiles and approve them for scoring."
-                  testId="tooltip-icp-profiles"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                {!collapsedBlocks.has("icp-profiles") && (
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href="/icp-builder">Manage</Link>
-                  </Button>
-                )}
-                {renderBlockControls("icp-profiles")}
-              </div>
-            </CardHeader>
-            {!collapsedBlocks.has("icp-profiles") && (
-            <CardContent>
-              <div className="space-y-4">
-                {displayStats.icpProfiles.map((profile) => (
-                  <div
-                    key={profile.segment}
-                    className="flex items-center justify-between p-3 rounded-md bg-muted/50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <ProgressRing
-                        value={profile.status === "approved" ? 100 : 50}
-                        size={40}
-                        strokeWidth={4}
-                      />
-                      <div>
-                        <span className="font-medium">{profile.segment}</span>
-                        <p className="text-xs text-muted-foreground">
-                          {profile.accountCount} accounts
-                        </p>
+          <Card className="h-full overflow-hidden">
+            {renderBlockHeader(
+              blockId,
+              "ICP Profiles",
+              "Segment profile status",
+              "Ideal Customer Profiles (ICPs) define expected category mix for each segment based on Class A customer data. Use AI analysis to refine profiles and approve them for scoring.",
+              !isCollapsed && (
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/icp-builder">Manage</Link>
+                </Button>
+              )
+            )}
+            {!isCollapsed && (
+              <CardContent className="overflow-auto">
+                <div className="space-y-4">
+                  {displayStats.icpProfiles.map((profile) => (
+                    <div
+                      key={profile.segment}
+                      className="flex items-center justify-between p-3 rounded-md bg-muted/50"
+                    >
+                      <div className="flex items-center gap-3">
+                        <ProgressRing
+                          value={profile.status === "approved" ? 100 : 50}
+                          size={40}
+                          strokeWidth={4}
+                        />
+                        <div>
+                          <span className="font-medium">{profile.segment}</span>
+                          <p className="text-xs text-muted-foreground">
+                            {profile.accountCount} accounts
+                          </p>
+                        </div>
                       </div>
+                      <Badge variant={profile.status === "approved" ? "default" : "secondary"}>
+                        {profile.status}
+                      </Badge>
                     </div>
-                    <Badge variant={profile.status === "approved" ? "default" : "secondary"}>
-                      {profile.status}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
+                  ))}
+                </div>
+              </CardContent>
             )}
           </Card>
         );
 
       case "revenue-chart":
         return (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4" />
-                  Revenue by Segment
-                </CardTitle>
-                <InfoTooltip
-                  content="Total revenue contribution by customer segment. Compare segment performance to identify growth opportunities and track the impact of wallet share capture efforts."
-                  testId="tooltip-revenue-by-segment"
-                />
-              </div>
-              {renderBlockControls("revenue-chart")}
-            </CardHeader>
-            {!collapsedBlocks.has("revenue-chart") && (
-            <CardContent>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={displayStats.segmentBreakdown}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis
-                      dataKey="segment"
-                      tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                      axisLine={{ stroke: "hsl(var(--border))" }}
-                    />
-                    <YAxis
-                      tickFormatter={(value) => formatCurrency(value)}
-                      tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                      axisLine={{ stroke: "hsl(var(--border))" }}
-                    />
-                    <RechartsTooltip
-                      formatter={(value: number) => [formatCurrency(value), "Revenue"]}
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--popover))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "var(--radius)",
-                      }}
-                    />
-                    <Bar dataKey="revenue" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
+          <Card className="h-full overflow-hidden">
+            {renderBlockHeader(
+              blockId,
+              "Revenue by Segment",
+              undefined,
+              "Total revenue contribution by customer segment. Compare segment performance to identify growth opportunities and track the impact of wallet share capture efforts."
+            )}
+            {!isCollapsed && (
+              <CardContent className="overflow-auto">
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={displayStats.segmentBreakdown}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis
+                        dataKey="segment"
+                        tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                        axisLine={{ stroke: "hsl(var(--border))" }}
+                      />
+                      <YAxis
+                        tickFormatter={(value) => formatCurrency(value)}
+                        tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                        axisLine={{ stroke: "hsl(var(--border))" }}
+                      />
+                      <RechartsTooltip
+                        formatter={(value: number) => [formatCurrency(value), "Revenue"]}
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--popover))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "var(--radius)",
+                        }}
+                      />
+                      <Bar dataKey="revenue" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
             )}
           </Card>
         );
@@ -856,109 +952,6 @@ export default function Dashboard() {
       default:
         return null;
     }
-  };
-
-  // Get the grid layout for different block types
-  const getBlockLayout = (blockId: string) => {
-    const width = blockWidths[blockId] || 1;
-    switch (width) {
-      case 3:
-        return "lg:col-span-3";
-      case 2:
-        return "lg:col-span-2";
-      default:
-        return "";
-    }
-  };
-
-  const renderBlockControls = (blockId: string) => {
-    const isCollapsed = collapsedBlocks.has(blockId);
-    const currentWidth = blockWidths[blockId] || 1;
-
-    return (
-      <div className="flex items-center gap-1 relative z-10">
-        <DropdownMenu>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-7 w-7"
-                  data-testid={`resize-${blockId}`}
-                >
-                  <Columns className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              <p>Resize block width</p>
-            </TooltipContent>
-          </Tooltip>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem 
-              onClick={() => setBlockWidth(blockId, 1)}
-              className={currentWidth === 1 ? "bg-accent" : ""}
-              data-testid={`resize-${blockId}-1`}
-            >
-              <span className="flex items-center gap-2">
-                <div className="flex gap-0.5">
-                  <div className="w-2 h-4 bg-foreground rounded-sm" />
-                </div>
-                1 Column
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuItem 
-              onClick={() => setBlockWidth(blockId, 2)}
-              className={currentWidth === 2 ? "bg-accent" : ""}
-              data-testid={`resize-${blockId}-2`}
-            >
-              <span className="flex items-center gap-2">
-                <div className="flex gap-0.5">
-                  <div className="w-2 h-4 bg-foreground rounded-sm" />
-                  <div className="w-2 h-4 bg-foreground rounded-sm" />
-                </div>
-                2 Columns
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuItem 
-              onClick={() => setBlockWidth(blockId, 3)}
-              className={currentWidth === 3 ? "bg-accent" : ""}
-              data-testid={`resize-${blockId}-3`}
-            >
-              <span className="flex items-center gap-2">
-                <div className="flex gap-0.5">
-                  <div className="w-2 h-4 bg-foreground rounded-sm" />
-                  <div className="w-2 h-4 bg-foreground rounded-sm" />
-                  <div className="w-2 h-4 bg-foreground rounded-sm" />
-                </div>
-                3 Columns (Full Width)
-              </span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => toggleCollapsed(blockId)}
-              data-testid={`collapse-${blockId}`}
-            >
-              {isCollapsed ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronUp className="h-4 w-4" />
-              )}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="top">
-            <p>{isCollapsed ? "Expand block" : "Collapse block"}</p>
-          </TooltipContent>
-        </Tooltip>
-      </div>
-    );
   };
 
   return (
@@ -971,6 +964,31 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant={isLayoutLocked ? "default" : "outline"} 
+                size="sm" 
+                onClick={toggleLayoutLock}
+                data-testid="button-toggle-lock"
+              >
+                {isLayoutLocked ? (
+                  <>
+                    <Lock className="mr-2 h-4 w-4" />
+                    Layout Locked
+                  </>
+                ) : (
+                  <>
+                    <Unlock className="mr-2 h-4 w-4" />
+                    Edit Layout
+                  </>
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{isLayoutLocked ? "Unlock to edit dashboard layout" : "Lock layout to prevent changes"}</p>
+            </TooltipContent>
+          </Tooltip>
           <Button variant="outline" size="sm" onClick={resetLayout} data-testid="button-reset-layout">
             <RotateCcw className="mr-2 h-4 w-4" />
             Reset Layout
@@ -984,7 +1002,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Workflow Progress - Getting Started Guide */}
       {!allComplete && (
         <Card className="border-chart-1/20 bg-chart-1/5" data-testid="card-getting-started">
           <CardHeader className="pb-3">
@@ -1006,14 +1023,14 @@ export default function Dashboard() {
               {workflowSteps.map((step, index) => {
                 const StepIcon = step.icon;
                 const isNextStep = !step.completed && workflowSteps.slice(0, index).every(s => s.completed);
-                
+
                 return (
                   <div key={step.id} className="flex items-center gap-4 flex-1">
                     <Link href={step.href}>
-                      <div 
+                      <div
                         className={`flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer ${
-                          step.completed 
-                            ? "bg-chart-2/10 border-chart-2/30" 
+                          step.completed
+                            ? "bg-chart-2/10 border-chart-2/30"
                             : isNextStep
                             ? "bg-primary/10 border-primary/30 hover-elevate"
                             : "bg-muted/50 border-muted"
@@ -1021,8 +1038,8 @@ export default function Dashboard() {
                         data-testid={`step-${step.id}`}
                       >
                         <div className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                          step.completed 
-                            ? "bg-chart-2 text-chart-2-foreground" 
+                          step.completed
+                            ? "bg-chart-2 text-chart-2-foreground"
                             : isNextStep
                             ? "bg-primary text-primary-foreground"
                             : "bg-muted text-muted-foreground"
@@ -1056,7 +1073,6 @@ export default function Dashboard() {
         </Card>
       )}
 
-      {/* KPI Cards - Not draggable */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KPICard
           title="Total Accounts"
@@ -1094,46 +1110,43 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Draggable Dashboard Blocks */}
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <Droppable droppableId="dashboard-blocks">
-          {(provided) => (
+      {!isLayoutLocked && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border border-dashed">
+          <Move className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">
+            Drag blocks to reorder. Click "Layout Locked" when done.
+          </span>
+        </div>
+      )}
+
+      <div id="dashboard-grid-container" className="grid grid-cols-12 gap-4 w-full">
+        {layout.map((item) => {
+          const isBeingDragged = draggedId === item.i;
+          const isDragOver = dragOverId === item.i && draggedId !== item.i;
+          
+          return (
             <div
-              {...provided.droppableProps}
-              ref={provided.innerRef}
-              className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+              key={item.i}
+              data-testid={`grid-block-${item.i}`}
+              onDragOver={handleDragOver}
+              onDragEnter={(e) => handleDragEnter(e, item.i)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, item.i)}
+              className={`
+                ${item.w === 12 ? "col-span-12" : ""}
+                ${item.w === 8 ? "col-span-12 lg:col-span-8" : ""}
+                ${item.w === 4 ? "col-span-12 sm:col-span-6 lg:col-span-4" : ""}
+                ${item.w === 6 ? "col-span-12 md:col-span-6" : ""}
+                transition-all duration-200 ease-in-out
+                ${isBeingDragged ? "opacity-50 scale-95" : ""}
+                ${isDragOver ? "ring-2 ring-primary ring-offset-2" : ""}
+              `}
             >
-              {blockOrder.map((blockId, index) => (
-                <Draggable key={blockId} draggableId={blockId} index={index}>
-                  {(provided, snapshot) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.draggableProps}
-                      className={`${getBlockLayout(blockId)} ${
-                        snapshot.isDragging ? "z-50" : ""
-                      }`}
-                    >
-                      <div className="relative group">
-                        <div
-                          {...provided.dragHandleProps}
-                          className="absolute -left-2 top-4 z-10 flex items-center justify-center h-8 w-8 rounded-md bg-background border shadow-sm opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
-                          data-testid={`drag-handle-${blockId}`}
-                        >
-                          <GripVertical className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                        <div className={snapshot.isDragging ? "ring-2 ring-primary rounded-lg" : ""}>
-                          {renderBlock(blockId)}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </Draggable>
-              ))}
-              {provided.placeholder}
+              {renderBlock(item.i)}
             </div>
-          )}
-        </Droppable>
-      </DragDropContext>
+          );
+        })}
+      </div>
     </div>
   );
 }
