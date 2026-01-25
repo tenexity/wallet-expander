@@ -35,6 +35,8 @@ import {
   Maximize2,
   RectangleHorizontal,
   RectangleVertical,
+  GraduationCap,
+  Trophy,
 } from "lucide-react";
 import {
   Popover,
@@ -90,6 +92,17 @@ interface DashboardStats {
     segment: string;
     status: string;
     accountCount: number;
+  }>;
+}
+
+interface GraduationReadyData {
+  count: number;
+  accounts: Array<{
+    programAccountId: number;
+    accountId: number;
+    accountName: string;
+    enrolledAt: string;
+    objectivesMet: { penetration: boolean; revenue: boolean; duration: boolean };
   }>;
 }
 
@@ -251,6 +264,10 @@ export default function Dashboard() {
 
   const { data: dailyFocus, isLoading: isDailyFocusLoading } = useQuery<DailyFocusData>({
     queryKey: ["/api/daily-focus"],
+  });
+
+  const { data: graduationReady } = useQuery<GraduationReadyData>({
+    queryKey: ["/api/program-accounts/graduation-ready"],
   });
 
   const handleOpportunityClick = (row: DashboardStats["topOpportunities"][0]) => {
@@ -1287,6 +1304,45 @@ export default function Dashboard() {
           tooltip="Additional revenue generated from enrolled accounts above their baseline. This is the basis for calculating rev-share fees (15% of incremental revenue)."
         />
       </div>
+
+      {/* Graduation Ready Quick Access */}
+      {graduationReady && graduationReady.count > 0 && (
+        <Link href="/revenue">
+          <Card className="border-chart-2/30 bg-chart-2/5 hover-elevate cursor-pointer" data-testid="card-graduation-ready">
+            <CardContent className="py-3">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-chart-2/20">
+                    <GraduationCap className="h-4 w-4 text-chart-2" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-chart-2">
+                      {graduationReady.count} Account{graduationReady.count > 1 ? "s" : ""} Ready to Graduate
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Click to review and graduate successful accounts
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {graduationReady.accounts.slice(0, 2).map(acc => (
+                    <Badge key={acc.programAccountId} variant="outline" className="bg-background">
+                      <Trophy className="h-3 w-3 mr-1 text-chart-2" />
+                      {acc.accountName}
+                    </Badge>
+                  ))}
+                  {graduationReady.count > 2 && (
+                    <Badge variant="outline" className="bg-background">
+                      +{graduationReady.count - 2} more
+                    </Badge>
+                  )}
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+      )}
 
       {!isLayoutLocked && (
         <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border border-dashed">

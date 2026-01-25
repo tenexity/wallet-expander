@@ -41,7 +41,8 @@ The application follows a client-server architecture.
     - **Account Insights:** Provides gap analysis, opportunity scores, and category penetration metrics for accounts.
     - **ICP Builder:** AI-assisted definition and management of Ideal Customer Profiles, including data insights for transparency into AI analysis and decision logic.
     - **Playbooks & Tasks:** AI-generated sales tasks, call scripts, and email templates, with automatic playbook generation upon account enrollment.
-    - **Revenue Tracking:** Tracks enrolled accounts, incremental revenue, and calculates rev-share fees.
+    - **Revenue Tracking:** Tracks enrolled accounts, incremental revenue, and calculates rev-share fees. Includes account graduation system for marking accounts as successfully completed.
+    - **Account Graduation System:** Allows setting graduation objectives (target penetration %, incremental revenue, enrollment duration), tracking progress, and graduating accounts when objectives are met. Graduated accounts move to an alumni section.
     - **Custom Categories:** Allows full CRUD operations for product categories, which are integrated into AI analysis for ICP and playbook generation.
     - **Scoring Settings:** Customizable weighting factors for opportunity scoring (Gap Size, Revenue Potential, Category Count).
     - **Territory Manager Administration:** CRUD operations for Territory Managers, including territory assignments and task linkage.

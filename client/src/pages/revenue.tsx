@@ -24,6 +24,8 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -40,6 +42,12 @@ import {
   HelpCircle,
   Loader2,
   Sparkles,
+  GraduationCap,
+  Trophy,
+  CheckCircle2,
+  Clock,
+  ChevronRight,
+  Award,
 } from "lucide-react";
 import {
   Tooltip as TooltipComponent,
@@ -73,6 +81,41 @@ interface EnrolledAccount {
   shareRate: number;
   feeAmount: number;
   status: "active" | "paused" | "graduated";
+  // Graduation objectives
+  targetPenetration?: number | null;
+  targetIncrementalRevenue?: number | null;
+  targetDurationMonths?: number | null;
+  graduationCriteria?: string | null;
+  graduatedAt?: string | null;
+  graduationNotes?: string | null;
+}
+
+interface GraduationProgress {
+  programAccountId: number;
+  accountId: number;
+  accountName: string;
+  status: string;
+  graduationCriteria: string;
+  hasObjectives: boolean;
+  isReadyToGraduate: boolean;
+  objectives: {
+    penetration: { current: number; target: number | null; progress: number | null; isMet: boolean };
+    revenue: { current: number; target: number | null; progress: number | null; isMet: boolean };
+    duration: { current: number; target: number | null; progress: number | null; isMet: boolean };
+  };
+  enrolledAt: string;
+  graduatedAt: string | null;
+}
+
+interface GraduationReadyResponse {
+  count: number;
+  accounts: Array<{
+    programAccountId: number;
+    accountId: number;
+    accountName: string;
+    enrolledAt: string;
+    objectivesMet: { penetration: boolean; revenue: boolean; duration: boolean };
+  }>;
 }
 
 interface RevenueSnapshot {
@@ -96,6 +139,22 @@ export default function Revenue() {
   const [shareRate, setShareRate] = useState<string>("15");
   const [baselinePeriod, setBaselinePeriod] = useState<string>("12m");
   const [isEnrolling, setIsEnrolling] = useState(false);
+  
+  // Graduation state
+  const [showGraduateDialog, setShowGraduateDialog] = useState(false);
+  const [showObjectivesDialog, setShowObjectivesDialog] = useState(false);
+  const [selectedProgramAccountId, setSelectedProgramAccountId] = useState<number | null>(null);
+  const [graduationNotes, setGraduationNotes] = useState<string>("");
+  const [isGraduating, setIsGraduating] = useState(false);
+  const [viewMode, setViewMode] = useState<"active" | "graduated">("active");
+  
+  // Objective form state
+  const [targetPenetration, setTargetPenetration] = useState<string>("");
+  const [targetIncrementalRevenue, setTargetIncrementalRevenue] = useState<string>("");
+  const [targetDurationMonths, setTargetDurationMonths] = useState<string>("");
+  const [graduationCriteria, setGraduationCriteria] = useState<string>("any");
+  const [isSavingObjectives, setIsSavingObjectives] = useState(false);
+  
   const { toast } = useToast();
   const [, navigate] = useLocation();
 
@@ -105,6 +164,10 @@ export default function Revenue() {
 
   const { data: allAccounts } = useQuery<Account[]>({
     queryKey: ["/api/accounts"],
+  });
+
+  const { data: graduationReady } = useQuery<GraduationReadyResponse>({
+    queryKey: ["/api/program-accounts/graduation-ready"],
   });
 
   const enrolledAccountIds = new Set(enrolledAccounts?.map(a => a.accountId) || []);
@@ -175,9 +238,12 @@ export default function Revenue() {
     { period: "Jan", baselineRevenue: 52000, actualRevenue: 94000, incrementalRevenue: 42000, feeAmount: 6300 },
   ];
 
-  const displayAccounts = enrolledAccounts || mockEnrolledAccounts;
+  const allDisplayAccounts = enrolledAccounts || mockEnrolledAccounts;
+  const activeAccounts = allDisplayAccounts.filter(a => a.status === "active" || a.status === "paused");
+  const graduatedAccounts = allDisplayAccounts.filter(a => a.status === "graduated");
+  const displayAccounts = viewMode === "active" ? activeAccounts : graduatedAccounts;
 
-  const totalBaseline = displayAccounts.reduce((sum, a) => sum + a.baselineRevenue, 0);
+  const totalBaseline = activeAccounts.reduce((sum, a) => sum + a.baselineRevenue, 0);
   const totalCurrent = displayAccounts.reduce((sum, a) => sum + a.currentRevenue, 0);
   const totalIncremental = displayAccounts.reduce((sum, a) => sum + a.incrementalRevenue, 0);
   const totalFees = displayAccounts.reduce((sum, a) => sum + a.feeAmount, 0);
@@ -187,6 +253,87 @@ export default function Revenue() {
     if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
     if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
     return `$${value.toFixed(0)}`;
+  };
+
+  // Check if account is ready to graduate
+  const isAccountReadyToGraduate = (accountId: number) => {
+    return graduationReady?.accounts.some(a => a.programAccountId === accountId) || false;
+  };
+
+  // Handle graduate account
+  const handleGraduate = async () => {
+    if (!selectedProgramAccountId) return;
+    
+    setIsGraduating(true);
+    try {
+      await apiRequest("POST", `/api/program-accounts/${selectedProgramAccountId}/graduate`, {
+        notes: graduationNotes || undefined,
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/program-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/program-accounts/graduation-ready"] });
+      
+      setShowGraduateDialog(false);
+      setGraduationNotes("");
+      
+      toast({
+        title: "Account graduated",
+        description: "The account has successfully completed the growth program!",
+      });
+    } catch (error) {
+      console.error("Graduation error:", error);
+      toast({
+        title: "Graduation failed",
+        description: "Failed to graduate account. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGraduating(false);
+    }
+  };
+
+  // Handle save objectives
+  const handleSaveObjectives = async () => {
+    if (!selectedProgramAccountId) return;
+    
+    setIsSavingObjectives(true);
+    try {
+      await apiRequest("PATCH", `/api/program-accounts/${selectedProgramAccountId}`, {
+        targetPenetration: targetPenetration ? parseFloat(targetPenetration) : null,
+        targetIncrementalRevenue: targetIncrementalRevenue ? parseFloat(targetIncrementalRevenue) : null,
+        targetDurationMonths: targetDurationMonths ? parseInt(targetDurationMonths) : null,
+        graduationCriteria,
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/program-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/program-accounts/graduation-ready"] });
+      
+      setShowObjectivesDialog(false);
+      
+      toast({
+        title: "Objectives saved",
+        description: "Graduation objectives have been updated.",
+      });
+    } catch (error) {
+      console.error("Save objectives error:", error);
+      toast({
+        title: "Failed to save",
+        description: "Failed to save objectives. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingObjectives(false);
+    }
+  };
+
+  // Open objectives dialog with current values
+  const openObjectivesDialog = (account: EnrolledAccount) => {
+    setSelectedProgramAccountId(account.id);
+    setTargetPenetration(account.targetPenetration?.toString() || "");
+    setTargetIncrementalRevenue(account.targetIncrementalRevenue?.toString() || "");
+    setTargetDurationMonths(account.targetDurationMonths?.toString() || "");
+    setGraduationCriteria(account.graduationCriteria || "any");
+    setShowObjectivesDialog(true);
   };
 
   const columns = [
@@ -253,11 +400,83 @@ export default function Revenue() {
     {
       key: "status",
       header: "Status",
-      cell: (row: EnrolledAccount) => (
-        <Badge variant={row.status === "active" ? "default" : "secondary"}>
-          {row.status}
-        </Badge>
-      ),
+      cell: (row: EnrolledAccount) => {
+        const isReady = isAccountReadyToGraduate(row.id);
+        if (row.status === "graduated") {
+          return (
+            <Badge variant="secondary" className="bg-chart-2/10 text-chart-2 border-chart-2/30">
+              <Trophy className="h-3 w-3 mr-1" />
+              Graduated
+            </Badge>
+          );
+        }
+        return (
+          <div className="flex items-center gap-2">
+            <Badge variant={row.status === "active" ? "default" : "secondary"}>
+              {row.status}
+            </Badge>
+            {isReady && (
+              <Badge variant="outline" className="bg-chart-2/10 text-chart-2 border-chart-2/30">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Ready
+              </Badge>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      cell: (row: EnrolledAccount) => {
+        if (row.status === "graduated") {
+          return (
+            <span className="text-sm text-muted-foreground">
+              {row.graduatedAt ? new Date(row.graduatedAt).toLocaleDateString() : "Completed"}
+            </span>
+          );
+        }
+        const isReady = isAccountReadyToGraduate(row.id);
+        const hasObjectives = row.targetPenetration || row.targetIncrementalRevenue || row.targetDurationMonths;
+        return (
+          <div className="flex items-center gap-1">
+            <TooltipComponent>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => openObjectivesDialog(row)}
+                  data-testid={`button-set-objectives-${row.id}`}
+                >
+                  <Target className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {hasObjectives ? "Edit graduation objectives" : "Set graduation objectives"}
+              </TooltipContent>
+            </TooltipComponent>
+            {isReady && (
+              <TooltipComponent>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-chart-2"
+                    onClick={() => {
+                      setSelectedProgramAccountId(row.id);
+                      setShowGraduateDialog(true);
+                    }}
+                    data-testid={`button-graduate-${row.id}`}
+                  >
+                    <GraduationCap className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Graduate account</TooltipContent>
+              </TooltipComponent>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -504,33 +723,102 @@ export default function Revenue() {
         </Card>
       </div>
 
+      {/* Graduation Ready Alert */}
+      {graduationReady && graduationReady.count > 0 && viewMode === "active" && (
+        <Card className="border-chart-2/30 bg-chart-2/5">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-chart-2/20">
+                  <GraduationCap className="h-5 w-5 text-chart-2" />
+                </div>
+                <div>
+                  <p className="font-semibold text-chart-2">
+                    {graduationReady.count} Account{graduationReady.count > 1 ? "s" : ""} Ready to Graduate
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    These accounts have achieved their objectives and can be graduated from the program.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {graduationReady.accounts.slice(0, 3).map(acc => (
+                  <Badge 
+                    key={acc.programAccountId} 
+                    variant="outline"
+                    className="bg-background"
+                  >
+                    <Trophy className="h-3 w-3 mr-1 text-chart-2" />
+                    {acc.accountName}
+                  </Badge>
+                ))}
+                {graduationReady.count > 3 && (
+                  <Badge variant="outline" className="bg-background">
+                    +{graduationReady.count - 3} more
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2">
+        <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
           <div>
-            <CardTitle className="text-base">Enrolled Accounts</CardTitle>
+            <CardTitle className="text-base">
+              {viewMode === "active" ? "Enrolled Accounts" : "Graduated Accounts"}
+            </CardTitle>
             <CardDescription>
-              Track revenue performance by enrolled account
+              {viewMode === "active" 
+                ? "Track revenue performance by enrolled account" 
+                : "Accounts that successfully completed the growth program"
+              }
             </CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={viewMode === "active" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setViewMode("active")}
+              data-testid="button-view-active"
+            >
+              <Target className="h-4 w-4 mr-1" />
+              Active ({activeAccounts.length})
+            </Button>
+            <Button
+              variant={viewMode === "graduated" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setViewMode("graduated")}
+              data-testid="button-view-graduated"
+            >
+              <Trophy className="h-4 w-4 mr-1" />
+              Graduated ({graduatedAccounts.length})
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
           {displayAccounts.length === 0 ? (
             <EmptyState
-              icon={Target}
-              title="No enrolled accounts"
-              description="Enroll accounts to start tracking revenue growth"
-              action={{
+              icon={viewMode === "active" ? Target : Trophy}
+              title={viewMode === "active" ? "No enrolled accounts" : "No graduated accounts yet"}
+              description={
+                viewMode === "active" 
+                  ? "Enroll accounts to start tracking revenue growth" 
+                  : "Accounts that complete their objectives will appear here"
+              }
+              action={viewMode === "active" ? {
                 label: "Enroll Account",
                 onClick: () => setShowEnrollDialog(true),
-              }}
-              testId="empty-enrolled"
+              } : undefined}
+              testId={viewMode === "active" ? "empty-enrolled" : "empty-graduated"}
             />
           ) : (
             <DataTable
               columns={columns}
               data={displayAccounts}
               isLoading={isLoading}
-              testId="table-enrolled"
+              testId={viewMode === "active" ? "table-enrolled" : "table-graduated"}
             />
           )}
         </CardContent>
@@ -711,6 +999,186 @@ export default function Revenue() {
                 <>
                   <Target className="mr-2 h-4 w-4" />
                   Enroll & Generate Playbook
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Graduate Account Dialog */}
+      <Dialog open={showGraduateDialog} onOpenChange={(open) => {
+        setShowGraduateDialog(open);
+        if (!open) {
+          setGraduationNotes("");
+          setSelectedProgramAccountId(null);
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GraduationCap className="h-5 w-5 text-chart-2" />
+              Graduate Account
+            </DialogTitle>
+            <DialogDescription>
+              This account has met its graduation objectives. Graduating will mark it as successfully completed and move it to the alumni section.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="bg-chart-2/10 border border-chart-2/30 rounded-md p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Trophy className="h-5 w-5 text-chart-2" />
+                <span className="font-semibold text-chart-2">Objectives Achieved</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                This account has successfully completed the growth program and achieved its targets.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Graduation Notes (Optional)</Label>
+              <Textarea
+                placeholder="Add any notes about this account's success..."
+                value={graduationNotes}
+                onChange={(e) => setGraduationNotes(e.target.value)}
+                rows={3}
+                data-testid="textarea-graduation-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowGraduateDialog(false)} disabled={isGraduating}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleGraduate}
+              disabled={isGraduating}
+              className="bg-chart-2 hover-elevate"
+              data-testid="button-confirm-graduate"
+            >
+              {isGraduating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Graduating...
+                </>
+              ) : (
+                <>
+                  <GraduationCap className="mr-2 h-4 w-4" />
+                  Graduate Account
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Set Objectives Dialog */}
+      <Dialog open={showObjectivesDialog} onOpenChange={(open) => {
+        setShowObjectivesDialog(open);
+        if (!open) {
+          setSelectedProgramAccountId(null);
+          setTargetPenetration("");
+          setTargetIncrementalRevenue("");
+          setTargetDurationMonths("");
+          setGraduationCriteria("any");
+        }
+      }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Target className="h-5 w-5" />
+              Set Graduation Objectives
+            </DialogTitle>
+            <DialogDescription>
+              Define the targets that this account should achieve before graduating from the program.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Target Penetration (%)</Label>
+                <Input
+                  type="number"
+                  placeholder="e.g., 80"
+                  value={targetPenetration}
+                  onChange={(e) => setTargetPenetration(e.target.value)}
+                  min="0"
+                  max="100"
+                  data-testid="input-target-penetration"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Category penetration percentage
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>Target Revenue ($)</Label>
+                <Input
+                  type="number"
+                  placeholder="e.g., 50000"
+                  value={targetIncrementalRevenue}
+                  onChange={(e) => setTargetIncrementalRevenue(e.target.value)}
+                  min="0"
+                  data-testid="input-target-revenue"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Incremental revenue target
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Target Duration (Months)</Label>
+                <Input
+                  type="number"
+                  placeholder="e.g., 12"
+                  value={targetDurationMonths}
+                  onChange={(e) => setTargetDurationMonths(e.target.value)}
+                  min="1"
+                  data-testid="input-target-duration"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Months enrolled before graduation
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>Graduation Criteria</Label>
+                <Select value={graduationCriteria} onValueChange={setGraduationCriteria}>
+                  <SelectTrigger data-testid="select-graduation-criteria">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any">Meet ANY objective</SelectItem>
+                    <SelectItem value="all">Meet ALL objectives</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  How to determine readiness
+                </p>
+              </div>
+            </div>
+            <div className="bg-muted/50 rounded-md p-3">
+              <p className="text-sm text-muted-foreground">
+                <strong>Tip:</strong> Set at least one objective. The account will show as "Ready to Graduate" once the criteria is met.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowObjectivesDialog(false)} disabled={isSavingObjectives}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveObjectives}
+              disabled={isSavingObjectives}
+              data-testid="button-save-objectives"
+            >
+              {isSavingObjectives ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Save Objectives
                 </>
               )}
             </Button>

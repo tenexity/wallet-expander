@@ -286,6 +286,13 @@ export const programAccounts = pgTable("program_accounts", {
   shareRate: numeric("share_rate").notNull(),
   status: text("status").default("active"), // active, paused, graduated
   notes: text("notes"),
+  // Graduation objectives
+  targetPenetration: numeric("target_penetration"), // Target category penetration % (e.g., 80 for 80%)
+  targetIncrementalRevenue: numeric("target_incremental_revenue"), // Target incremental revenue amount
+  targetDurationMonths: integer("target_duration_months"), // Target enrollment duration in months
+  graduationCriteria: text("graduation_criteria").default("any"), // 'any' or 'all' - meet any objective vs all
+  graduatedAt: timestamp("graduated_at"), // When account was graduated
+  graduationNotes: text("graduation_notes"), // Notes about graduation/success
 });
 
 export const insertProgramAccountSchema = createInsertSchema(programAccounts).omit({

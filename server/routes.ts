@@ -384,10 +384,10 @@ KEY TALKING POINTS:
         }
 
         // Get task count for response
-        const playbookTasks = await storage.getTasks({ playbookId: playbook.id });
+        const playbookTaskList = await storage.getPlaybookTasks(playbook.id);
         playbook = {
           ...playbook,
-          taskCount: playbookTasks.length,
+          taskCount: playbookTaskList.length,
         };
       }
 
@@ -1256,6 +1256,220 @@ KEY TALKING POINTS:
       res.json(programAccount);
     } catch (error) {
       res.status(500).json({ message: "Failed to update program account" });
+    }
+  });
+
+  // Get graduation progress for a program account
+  app.get("/api/program-accounts/:id/graduation-progress", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const programAccount = await storage.getProgramAccount(id);
+      if (!programAccount) {
+        return res.status(404).json({ message: "Program account not found" });
+      }
+
+      const account = await storage.getAccount(programAccount.accountId);
+      const metrics = await storage.getAccountMetrics(programAccount.accountId);
+      const snapshots = await storage.getProgramRevenueSnapshots(id);
+
+      // Calculate current penetration from account metrics
+      const currentPenetration = metrics ? parseFloat(metrics.categoryPenetration || "0") : 0;
+      const targetPenetration = programAccount.targetPenetration 
+        ? parseFloat(programAccount.targetPenetration) 
+        : null;
+      
+      // Calculate incremental revenue from snapshots
+      const totalIncrementalRevenue = snapshots.reduce(
+        (sum, s) => sum + parseFloat(s.incrementalRevenue || "0"), 
+        0
+      );
+      const targetIncrementalRevenue = programAccount.targetIncrementalRevenue 
+        ? parseFloat(programAccount.targetIncrementalRevenue) 
+        : null;
+
+      // Calculate months enrolled
+      const enrolledAt = new Date(programAccount.enrolledAt);
+      const now = new Date();
+      const monthsEnrolled = Math.floor(
+        (now.getTime() - enrolledAt.getTime()) / (1000 * 60 * 60 * 24 * 30)
+      );
+      const targetDurationMonths = programAccount.targetDurationMonths || null;
+
+      // Calculate progress percentages
+      const penetrationProgress = targetPenetration && targetPenetration > 0
+        ? Math.min(100, (currentPenetration / targetPenetration) * 100)
+        : null;
+      const revenueProgress = targetIncrementalRevenue && targetIncrementalRevenue > 0
+        ? Math.min(100, (totalIncrementalRevenue / targetIncrementalRevenue) * 100)
+        : null;
+      const durationProgress = targetDurationMonths && targetDurationMonths > 0
+        ? Math.min(100, (monthsEnrolled / targetDurationMonths) * 100)
+        : null;
+
+      // Determine if ready to graduate based on criteria
+      const criteria = programAccount.graduationCriteria || "any";
+      const objectivesMet = {
+        penetration: penetrationProgress !== null && penetrationProgress >= 100,
+        revenue: revenueProgress !== null && revenueProgress >= 100,
+        duration: durationProgress !== null && durationProgress >= 100,
+      };
+
+      const hasObjectives = targetPenetration !== null || targetIncrementalRevenue !== null || targetDurationMonths !== null;
+      
+      let isReadyToGraduate = false;
+      if (hasObjectives) {
+        if (criteria === "all") {
+          // All defined objectives must be met
+          isReadyToGraduate = (targetPenetration === null || objectivesMet.penetration) &&
+                              (targetIncrementalRevenue === null || objectivesMet.revenue) &&
+                              (targetDurationMonths === null || objectivesMet.duration);
+        } else {
+          // Any objective being met is sufficient
+          isReadyToGraduate = objectivesMet.penetration || objectivesMet.revenue || objectivesMet.duration;
+        }
+      }
+
+      res.json({
+        programAccountId: id,
+        accountId: programAccount.accountId,
+        accountName: account?.name || "Unknown",
+        status: programAccount.status,
+        graduationCriteria: criteria,
+        hasObjectives,
+        isReadyToGraduate,
+        objectives: {
+          penetration: {
+            current: currentPenetration,
+            target: targetPenetration,
+            progress: penetrationProgress,
+            isMet: objectivesMet.penetration,
+          },
+          revenue: {
+            current: totalIncrementalRevenue,
+            target: targetIncrementalRevenue,
+            progress: revenueProgress,
+            isMet: objectivesMet.revenue,
+          },
+          duration: {
+            current: monthsEnrolled,
+            target: targetDurationMonths,
+            progress: durationProgress,
+            isMet: objectivesMet.duration,
+          },
+        },
+        enrolledAt: programAccount.enrolledAt,
+        graduatedAt: programAccount.graduatedAt,
+      });
+    } catch (error) {
+      console.error("Graduation progress error:", error);
+      res.status(500).json({ message: "Failed to get graduation progress" });
+    }
+  });
+
+  // Graduate an account
+  app.post("/api/program-accounts/:id/graduate", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { notes } = req.body;
+
+      const programAccount = await storage.getProgramAccount(id);
+      if (!programAccount) {
+        return res.status(404).json({ message: "Program account not found" });
+      }
+
+      if (programAccount.status === "graduated") {
+        return res.status(400).json({ message: "Account is already graduated" });
+      }
+
+      const updatedAccount = await storage.updateProgramAccount(id, {
+        status: "graduated",
+        graduatedAt: new Date(),
+        graduationNotes: notes || null,
+      });
+
+      const account = await storage.getAccount(programAccount.accountId);
+      
+      res.json({
+        success: true,
+        message: "Account graduated successfully",
+        programAccount: updatedAccount,
+        accountName: account?.name || "Unknown",
+      });
+    } catch (error) {
+      console.error("Graduate account error:", error);
+      res.status(500).json({ message: "Failed to graduate account" });
+    }
+  });
+
+  // Get all graduation-ready accounts
+  app.get("/api/program-accounts/graduation-ready", async (req, res) => {
+    try {
+      const programAccounts = await storage.getProgramAccounts();
+      const activeAccounts = programAccounts.filter(pa => pa.status === "active");
+      
+      const readyAccounts = [];
+      
+      for (const pa of activeAccounts) {
+        const account = await storage.getAccount(pa.accountId);
+        const metrics = await storage.getAccountMetrics(pa.accountId);
+        const snapshots = await storage.getProgramRevenueSnapshots(pa.id);
+
+        const currentPenetration = metrics ? parseFloat(metrics.categoryPenetration || "0") : 0;
+        const targetPenetration = pa.targetPenetration ? parseFloat(pa.targetPenetration) : null;
+        
+        const totalIncrementalRevenue = snapshots.reduce(
+          (sum, s) => sum + parseFloat(s.incrementalRevenue || "0"), 
+          0
+        );
+        const targetIncrementalRevenue = pa.targetIncrementalRevenue 
+          ? parseFloat(pa.targetIncrementalRevenue) 
+          : null;
+
+        const enrolledAt = new Date(pa.enrolledAt);
+        const now = new Date();
+        const monthsEnrolled = Math.floor(
+          (now.getTime() - enrolledAt.getTime()) / (1000 * 60 * 60 * 24 * 30)
+        );
+        const targetDurationMonths = pa.targetDurationMonths || null;
+
+        const objectivesMet = {
+          penetration: targetPenetration !== null && currentPenetration >= targetPenetration,
+          revenue: targetIncrementalRevenue !== null && totalIncrementalRevenue >= targetIncrementalRevenue,
+          duration: targetDurationMonths !== null && monthsEnrolled >= targetDurationMonths,
+        };
+
+        const hasObjectives = targetPenetration !== null || targetIncrementalRevenue !== null || targetDurationMonths !== null;
+        
+        let isReadyToGraduate = false;
+        const criteria = pa.graduationCriteria || "any";
+        if (hasObjectives) {
+          if (criteria === "all") {
+            isReadyToGraduate = (targetPenetration === null || objectivesMet.penetration) &&
+                                (targetIncrementalRevenue === null || objectivesMet.revenue) &&
+                                (targetDurationMonths === null || objectivesMet.duration);
+          } else {
+            isReadyToGraduate = objectivesMet.penetration || objectivesMet.revenue || objectivesMet.duration;
+          }
+        }
+
+        if (isReadyToGraduate) {
+          readyAccounts.push({
+            programAccountId: pa.id,
+            accountId: pa.accountId,
+            accountName: account?.name || "Unknown",
+            enrolledAt: pa.enrolledAt,
+            objectivesMet,
+          });
+        }
+      }
+
+      res.json({
+        count: readyAccounts.length,
+        accounts: readyAccounts,
+      });
+    } catch (error) {
+      console.error("Graduation ready error:", error);
+      res.status(500).json({ message: "Failed to get graduation-ready accounts" });
     }
   });
 
