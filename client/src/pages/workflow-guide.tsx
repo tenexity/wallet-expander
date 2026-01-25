@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Upload,
   Settings,
@@ -15,6 +18,10 @@ import {
   Calendar,
   CalendarDays,
   CalendarClock,
+  ChevronDown,
+  ChevronRight,
+  UserPlus,
+  Info,
 } from "lucide-react";
 import teeterTotterImage from "@assets/teeter-totter-workflow.png";
 
@@ -24,6 +31,8 @@ interface WorkflowStep {
   description: string;
   url: string;
   icon: React.ElementType;
+  isEnrollment?: boolean;
+  enrollmentTooltip?: string;
 }
 
 const setupSteps: WorkflowStep[] = [
@@ -84,13 +93,22 @@ const weeklySteps: WorkflowStep[] = [
   },
   {
     id: "weekly-2",
+    title: "Enroll Accounts",
+    description: "Enroll high-opportunity accounts into the revenue program",
+    url: "/revenue",
+    icon: UserPlus,
+    isEnrollment: true,
+    enrollmentTooltip: "This is where enrollment happens, and with each account enrolled, new revenue will be unlocked.",
+  },
+  {
+    id: "weekly-3",
     title: "Generate Playbooks",
     description: "Create AI-powered sales tasks with call scripts and emails",
     url: "/playbooks",
     icon: ClipboardList,
   },
   {
-    id: "weekly-3",
+    id: "weekly-4",
     title: "Track Revenue",
     description: "Monitor incremental revenue and update account enrollments",
     url: "/revenue",
@@ -150,17 +168,39 @@ function SwimLane({ title, subtitle, steps, color, bgColor, borderColor, icon: L
       <div className="flex flex-wrap items-center gap-3">
         {steps.map((step, index) => (
           <div key={step.id} className="flex items-center gap-3">
-            <button
-              onClick={() => navigate(step.url)}
-              className="group flex flex-col items-start p-3 rounded-lg bg-background border border-border hover-elevate active-elevate-2 cursor-pointer min-w-[180px] text-left transition-all"
-              data-testid={`workflow-step-${step.id}`}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                <step.icon className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
-                <span className="font-medium text-sm text-foreground">{step.title}</span>
-              </div>
-              <p className="text-xs text-muted-foreground line-clamp-2">{step.description}</p>
-            </button>
+            {step.isEnrollment ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => navigate(step.url)}
+                    className="group flex flex-col items-start p-3 rounded-lg bg-orange-500 border-2 border-orange-600 hover-elevate active-elevate-2 cursor-pointer min-w-[180px] text-left transition-all shadow-lg"
+                    data-testid={`workflow-step-${step.id}`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <step.icon className="h-4 w-4 text-white" />
+                      <span className="font-medium text-sm text-white">{step.title}</span>
+                      <Info className="h-3 w-3 text-white/80" />
+                    </div>
+                    <p className="text-xs text-white/90 line-clamp-2">{step.description}</p>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  <p>{step.enrollmentTooltip}</p>
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <button
+                onClick={() => navigate(step.url)}
+                className="group flex flex-col items-start p-3 rounded-lg bg-background border border-border hover-elevate active-elevate-2 cursor-pointer min-w-[180px] text-left transition-all"
+                data-testid={`workflow-step-${step.id}`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <step.icon className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                  <span className="font-medium text-sm text-foreground">{step.title}</span>
+                </div>
+                <p className="text-xs text-muted-foreground line-clamp-2">{step.description}</p>
+              </button>
+            )}
             {index < steps.length - 1 && (
               <ArrowRight className="h-5 w-5 text-muted-foreground flex-shrink-0 hidden sm:block" />
             )}
@@ -172,6 +212,8 @@ function SwimLane({ title, subtitle, steps, color, bgColor, borderColor, icon: L
 }
 
 export default function WorkflowGuide() {
+  const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
+
   return (
     <div className="p-6 space-y-6">
       <div className="space-y-2">
@@ -184,20 +226,39 @@ export default function WorkflowGuide() {
       </div>
 
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col items-center gap-4">
-            <img 
-              src={teeterTotterImage} 
-              alt="Workflow diagram showing Account Enrollment as the central fulcrum, with data preparation activities on the left and sales execution activities on the right" 
-              className="w-full max-w-4xl rounded-lg border border-border"
-              data-testid="img-teeter-totter"
-            />
-            <p className="text-sm text-muted-foreground text-center max-w-2xl">
-              Account Enrollment is the central pivot point of this system. On the left, prepare your data through uploads, configuration, and ICP analysis. 
-              Once enrolled, execute sales activities on the right through playbooks, tasks, and revenue tracking.
-            </p>
-          </div>
-        </CardContent>
+        <Collapsible open={isHowItWorksOpen} onOpenChange={setIsHowItWorksOpen}>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer hover-elevate pb-4">
+              <CardTitle className="flex items-center justify-between gap-2 text-lg">
+                <div className="flex items-center gap-2">
+                  <Info className="h-5 w-5 text-primary" />
+                  How It Works
+                </div>
+                {isHowItWorksOpen ? (
+                  <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                )}
+              </CardTitle>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="pt-0">
+              <div className="flex flex-col items-center gap-4">
+                <img 
+                  src={teeterTotterImage} 
+                  alt="Workflow diagram showing Account Enrollment as the central fulcrum, with data preparation activities on the left and sales execution activities on the right" 
+                  className="w-full max-w-4xl rounded-lg border border-border"
+                  data-testid="img-teeter-totter"
+                />
+                <p className="text-sm text-muted-foreground text-center max-w-2xl">
+                  Account Enrollment is the central pivot point of this system. On the left, prepare your data through uploads, configuration, and ICP analysis. 
+                  Once enrolled, execute sales activities on the right through playbooks, tasks, and revenue tracking.
+                </p>
+              </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Collapsible>
       </Card>
 
       <Card>
