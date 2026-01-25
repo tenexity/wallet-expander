@@ -78,7 +78,23 @@ import {
   ChevronDown,
   ChevronRight,
   BookOpen,
+  TrendingUp,
+  Calendar,
+  Clock,
+  ArrowUpRight,
 } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 import { Slider } from "@/components/ui/slider";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -122,6 +138,249 @@ interface CustomCategory {
   name: string;
   displayOrder: number;
   isActive: boolean;
+}
+
+interface RevenueSnapshot {
+  period: string;
+  baselineRevenue: number;
+  actualRevenue: number;
+  incrementalRevenue: number;
+  feeAmount: number;
+}
+
+interface EnrolledAccountSummary {
+  id: number;
+  accountName: string;
+  incrementalRevenue: number;
+  feeAmount: number;
+  status: string;
+}
+
+function RevenueTrackingManager() {
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
+
+  const { data: enrolledAccounts } = useQuery<EnrolledAccountSummary[]>({
+    queryKey: ["/api/program-accounts"],
+  });
+
+  const mockRevenueData: RevenueSnapshot[] = [
+    { period: "Aug", baselineRevenue: 56000, actualRevenue: 58000, incrementalRevenue: 2000, feeAmount: 300 },
+    { period: "Sep", baselineRevenue: 58000, actualRevenue: 65000, incrementalRevenue: 7000, feeAmount: 1050 },
+    { period: "Oct", baselineRevenue: 55000, actualRevenue: 72000, incrementalRevenue: 17000, feeAmount: 2550 },
+    { period: "Nov", baselineRevenue: 62000, actualRevenue: 85000, incrementalRevenue: 23000, feeAmount: 3450 },
+    { period: "Dec", baselineRevenue: 48000, actualRevenue: 78000, incrementalRevenue: 30000, feeAmount: 4500 },
+    { period: "Jan", baselineRevenue: 52000, actualRevenue: 94000, incrementalRevenue: 42000, feeAmount: 6300 },
+  ];
+
+  const activeAccounts = enrolledAccounts?.filter(a => a.status === "active") || [];
+  const totalIncremental = activeAccounts.reduce((sum, a) => sum + (a.incrementalRevenue || 0), 0);
+  const totalFees = activeAccounts.reduce((sum, a) => sum + (a.feeAmount || 0), 0);
+  
+  const currentMonthFee = mockRevenueData[mockRevenueData.length - 1]?.feeAmount || 0;
+  
+  const today = new Date();
+  const nextBillingDate = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+  const daysUntilBilling = Math.ceil((nextBillingDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+  return (
+    <div className="space-y-6">
+      <Card className="border-primary/20 bg-primary/5" data-testid="card-billing-cycle">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-primary" />
+            Next Billing Cycle
+          </CardTitle>
+          <CardDescription>
+            Amount owed to Tenexity at the next billing date
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-6 md:grid-cols-3">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Clock className="h-4 w-4" />
+                Billing Date
+              </div>
+              <p className="text-2xl font-bold" data-testid="text-billing-date">
+                {nextBillingDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+              </p>
+              <p className="text-sm text-muted-foreground" data-testid="text-days-remaining">
+                {daysUntilBilling} days remaining
+              </p>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <TrendingUp className="h-4 w-4" />
+                Current Month Incremental
+              </div>
+              <p className="text-2xl font-bold text-chart-2" data-testid="text-current-incremental">
+                {formatCurrency(mockRevenueData[mockRevenueData.length - 1]?.incrementalRevenue || 0)}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Revenue above baseline
+              </p>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <DollarSign className="h-4 w-4" />
+                Amount Due to Tenexity
+              </div>
+              <p className="text-2xl font-bold text-primary" data-testid="text-amount-due">
+                {formatCurrency(currentMonthFee)}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                15% of incremental revenue
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card data-testid="card-fees-summary">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Total Fees Summary
+            </CardTitle>
+            <CardDescription>
+              Cumulative fees owed to Tenexity
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between py-3 border-b">
+              <div>
+                <p className="font-medium">Total Incremental Revenue</p>
+                <p className="text-sm text-muted-foreground">
+                  From {activeAccounts.length} active enrolled accounts
+                </p>
+              </div>
+              <p className="text-xl font-bold text-chart-2" data-testid="text-total-incremental">
+                {formatCurrency(totalIncremental)}
+              </p>
+            </div>
+            <div className="flex items-center justify-between py-3 border-b">
+              <div>
+                <p className="font-medium">Rev-Share Rate</p>
+                <p className="text-sm text-muted-foreground">
+                  Applied to incremental revenue
+                </p>
+              </div>
+              <p className="text-xl font-bold" data-testid="text-revshare-rate">15%</p>
+            </div>
+            <div className="flex items-center justify-between py-3">
+              <div>
+                <p className="font-medium">Total Fees Owed</p>
+                <p className="text-sm text-muted-foreground">
+                  Cumulative amount to Tenexity
+                </p>
+              </div>
+              <p className="text-2xl font-bold text-primary" data-testid="text-total-fees">
+                {formatCurrency(totalFees)}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-monthly-fees">
+          <CardHeader>
+            <CardTitle className="text-base">Monthly Fee Revenue</CardTitle>
+            <CardDescription>Rev-share fees by month</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={mockRevenueData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis
+                    dataKey="period"
+                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                    axisLine={{ stroke: "hsl(var(--border))" }}
+                  />
+                  <YAxis
+                    tickFormatter={(value) => formatCurrency(value)}
+                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                    axisLine={{ stroke: "hsl(var(--border))" }}
+                  />
+                  <RechartsTooltip
+                    formatter={(value: number) => [formatCurrency(value), "Fee"]}
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--popover))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "var(--radius)",
+                    }}
+                  />
+                  <Bar
+                    dataKey="feeAmount"
+                    name="Fee"
+                    fill="hsl(var(--primary))"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card data-testid="card-fee-breakdown">
+        <CardHeader>
+          <CardTitle className="text-base">Fee Breakdown by Account</CardTitle>
+          <CardDescription>
+            Revenue share owed per enrolled account
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {activeAccounts.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <DollarSign className="mx-auto h-8 w-8 mb-2 opacity-50" />
+              <p>No enrolled accounts yet.</p>
+              <p className="text-sm">Enroll accounts from the Revenue Tracking page to see fee breakdowns.</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Account</TableHead>
+                  <TableHead className="text-right">Incremental Revenue</TableHead>
+                  <TableHead className="text-right">Fee (15%)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {activeAccounts.map((account) => (
+                  <TableRow key={account.id}>
+                    <TableCell className="font-medium">{account.accountName}</TableCell>
+                    <TableCell className="text-right text-chart-2">
+                      {formatCurrency(account.incrementalRevenue || 0)}
+                    </TableCell>
+                    <TableCell className="text-right font-medium text-primary">
+                      {formatCurrency(account.feeAmount || 0)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                <TableRow className="bg-muted/50">
+                  <TableCell className="font-bold">Total</TableCell>
+                  <TableCell className="text-right font-bold text-chart-2">
+                    {formatCurrency(totalIncremental)}
+                  </TableCell>
+                  <TableCell className="text-right font-bold text-primary">
+                    {formatCurrency(totalFees)}
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
 
 function CategoriesManager() {
@@ -702,6 +961,10 @@ export default function SettingsPage() {
           <TabsTrigger value="categories" data-testid="tab-categories">
             <FileText className="mr-2 h-4 w-4" />
             Categories
+          </TabsTrigger>
+          <TabsTrigger value="revenue-tracking" data-testid="tab-revenue-tracking">
+            <DollarSign className="mr-2 h-4 w-4" />
+            Revenue Tracking
           </TabsTrigger>
         </TabsList>
 
@@ -1395,6 +1658,10 @@ Output a structured profile with category expectations.`}
 
         <TabsContent value="categories" className="space-y-6">
           <CategoriesManager />
+        </TabsContent>
+
+        <TabsContent value="revenue-tracking" className="space-y-6">
+          <RevenueTrackingManager />
         </TabsContent>
       </Tabs>
 

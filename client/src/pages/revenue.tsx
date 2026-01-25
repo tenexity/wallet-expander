@@ -79,7 +79,6 @@ interface EnrolledAccount {
   currentRevenue: number;
   incrementalRevenue: number;
   shareRate: number;
-  feeAmount: number;
   status: "active" | "paused" | "graduated";
   // Graduation objectives
   targetPenetration?: number | null;
@@ -123,7 +122,6 @@ interface RevenueSnapshot {
   baselineRevenue: number;
   actualRevenue: number;
   incrementalRevenue: number;
-  feeAmount: number;
 }
 
 interface Account {
@@ -185,7 +183,6 @@ export default function Revenue() {
       currentRevenue: 145000,
       incrementalRevenue: 35000,
       shareRate: 0.15,
-      feeAmount: 5250,
       status: "active",
     },
     {
@@ -198,7 +195,6 @@ export default function Revenue() {
       currentRevenue: 242000,
       incrementalRevenue: 47000,
       shareRate: 0.15,
-      feeAmount: 7050,
       status: "active",
     },
     {
@@ -211,7 +207,6 @@ export default function Revenue() {
       currentRevenue: 348000,
       incrementalRevenue: 68000,
       shareRate: 0.15,
-      feeAmount: 10200,
       status: "active",
     },
     {
@@ -224,18 +219,17 @@ export default function Revenue() {
       currentRevenue: 98000,
       incrementalRevenue: 13000,
       shareRate: 0.15,
-      feeAmount: 1950,
       status: "active",
     },
   ];
 
   const mockRevenueData: RevenueSnapshot[] = [
-    { period: "Aug", baselineRevenue: 56000, actualRevenue: 58000, incrementalRevenue: 2000, feeAmount: 300 },
-    { period: "Sep", baselineRevenue: 58000, actualRevenue: 65000, incrementalRevenue: 7000, feeAmount: 1050 },
-    { period: "Oct", baselineRevenue: 55000, actualRevenue: 72000, incrementalRevenue: 17000, feeAmount: 2550 },
-    { period: "Nov", baselineRevenue: 62000, actualRevenue: 85000, incrementalRevenue: 23000, feeAmount: 3450 },
-    { period: "Dec", baselineRevenue: 48000, actualRevenue: 78000, incrementalRevenue: 30000, feeAmount: 4500 },
-    { period: "Jan", baselineRevenue: 52000, actualRevenue: 94000, incrementalRevenue: 42000, feeAmount: 6300 },
+    { period: "Aug", baselineRevenue: 56000, actualRevenue: 58000, incrementalRevenue: 2000 },
+    { period: "Sep", baselineRevenue: 58000, actualRevenue: 65000, incrementalRevenue: 7000 },
+    { period: "Oct", baselineRevenue: 55000, actualRevenue: 72000, incrementalRevenue: 17000 },
+    { period: "Nov", baselineRevenue: 62000, actualRevenue: 85000, incrementalRevenue: 23000 },
+    { period: "Dec", baselineRevenue: 48000, actualRevenue: 78000, incrementalRevenue: 30000 },
+    { period: "Jan", baselineRevenue: 52000, actualRevenue: 94000, incrementalRevenue: 42000 },
   ];
 
   const allDisplayAccounts = enrolledAccounts || mockEnrolledAccounts;
@@ -246,7 +240,6 @@ export default function Revenue() {
   const totalBaseline = activeAccounts.reduce((sum, a) => sum + a.baselineRevenue, 0);
   const totalCurrent = displayAccounts.reduce((sum, a) => sum + a.currentRevenue, 0);
   const totalIncremental = displayAccounts.reduce((sum, a) => sum + a.incrementalRevenue, 0);
-  const totalFees = displayAccounts.reduce((sum, a) => sum + a.feeAmount, 0);
   const growthRate = ((totalCurrent - totalBaseline) / totalBaseline) * 100;
 
   const formatCurrency = (value: number) => {
@@ -389,15 +382,6 @@ export default function Revenue() {
       },
     },
     {
-      key: "feeAmount",
-      header: "Fee (15%)",
-      cell: (row: EnrolledAccount) => (
-        <span className="font-medium text-primary">
-          {formatCurrency(row.feeAmount)}
-        </span>
-      ),
-    },
-    {
       key: "status",
       header: "Status",
       cell: (row: EnrolledAccount) => {
@@ -486,7 +470,7 @@ export default function Revenue() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Revenue Tracking</h1>
           <p className="text-muted-foreground">
-            Monitor program performance and calculate rev-share fees
+            Monitor program performance and track revenue growth
           </p>
         </div>
         <div className="flex gap-2">
@@ -514,7 +498,7 @@ export default function Revenue() {
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="max-w-[250px]">
-              Add an account to the revenue growth program to track incremental revenue and calculate rev-share fees (15% of revenue above baseline).
+              Add an account to the revenue growth program to track incremental revenue above their baseline.
             </TooltipContent>
           </TooltipComponent>
         </div>
@@ -540,7 +524,7 @@ export default function Revenue() {
                   </button>
                 </TooltipTrigger>
                 <TooltipContent className="max-w-xs">
-                  <p className="text-sm">Accounts actively enrolled in the revenue growth program. Their incremental revenue above baseline is used to calculate your rev-share fees.</p>
+                  <p className="text-sm">Accounts actively enrolled in the revenue growth program, tracking incremental revenue above their established baseline.</p>
                 </TooltipContent>
               </TooltipComponent>
             </div>
@@ -596,132 +580,65 @@ export default function Revenue() {
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-chart-1/10">
-                  <DollarSign className="h-5 w-5 text-chart-1" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{formatCurrency(totalFees)}</p>
-                  <p className="text-xs text-muted-foreground">Total Fees Earned</p>
-                </div>
-              </div>
-              <TooltipComponent>
-                <TooltipTrigger asChild>
-                  <button className="text-muted-foreground hover:text-foreground transition-colors" data-testid="tooltip-revenue-fees">
-                    <HelpCircle className="h-4 w-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <p className="text-sm">Your total rev-share earnings calculated as 15% of incremental revenue. This is the fee earned for helping capture additional wallet share.</p>
-                </TooltipContent>
-              </TooltipComponent>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Revenue Trend</CardTitle>
-            <CardDescription>Baseline vs Actual revenue over time</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={mockRevenueData}>
-                  <defs>
-                    <linearGradient id="colorActual" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis
-                    dataKey="period"
-                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                    axisLine={{ stroke: "hsl(var(--border))" }}
-                  />
-                  <YAxis
-                    tickFormatter={(value) => formatCurrency(value)}
-                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                    axisLine={{ stroke: "hsl(var(--border))" }}
-                  />
-                  <Tooltip
-                    formatter={(value: number) => [formatCurrency(value)]}
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--popover))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "var(--radius)",
-                    }}
-                  />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="baselineRevenue"
-                    name="Baseline"
-                    stroke="hsl(var(--muted-foreground))"
-                    strokeDasharray="5 5"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="actualRevenue"
-                    name="Actual"
-                    stroke="hsl(var(--chart-2))"
-                    fill="url(#colorActual)"
-                    strokeWidth={2}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Monthly Fee Revenue</CardTitle>
-            <CardDescription>Rev-share fees earned by month</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={mockRevenueData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis
-                    dataKey="period"
-                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                    axisLine={{ stroke: "hsl(var(--border))" }}
-                  />
-                  <YAxis
-                    tickFormatter={(value) => formatCurrency(value)}
-                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                    axisLine={{ stroke: "hsl(var(--border))" }}
-                  />
-                  <Tooltip
-                    formatter={(value: number) => [formatCurrency(value), "Fee"]}
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--popover))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "var(--radius)",
-                    }}
-                  />
-                  <Bar
-                    dataKey="feeAmount"
-                    name="Fee"
-                    fill="hsl(var(--chart-1))"
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Revenue Trend</CardTitle>
+          <CardDescription>Baseline vs Actual revenue over time</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={mockRevenueData}>
+                <defs>
+                  <linearGradient id="colorActual" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis
+                  dataKey="period"
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                  axisLine={{ stroke: "hsl(var(--border))" }}
+                />
+                <YAxis
+                  tickFormatter={(value) => formatCurrency(value)}
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                  axisLine={{ stroke: "hsl(var(--border))" }}
+                />
+                <Tooltip
+                  formatter={(value: number) => [formatCurrency(value)]}
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--popover))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "var(--radius)",
+                  }}
+                />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="baselineRevenue"
+                  name="Baseline"
+                  stroke="hsl(var(--muted-foreground))"
+                  strokeDasharray="5 5"
+                  strokeWidth={2}
+                  dot={false}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="actualRevenue"
+                  name="Actual"
+                  stroke="hsl(var(--chart-2))"
+                  fill="url(#colorActual)"
+                  strokeWidth={2}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Graduation Ready Alert */}
       {graduationReady && graduationReady.count > 0 && viewMode === "active" && (
@@ -829,7 +746,7 @@ export default function Revenue() {
           <CardTitle className="text-base">Program Summary</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-3 gap-6">
             <div className="text-center p-4 rounded-md bg-muted/50">
               <p className="text-3xl font-bold">{formatCurrency(totalBaseline)}</p>
               <p className="text-sm text-muted-foreground mt-1">Total Baseline</p>
@@ -843,14 +760,6 @@ export default function Revenue() {
                 {formatCurrency(totalIncremental)}
               </p>
               <p className="text-sm text-muted-foreground mt-1">Incremental Growth</p>
-            </div>
-            <div className="text-center p-4 rounded-md bg-chart-1/10">
-              <p className="text-3xl font-bold text-chart-1">
-                {formatCurrency(totalFees)}
-              </p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Your Fees (15%)
-              </p>
             </div>
           </div>
         </CardContent>
