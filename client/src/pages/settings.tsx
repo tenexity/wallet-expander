@@ -70,12 +70,43 @@ import {
   Upload,
   X,
   Image,
+  Target,
+  DollarSign,
+  Layers,
+  RotateCcw,
+  HelpCircle,
+  ChevronDown,
+  ChevronRight,
+  BookOpen,
 } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface Setting {
   key: string;
   value: string | null;
 }
+
+interface ScoringWeights {
+  id: number;
+  name: string;
+  gapSizeWeight: number;
+  revenuePotentialWeight: number;
+  categoryCountWeight: number;
+  description: string;
+  isActive: boolean;
+}
+
+const DEFAULT_WEIGHTS = {
+  gapSizeWeight: 40,
+  revenuePotentialWeight: 30,
+  categoryCountWeight: 30,
+};
 
 const territoryManagerFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -369,6 +400,12 @@ export default function SettingsPage() {
   const [appTitle, setAppTitle] = useState("AI VP Dashboard");
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
 
+  const [gapSizeWeight, setGapSizeWeight] = useState(DEFAULT_WEIGHTS.gapSizeWeight);
+  const [revenuePotentialWeight, setRevenuePotentialWeight] = useState(DEFAULT_WEIGHTS.revenuePotentialWeight);
+  const [categoryCountWeight, setCategoryCountWeight] = useState(DEFAULT_WEIGHTS.categoryCountWeight);
+  const [hasWeightChanges, setHasWeightChanges] = useState(false);
+  const [isInstructionsOpen, setIsInstructionsOpen] = useState(false);
+
   const form = useForm<TerritoryManagerFormValues>({
     resolver: zodResolver(territoryManagerFormSchema),
     defaultValues: {
@@ -398,6 +435,71 @@ export default function SettingsPage() {
   const { data: territoryManagers = [], isLoading: isLoadingManagers } = useQuery<TerritoryManager[]>({
     queryKey: ["/api/territory-managers"],
   });
+
+  const { data: scoringWeights } = useQuery<ScoringWeights>({
+    queryKey: ["/api/scoring-weights"],
+  });
+
+  useEffect(() => {
+    if (scoringWeights) {
+      setGapSizeWeight(scoringWeights.gapSizeWeight);
+      setRevenuePotentialWeight(scoringWeights.revenuePotentialWeight);
+      setCategoryCountWeight(scoringWeights.categoryCountWeight);
+    }
+  }, [scoringWeights]);
+
+  const updateWeightsMutation = useMutation({
+    mutationFn: async (weights: { gapSizeWeight: number; revenuePotentialWeight: number; categoryCountWeight: number }) => {
+      return apiRequest("PUT", "/api/scoring-weights", weights);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/scoring-weights"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
+      setHasWeightChanges(false);
+      toast({
+        title: "Scoring weights updated",
+        description: "The new weights will be applied to all account scores.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update weights",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const weightsTotal = gapSizeWeight + revenuePotentialWeight + categoryCountWeight;
+  const isValidWeightsTotal = Math.abs(weightsTotal - 100) < 0.01;
+
+  const handleWeightChange = (setter: (val: number) => void, value: number) => {
+    setter(value);
+    setHasWeightChanges(true);
+  };
+
+  const handleResetWeights = () => {
+    setGapSizeWeight(DEFAULT_WEIGHTS.gapSizeWeight);
+    setRevenuePotentialWeight(DEFAULT_WEIGHTS.revenuePotentialWeight);
+    setCategoryCountWeight(DEFAULT_WEIGHTS.categoryCountWeight);
+    setHasWeightChanges(true);
+  };
+
+  const handleSaveWeights = () => {
+    if (!isValidWeightsTotal) {
+      toast({
+        title: "Invalid weights",
+        description: "Weights must sum to 100%",
+        variant: "destructive",
+      });
+      return;
+    }
+    updateWeightsMutation.mutate({
+      gapSizeWeight,
+      revenuePotentialWeight,
+      categoryCountWeight,
+    });
+  };
 
   const saveSettingMutation = useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
@@ -860,81 +962,245 @@ export default function SettingsPage() {
 
         <TabsContent value="scoring" className="space-y-6">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Opportunity Score Weights</CardTitle>
-              <CardDescription>
-                Adjust how different factors contribute to the opportunity score
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label>Gap Score Weight</Label>
-                  <div className="flex items-center gap-2">
-                    <Input type="number" defaultValue="40" className="w-20" />
-                    <span className="text-sm text-muted-foreground">%</span>
+            <Collapsible open={isInstructionsOpen} onOpenChange={setIsInstructionsOpen}>
+              <CollapsibleTrigger asChild>
+                <CardHeader className="cursor-pointer hover-elevate">
+                  <CardTitle className="flex items-center justify-between gap-2 text-base">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="h-4 w-4 text-primary" />
+                      How Scoring Works
+                    </div>
+                    {isInstructionsOpen ? (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </CardTitle>
+                </CardHeader>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="pt-0 space-y-4">
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-2">What is the Opportunity Score?</h4>
+                    <p className="text-sm text-muted-foreground">
+                      The Opportunity Score ranks accounts by their potential for wallet share capture. It combines three factors 
+                      to identify which accounts should be prioritized for enrollment in the revenue recovery program.
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Weight of category gaps in final score
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label>Account Size Weight</Label>
-                  <div className="flex items-center gap-2">
-                    <Input type="number" defaultValue="30" className="w-20" />
-                    <span className="text-sm text-muted-foreground">%</span>
+
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-2">The Three Factors</h4>
+                    <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                      <li><strong>Gap Size:</strong> How far the account falls below your ICP targets. Larger gaps = more room for growth.</li>
+                      <li><strong>Revenue Potential:</strong> The account's current revenue and estimated upside. Bigger accounts offer bigger absolute gains.</li>
+                      <li><strong>Category Count:</strong> Number of product categories with gaps. More gaps may indicate broader opportunity.</li>
+                    </ul>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Weight of account revenue in final score
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label>Growth Trend Weight</Label>
-                  <div className="flex items-center gap-2">
-                    <Input type="number" defaultValue="20" className="w-20" />
-                    <span className="text-sm text-muted-foreground">%</span>
+
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-2">How to Adjust Weights</h4>
+                    <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                      <li>Use sliders or type values directly - weights must add up to exactly 100%</li>
+                      <li>Higher weight = more influence on which accounts rank at the top</li>
+                      <li>Changes apply immediately after saving and re-rank all accounts</li>
+                    </ul>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Weight of YoY growth rate in final score
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label>Recency Weight</Label>
-                  <div className="flex items-center gap-2">
-                    <Input type="number" defaultValue="10" className="w-20" />
-                    <span className="text-sm text-muted-foreground">%</span>
+
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-2">Suggested Strategies</h4>
+                    <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                      <li><strong>Balanced (40/30/30):</strong> Default - considers all factors roughly equally</li>
+                      <li><strong>Revenue-Focused (30/50/20):</strong> Prioritize accounts with highest dollar potential</li>
+                      <li><strong>Gap-Focused (60/20/20):</strong> Target accounts with the most room for improvement</li>
+                    </ul>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Weight of recent purchase activity
-                  </p>
-                </div>
-              </div>
-            </CardContent>
+                </CardContent>
+              </CollapsibleContent>
+            </Collapsible>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Thresholds</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2">
+                Opportunity Score Weights
+                {hasWeightChanges && (
+                  <Badge variant="outline" className="ml-2">Unsaved</Badge>
+                )}
+              </CardTitle>
               <CardDescription>
-                Set thresholds for alerts and classifications
+                Adjust how each factor contributes to the opportunity score. Weights must total 100%.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label>High Priority Score</Label>
-                  <Input type="number" defaultValue="70" />
-                  <p className="text-xs text-muted-foreground">
-                    Accounts above this score are high priority
-                  </p>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-md bg-chart-5/10">
+                      <Target className="h-4 w-4 text-chart-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Label className="font-medium">Gap Size</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-5 w-5 p-0" data-testid="tooltip-gap-size">
+                              <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p className="text-sm">Measures how far below the ICP target each account is across categories.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Distance from ICP targets</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Slider
+                      value={[gapSizeWeight]}
+                      onValueChange={([val]) => handleWeightChange(setGapSizeWeight, val)}
+                      max={100}
+                      step={5}
+                      className="w-32"
+                      data-testid="slider-gap-size"
+                    />
+                    <Input
+                      type="number"
+                      value={gapSizeWeight}
+                      onChange={(e) => handleWeightChange(setGapSizeWeight, parseInt(e.target.value) || 0)}
+                      className="w-16 text-center"
+                      min={0}
+                      max={100}
+                      data-testid="input-gap-size"
+                    />
+                    <span className="text-sm text-muted-foreground w-4">%</span>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Minimum Revenue for Class A</Label>
-                  <Input type="number" defaultValue="50000" />
-                  <p className="text-xs text-muted-foreground">
-                    Minimum 12M revenue for Class A designation
-                  </p>
+
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-md bg-chart-1/10">
+                      <DollarSign className="h-4 w-4 text-chart-1" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Label className="font-medium">Revenue Potential</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-5 w-5 p-0" data-testid="tooltip-revenue-potential">
+                              <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p className="text-sm">Based on account revenue and estimated opportunity value.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Potential for incremental revenue</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Slider
+                      value={[revenuePotentialWeight]}
+                      onValueChange={([val]) => handleWeightChange(setRevenuePotentialWeight, val)}
+                      max={100}
+                      step={5}
+                      className="w-32"
+                      data-testid="slider-revenue-potential"
+                    />
+                    <Input
+                      type="number"
+                      value={revenuePotentialWeight}
+                      onChange={(e) => handleWeightChange(setRevenuePotentialWeight, parseInt(e.target.value) || 0)}
+                      className="w-16 text-center"
+                      min={0}
+                      max={100}
+                      data-testid="input-revenue-potential"
+                    />
+                    <span className="text-sm text-muted-foreground w-4">%</span>
+                  </div>
                 </div>
+
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-md bg-chart-2/10">
+                      <Layers className="h-4 w-4 text-chart-2" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Label className="font-medium">Category Count</Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-5 w-5 p-0" data-testid="tooltip-category-count">
+                              <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p className="text-sm">Number of categories where there's a gap opportunity.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Number of categories with gaps</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Slider
+                      value={[categoryCountWeight]}
+                      onValueChange={([val]) => handleWeightChange(setCategoryCountWeight, val)}
+                      max={100}
+                      step={5}
+                      className="w-32"
+                      data-testid="slider-category-count"
+                    />
+                    <Input
+                      type="number"
+                      value={categoryCountWeight}
+                      onChange={(e) => handleWeightChange(setCategoryCountWeight, parseInt(e.target.value) || 0)}
+                      className="w-16 text-center"
+                      min={0}
+                      max={100}
+                      data-testid="input-category-count"
+                    />
+                    <span className="text-sm text-muted-foreground w-4">%</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-4 border-t">
+                <div className="flex items-center gap-2">
+                  {isValidWeightsTotal ? (
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4 text-destructive" />
+                  )}
+                  <span className={`font-medium ${isValidWeightsTotal ? 'text-green-600' : 'text-destructive'}`}>
+                    Total: {weightsTotal}%
+                  </span>
+                  {!isValidWeightsTotal && (
+                    <span className="text-sm text-destructive">(must equal 100%)</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button
+                  onClick={handleSaveWeights}
+                  disabled={!hasWeightChanges || !isValidWeightsTotal || updateWeightsMutation.isPending}
+                  className="flex-1"
+                  data-testid="button-save-weights"
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  {updateWeightsMutation.isPending ? "Saving..." : "Save Weights"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleResetWeights}
+                  disabled={updateWeightsMutation.isPending}
+                  data-testid="button-reset-weights"
+                >
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Reset
+                </Button>
               </div>
             </CardContent>
           </Card>

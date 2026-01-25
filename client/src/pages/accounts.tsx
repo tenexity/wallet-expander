@@ -761,10 +761,12 @@ export default function Accounts() {
                                   </div>
                                 </div>
                                 <p>Higher scores indicate greater opportunity for incremental revenue if enrolled.</p>
-                                <Link href="/scoring-settings" className="flex items-center gap-1 text-primary hover:underline mt-2" data-testid="link-scoring-settings">
-                                  <Settings className="h-3 w-3" />
-                                  Adjust weighting in Scoring Settings
-                                  <ExternalLink className="h-3 w-3" />
+                                <Link href="/settings" data-testid="link-settings">
+                                  <Button variant="ghost" size="sm" className="gap-1">
+                                    <Settings className="h-3 w-3" />
+                                    Adjust weights in Settings
+                                    <ExternalLink className="h-3 w-3" />
+                                  </Button>
                                 </Link>
                               </div>
                             </PopoverContent>

@@ -15,7 +15,6 @@ import ICPBuilder from "@/pages/icp-builder";
 import Playbooks from "@/pages/playbooks";
 import Revenue from "@/pages/revenue";
 import Settings from "@/pages/settings";
-import ScoringSettings from "@/pages/scoring-settings";
 import WorkflowGuide from "@/pages/workflow-guide";
 
 function Router() {
@@ -29,7 +28,6 @@ function Router() {
       <Route path="/playbooks" component={Playbooks} />
       <Route path="/revenue" component={Revenue} />
       <Route path="/settings" component={Settings} />
-      <Route path="/scoring-settings" component={ScoringSettings} />
       <Route component={NotFound} />
     </Switch>
   );
