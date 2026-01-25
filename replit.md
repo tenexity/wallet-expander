@@ -27,9 +27,11 @@ The application follows a client-server architecture.
     - Enhanced cross-navigation allowing drill-down from dashboard KPIs to detailed account analysis and pre-filled playbook generation.
     - Dynamic branding settings (Company Name, Application Title, Company Logo) persisted in the database and updated in real-time.
     - **Workflow Guide:** Visual swim lane chart showing Setup (one-time), Monthly, Weekly, and Daily workflows with clickable steps that navigate directly to corresponding features.
+    - **Top Opportunities Block:** Enhanced dashboard block showing top 10 accounts with sortable columns (Account, Segment, Region, Revenue, Penetration, Score, Enrolled), column visibility toggle with localStorage persistence, and direct link to accounts page.
+    - **Revenue by Segment:** Chart connected to live enrolled accounts data from revenue tracking, with fallback to segment breakdown when no enrolled accounts exist.
 
 **Navigation Structure:**
-- **Main Section:** Dashboard, Workflow Guide, Accounts, ICP Builder, Playbooks, Revenue Tracking
+- **Main Section:** Dashboard, Revenue Tracking, Workflow Guide, Accounts, ICP Builder, Playbooks
 - **Admin Section:** Data Uploads, Settings
 
 **Backend:**
