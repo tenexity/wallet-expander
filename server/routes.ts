@@ -11,6 +11,7 @@ import {
   insertScoringWeightsSchema,
   insertTerritoryManagerSchema,
   insertCustomCategorySchema,
+  insertRevShareTierSchema,
   DEFAULT_SCORING_WEIGHTS,
 } from "@shared/schema";
 import { z } from "zod";
@@ -1780,6 +1781,180 @@ KEY TALKING POINTS:
     } catch (error) {
       console.error("Seed categories error:", error);
       res.status(500).json({ message: "Failed to seed default categories" });
+    }
+  });
+
+  // ============ Rev-Share Tiers ============
+  app.get("/api/rev-share-tiers", async (req, res) => {
+    try {
+      const tiers = await storage.getRevShareTiers();
+      res.json(tiers);
+    } catch (error) {
+      console.error("Get rev-share tiers error:", error);
+      res.status(500).json({ message: "Failed to get rev-share tiers" });
+    }
+  });
+
+  app.post("/api/rev-share-tiers", async (req, res) => {
+    try {
+      const validated = insertRevShareTierSchema.parse(req.body);
+      
+      // Validate min/max relationship
+      const minRev = parseFloat(validated.minRevenue);
+      const maxRev = validated.maxRevenue ? parseFloat(validated.maxRevenue) : null;
+      const shareRate = parseFloat(validated.shareRate);
+      
+      if (isNaN(minRev) || minRev < 0) {
+        return res.status(400).json({ message: "Minimum revenue must be a non-negative number" });
+      }
+      if (maxRev !== null && (isNaN(maxRev) || maxRev <= minRev)) {
+        return res.status(400).json({ message: "Maximum revenue must be greater than minimum revenue" });
+      }
+      if (isNaN(shareRate) || shareRate < 0 || shareRate > 100) {
+        return res.status(400).json({ message: "Share rate must be between 0 and 100" });
+      }
+      
+      const tier = await storage.createRevShareTier(validated);
+      res.status(201).json(tier);
+    } catch (error) {
+      console.error("Create rev-share tier error:", error);
+      res.status(500).json({ message: "Failed to create rev-share tier" });
+    }
+  });
+
+  app.put("/api/rev-share-tiers/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      
+      // Validate min/max relationship if both are provided
+      if (req.body.minRevenue !== undefined || req.body.maxRevenue !== undefined) {
+        const minRev = req.body.minRevenue ? parseFloat(req.body.minRevenue) : null;
+        const maxRev = req.body.maxRevenue ? parseFloat(req.body.maxRevenue) : null;
+        
+        if (minRev !== null && (isNaN(minRev) || minRev < 0)) {
+          return res.status(400).json({ message: "Minimum revenue must be a non-negative number" });
+        }
+        if (maxRev !== null && minRev !== null && maxRev <= minRev) {
+          return res.status(400).json({ message: "Maximum revenue must be greater than minimum revenue" });
+        }
+      }
+      if (req.body.shareRate !== undefined) {
+        const shareRate = parseFloat(req.body.shareRate);
+        if (isNaN(shareRate) || shareRate < 0 || shareRate > 100) {
+          return res.status(400).json({ message: "Share rate must be between 0 and 100" });
+        }
+      }
+      
+      const tier = await storage.updateRevShareTier(id, req.body);
+      if (!tier) {
+        return res.status(404).json({ message: "Rev-share tier not found" });
+      }
+      res.json(tier);
+    } catch (error) {
+      console.error("Update rev-share tier error:", error);
+      res.status(500).json({ message: "Failed to update rev-share tier" });
+    }
+  });
+
+  app.delete("/api/rev-share-tiers/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      await storage.deleteRevShareTier(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Delete rev-share tier error:", error);
+      res.status(500).json({ message: "Failed to delete rev-share tier" });
+    }
+  });
+
+  // Calculate fee based on tiered rates
+  app.post("/api/rev-share-tiers/calculate", async (req, res) => {
+    try {
+      const { incrementalRevenue } = req.body;
+      if (typeof incrementalRevenue !== 'number' || incrementalRevenue < 0) {
+        return res.status(400).json({ message: "Invalid incremental revenue" });
+      }
+
+      const tiers = await storage.getRevShareTiers();
+      
+      // If no tiers defined, use default 15%
+      if (tiers.length === 0) {
+        const fee = incrementalRevenue * 0.15;
+        return res.json({
+          incrementalRevenue,
+          totalFee: fee,
+          effectiveRate: 15,
+          breakdown: [{ tier: "Default", rate: 15, revenueInTier: incrementalRevenue, fee }]
+        });
+      }
+
+      // Sort tiers by minRevenue
+      const sortedTiers = [...tiers]
+        .filter(t => t.isActive)
+        .sort((a, b) => parseFloat(a.minRevenue) - parseFloat(b.minRevenue));
+
+      let remainingRevenue = incrementalRevenue;
+      let totalFee = 0;
+      const breakdown: Array<{ tier: string; rate: number; revenueInTier: number; fee: number }> = [];
+
+      for (const tier of sortedTiers) {
+        if (remainingRevenue <= 0) break;
+
+        const minRev = parseFloat(tier.minRevenue);
+        const maxRev = tier.maxRevenue ? parseFloat(tier.maxRevenue) : Infinity;
+        const rate = parseFloat(tier.shareRate);
+
+        // How much falls in this tier
+        const tierSize = maxRev - minRev;
+        const revenueInTier = Math.min(remainingRevenue, tierSize);
+
+        if (revenueInTier > 0) {
+          const fee = revenueInTier * (rate / 100);
+          totalFee += fee;
+          breakdown.push({
+            tier: `$${minRev.toLocaleString()} - ${maxRev === Infinity ? 'Unlimited' : '$' + maxRev.toLocaleString()}`,
+            rate,
+            revenueInTier,
+            fee
+          });
+          remainingRevenue -= revenueInTier;
+        }
+      }
+
+      const effectiveRate = incrementalRevenue > 0 ? (totalFee / incrementalRevenue) * 100 : 0;
+
+      res.json({
+        incrementalRevenue,
+        totalFee,
+        effectiveRate: Math.round(effectiveRate * 100) / 100,
+        breakdown
+      });
+    } catch (error) {
+      console.error("Calculate rev-share error:", error);
+      res.status(500).json({ message: "Failed to calculate rev-share" });
+    }
+  });
+
+  // Seed default tier if none exist
+  app.post("/api/rev-share-tiers/seed-default", async (req, res) => {
+    try {
+      const existing = await storage.getRevShareTiers();
+      if (existing.length > 0) {
+        return res.json({ message: "Tiers already exist", tiers: existing });
+      }
+
+      const defaultTier = await storage.createRevShareTier({
+        minRevenue: "0",
+        maxRevenue: null,
+        shareRate: "15",
+        displayOrder: 0,
+        isActive: true,
+      });
+
+      res.status(201).json({ message: "Default tier created", tier: defaultTier });
+    } catch (error) {
+      console.error("Seed default tier error:", error);
+      res.status(500).json({ message: "Failed to seed default tier" });
     }
   });
 

@@ -439,3 +439,24 @@ export const insertDashboardLayoutSchema = createInsertSchema(dashboardLayouts).
 
 export type InsertDashboardLayout = z.infer<typeof insertDashboardLayoutSchema>;
 export type DashboardLayout = typeof dashboardLayouts.$inferSelect;
+
+// ============ REV-SHARE TIERS ============
+export const revShareTiers = pgTable("rev_share_tiers", {
+  id: serial("id").primaryKey(),
+  minRevenue: numeric("min_revenue").notNull().default("0"), // Tier starts at this revenue amount
+  maxRevenue: numeric("max_revenue"), // Tier ends at this amount (null = unlimited)
+  shareRate: numeric("share_rate").notNull().default("15"), // Percentage rate for this tier
+  displayOrder: integer("display_order").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const insertRevShareTierSchema = createInsertSchema(revShareTiers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertRevShareTier = z.infer<typeof insertRevShareTierSchema>;
+export type RevShareTier = typeof revShareTiers.$inferSelect;

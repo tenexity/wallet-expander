@@ -43,6 +43,7 @@ The application follows a client-server architecture.
     - **Playbooks & Tasks:** AI-generated sales tasks, call scripts, and email templates, with automatic playbook generation upon account enrollment.
     - **Revenue Tracking:** Tracks enrolled accounts, incremental revenue, and calculates rev-share fees. Includes account graduation system for marking accounts as successfully completed.
     - **Account Graduation System:** Allows setting graduation objectives (target penetration %, incremental revenue, enrollment duration), tracking progress, and graduating accounts when objectives are met. Graduated accounts move to an alumni section.
+    - **Tiered Rev-Share Pricing:** Configurable volume-based pricing tiers for calculating fees owed to Tenexity. Supports multiple tiers with different rates at different revenue thresholds, calculates blended effective rates, and displays tier breakdown showing how fees are distributed across tiers.
     - **Custom Categories:** Allows full CRUD operations for product categories, which are integrated into AI analysis for ICP and playbook generation.
     - **Scoring Settings:** Customizable weighting factors for opportunity scoring (Gap Size, Revenue Potential, Category Count).
     - **Territory Manager Administration:** CRUD operations for Territory Managers, including territory assignments and task linkage.
@@ -52,7 +53,7 @@ The application follows a client-server architecture.
 - `server/`: Backend application, including database connection, API routes, storage, and seeding scripts.
 - `shared/`: Shared schema definitions and AI chat models.
 
-**Database Schema:** Key tables include `accounts`, `products`, `orders`, `segment_profiles`, `account_metrics`, `tasks`, `playbooks`, `program_accounts`, `custom_categories`, `settings`, and `territory_managers`.
+**Database Schema:** Key tables include `accounts`, `products`, `orders`, `segment_profiles`, `account_metrics`, `tasks`, `playbooks`, `program_accounts`, `custom_categories`, `settings`, `territory_managers`, and `rev_share_tiers`.
 
 ## External Dependencies
 

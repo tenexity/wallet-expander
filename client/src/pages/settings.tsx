@@ -81,7 +81,6 @@ import {
   TrendingUp,
   Calendar,
   Clock,
-  ArrowUpRight,
 } from "lucide-react";
 import {
   LineChart,
@@ -156,7 +155,30 @@ interface EnrolledAccountSummary {
   status: string;
 }
 
+interface RevShareTier {
+  id: number;
+  minRevenue: string;
+  maxRevenue: string | null;
+  shareRate: string;
+  displayOrder: number | null;
+  isActive: boolean | null;
+}
+
+interface FeeCalculation {
+  incrementalRevenue: number;
+  totalFee: number;
+  effectiveRate: number;
+  breakdown: Array<{ tier: string; rate: number; revenueInTier: number; fee: number }>;
+}
+
 function RevenueTrackingManager() {
+  const { toast } = useToast();
+  const [isAddTierOpen, setIsAddTierOpen] = useState(false);
+  const [editingTier, setEditingTier] = useState<RevShareTier | null>(null);
+  const [newTierMin, setNewTierMin] = useState("");
+  const [newTierMax, setNewTierMax] = useState("");
+  const [newTierRate, setNewTierRate] = useState("");
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -170,6 +192,172 @@ function RevenueTrackingManager() {
     queryKey: ["/api/program-accounts"],
   });
 
+  const { data: tiers = [], isLoading: tiersLoading } = useQuery<RevShareTier[]>({
+    queryKey: ["/api/rev-share-tiers"],
+  });
+
+  const activeAccounts = enrolledAccounts?.filter(a => a.status === "active") || [];
+  const totalIncremental = activeAccounts.reduce((sum, a) => sum + (a.incrementalRevenue || 0), 0);
+
+  const { data: feeCalculation } = useQuery<FeeCalculation>({
+    queryKey: ["/api/rev-share-tiers/calculate", totalIncremental],
+    queryFn: async () => {
+      const res = await fetch("/api/rev-share-tiers/calculate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ incrementalRevenue: totalIncremental }),
+      });
+      if (!res.ok) throw new Error("Failed to calculate fees");
+      return res.json();
+    },
+    enabled: totalIncremental >= 0,
+  });
+
+  const createTierMutation = useMutation({
+    mutationFn: async (data: { minRevenue: string; maxRevenue: string | null; shareRate: string }) => {
+      const res = await apiRequest("POST", "/api/rev-share-tiers", {
+        ...data,
+        displayOrder: tiers.length,
+        isActive: true,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rev-share-tiers"] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          Array.isArray(query.queryKey) && 
+          query.queryKey[0] === "/api/rev-share-tiers/calculate" 
+      });
+      setIsAddTierOpen(false);
+      setNewTierMin("");
+      setNewTierMax("");
+      setNewTierRate("");
+      toast({ title: "Tier created", description: "New pricing tier has been added." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to create tier", variant: "destructive" });
+    },
+  });
+
+  const updateTierMutation = useMutation({
+    mutationFn: async ({ id, ...data }: { id: number; minRevenue?: string; maxRevenue?: string | null; shareRate?: string }) => {
+      const res = await apiRequest("PUT", `/api/rev-share-tiers/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rev-share-tiers"] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          Array.isArray(query.queryKey) && 
+          query.queryKey[0] === "/api/rev-share-tiers/calculate" 
+      });
+      setEditingTier(null);
+      toast({ title: "Tier updated", description: "Pricing tier has been updated." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to update tier", variant: "destructive" });
+    },
+  });
+
+  const deleteTierMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/rev-share-tiers/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rev-share-tiers"] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          Array.isArray(query.queryKey) && 
+          query.queryKey[0] === "/api/rev-share-tiers/calculate" 
+      });
+      toast({ title: "Tier deleted", description: "Pricing tier has been removed." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete tier", variant: "destructive" });
+    },
+  });
+
+  const seedDefaultMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/rev-share-tiers/seed-default");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rev-share-tiers"] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => 
+          Array.isArray(query.queryKey) && 
+          query.queryKey[0] === "/api/rev-share-tiers/calculate" 
+      });
+      toast({ title: "Default tier created", description: "A 15% flat rate tier has been added." });
+    },
+  });
+
+  const handleAddTier = () => {
+    if (!newTierMin || !newTierRate) {
+      toast({ title: "Error", description: "Min revenue and rate are required", variant: "destructive" });
+      return;
+    }
+    const minVal = parseFloat(newTierMin);
+    const maxVal = newTierMax ? parseFloat(newTierMax) : null;
+    const rateVal = parseFloat(newTierRate);
+    
+    if (isNaN(minVal) || minVal < 0) {
+      toast({ title: "Error", description: "Minimum revenue must be a non-negative number", variant: "destructive" });
+      return;
+    }
+    if (maxVal !== null && maxVal <= minVal) {
+      toast({ title: "Error", description: "Maximum revenue must be greater than minimum", variant: "destructive" });
+      return;
+    }
+    if (isNaN(rateVal) || rateVal < 0 || rateVal > 100) {
+      toast({ title: "Error", description: "Rate must be between 0 and 100", variant: "destructive" });
+      return;
+    }
+    
+    createTierMutation.mutate({
+      minRevenue: newTierMin,
+      maxRevenue: newTierMax || null,
+      shareRate: newTierRate,
+    });
+  };
+
+  const handleUpdateTier = () => {
+    if (!editingTier) return;
+    
+    const minVal = parseFloat(editingTier.minRevenue);
+    const maxVal = editingTier.maxRevenue ? parseFloat(editingTier.maxRevenue) : null;
+    const rateVal = parseFloat(editingTier.shareRate);
+    
+    if (isNaN(minVal) || minVal < 0) {
+      toast({ title: "Error", description: "Minimum revenue must be a non-negative number", variant: "destructive" });
+      return;
+    }
+    if (maxVal !== null && maxVal <= minVal) {
+      toast({ title: "Error", description: "Maximum revenue must be greater than minimum", variant: "destructive" });
+      return;
+    }
+    if (isNaN(rateVal) || rateVal < 0 || rateVal > 100) {
+      toast({ title: "Error", description: "Rate must be between 0 and 100", variant: "destructive" });
+      return;
+    }
+    
+    updateTierMutation.mutate({
+      id: editingTier.id,
+      minRevenue: editingTier.minRevenue,
+      maxRevenue: editingTier.maxRevenue,
+      shareRate: editingTier.shareRate,
+    });
+  };
+
+  const totalFees = feeCalculation?.totalFee || 0;
+  const effectiveRate = feeCalculation?.effectiveRate || 15;
+  
+  const today = new Date();
+  const nextBillingDate = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+  const daysUntilBilling = Math.ceil((nextBillingDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
   const mockRevenueData: RevenueSnapshot[] = [
     { period: "Aug", baselineRevenue: 56000, actualRevenue: 58000, incrementalRevenue: 2000, feeAmount: 300 },
     { period: "Sep", baselineRevenue: 58000, actualRevenue: 65000, incrementalRevenue: 7000, feeAmount: 1050 },
@@ -179,18 +367,87 @@ function RevenueTrackingManager() {
     { period: "Jan", baselineRevenue: 52000, actualRevenue: 94000, incrementalRevenue: 42000, feeAmount: 6300 },
   ];
 
-  const activeAccounts = enrolledAccounts?.filter(a => a.status === "active") || [];
-  const totalIncremental = activeAccounts.reduce((sum, a) => sum + (a.incrementalRevenue || 0), 0);
-  const totalFees = activeAccounts.reduce((sum, a) => sum + (a.feeAmount || 0), 0);
-  
-  const currentMonthFee = mockRevenueData[mockRevenueData.length - 1]?.feeAmount || 0;
-  
-  const today = new Date();
-  const nextBillingDate = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-  const daysUntilBilling = Math.ceil((nextBillingDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
   return (
     <div className="space-y-6">
+      {/* Tiered Pricing Configuration */}
+      <Card data-testid="card-tiered-pricing">
+        <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Layers className="h-4 w-4" />
+              Rev-Share Tiers
+            </CardTitle>
+            <CardDescription>
+              Configure volume-based pricing tiers for calculating fees
+            </CardDescription>
+          </div>
+          <Button size="sm" onClick={() => setIsAddTierOpen(true)} data-testid="button-add-tier">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Tier
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {tiersLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : tiers.length === 0 ? (
+            <div className="text-center py-8">
+              <Layers className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
+              <p className="text-muted-foreground mb-4">No pricing tiers defined yet.</p>
+              <Button variant="outline" onClick={() => seedDefaultMutation.mutate()} data-testid="button-seed-default">
+                Create Default 15% Tier
+              </Button>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Revenue Range</TableHead>
+                  <TableHead className="text-right">Rate</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {tiers
+                  .filter(t => t.isActive)
+                  .sort((a, b) => parseFloat(a.minRevenue) - parseFloat(b.minRevenue))
+                  .map((tier) => (
+                    <TableRow key={tier.id} data-testid={`row-tier-${tier.id}`}>
+                      <TableCell>
+                        {formatCurrency(parseFloat(tier.minRevenue))} - {tier.maxRevenue ? formatCurrency(parseFloat(tier.maxRevenue)) : "Unlimited"}
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {parseFloat(tier.shareRate)}%
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setEditingTier(tier)}
+                            data-testid={`button-edit-tier-${tier.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => deleteTierMutation.mutate(tier.id)}
+                            data-testid={`button-delete-tier-${tier.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
       <Card className="border-primary/20 bg-primary/5" data-testid="card-billing-cycle">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -218,10 +475,10 @@ function RevenueTrackingManager() {
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <TrendingUp className="h-4 w-4" />
-                Current Month Incremental
+                Total Incremental Revenue
               </div>
               <p className="text-2xl font-bold text-chart-2" data-testid="text-current-incremental">
-                {formatCurrency(mockRevenueData[mockRevenueData.length - 1]?.incrementalRevenue || 0)}
+                {formatCurrency(totalIncremental)}
               </p>
               <p className="text-sm text-muted-foreground">
                 Revenue above baseline
@@ -233,15 +490,52 @@ function RevenueTrackingManager() {
                 Amount Due to Tenexity
               </div>
               <p className="text-2xl font-bold text-primary" data-testid="text-amount-due">
-                {formatCurrency(currentMonthFee)}
+                {formatCurrency(totalFees)}
               </p>
               <p className="text-sm text-muted-foreground">
-                15% of incremental revenue
+                Blended rate: {effectiveRate.toFixed(1)}%
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Fee Breakdown by Tier */}
+      {feeCalculation && feeCalculation.breakdown.length > 0 && (
+        <Card data-testid="card-tier-breakdown">
+          <CardHeader>
+            <CardTitle className="text-base">Fee Calculation Breakdown</CardTitle>
+            <CardDescription>How your fee is calculated across pricing tiers</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tier</TableHead>
+                  <TableHead className="text-right">Rate</TableHead>
+                  <TableHead className="text-right">Revenue in Tier</TableHead>
+                  <TableHead className="text-right">Fee</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {feeCalculation.breakdown.map((item, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell>{item.tier}</TableCell>
+                    <TableCell className="text-right">{item.rate}%</TableCell>
+                    <TableCell className="text-right">{formatCurrency(item.revenueInTier)}</TableCell>
+                    <TableCell className="text-right font-medium text-primary">{formatCurrency(item.fee)}</TableCell>
+                  </TableRow>
+                ))}
+                <TableRow className="bg-muted/50">
+                  <TableCell colSpan={2} className="font-bold">Total</TableCell>
+                  <TableCell className="text-right font-bold">{formatCurrency(totalIncremental)}</TableCell>
+                  <TableCell className="text-right font-bold text-primary">{formatCurrency(totalFees)}</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card data-testid="card-fees-summary">
@@ -268,12 +562,12 @@ function RevenueTrackingManager() {
             </div>
             <div className="flex items-center justify-between py-3 border-b">
               <div>
-                <p className="font-medium">Rev-Share Rate</p>
+                <p className="font-medium">Effective Blended Rate</p>
                 <p className="text-sm text-muted-foreground">
-                  Applied to incremental revenue
+                  Based on tiered pricing
                 </p>
               </div>
-              <p className="text-xl font-bold" data-testid="text-revshare-rate">15%</p>
+              <p className="text-xl font-bold" data-testid="text-revshare-rate">{effectiveRate.toFixed(1)}%</p>
             </div>
             <div className="flex items-center justify-between py-3">
               <div>
@@ -350,21 +644,24 @@ function RevenueTrackingManager() {
                 <TableRow>
                   <TableHead>Account</TableHead>
                   <TableHead className="text-right">Incremental Revenue</TableHead>
-                  <TableHead className="text-right">Fee (15%)</TableHead>
+                  <TableHead className="text-right">Fee ({effectiveRate.toFixed(1)}%)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {activeAccounts.map((account) => (
-                  <TableRow key={account.id}>
-                    <TableCell className="font-medium">{account.accountName}</TableCell>
-                    <TableCell className="text-right text-chart-2">
-                      {formatCurrency(account.incrementalRevenue || 0)}
-                    </TableCell>
-                    <TableCell className="text-right font-medium text-primary">
-                      {formatCurrency(account.feeAmount || 0)}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {activeAccounts.map((account) => {
+                  const accountFee = (account.incrementalRevenue || 0) * (effectiveRate / 100);
+                  return (
+                    <TableRow key={account.id}>
+                      <TableCell className="font-medium">{account.accountName}</TableCell>
+                      <TableCell className="text-right text-chart-2">
+                        {formatCurrency(account.incrementalRevenue || 0)}
+                      </TableCell>
+                      <TableCell className="text-right font-medium text-primary">
+                        {formatCurrency(accountFee)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
                 <TableRow className="bg-muted/50">
                   <TableCell className="font-bold">Total</TableCell>
                   <TableCell className="text-right font-bold text-chart-2">
@@ -379,6 +676,118 @@ function RevenueTrackingManager() {
           )}
         </CardContent>
       </Card>
+
+      {/* Add Tier Dialog */}
+      <Dialog open={isAddTierOpen} onOpenChange={setIsAddTierOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Pricing Tier</DialogTitle>
+            <DialogDescription>
+              Define a new revenue tier with its share rate percentage.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="tier-min">Minimum Revenue ($)</Label>
+                <Input
+                  id="tier-min"
+                  type="number"
+                  value={newTierMin}
+                  onChange={(e) => setNewTierMin(e.target.value)}
+                  placeholder="0"
+                  data-testid="input-tier-min"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="tier-max">Maximum Revenue ($)</Label>
+                <Input
+                  id="tier-max"
+                  type="number"
+                  value={newTierMax}
+                  onChange={(e) => setNewTierMax(e.target.value)}
+                  placeholder="Leave empty for unlimited"
+                  data-testid="input-tier-max"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="tier-rate">Share Rate (%)</Label>
+              <Input
+                id="tier-rate"
+                type="number"
+                value={newTierRate}
+                onChange={(e) => setNewTierRate(e.target.value)}
+                placeholder="15"
+                data-testid="input-tier-rate"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddTierOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddTier} disabled={createTierMutation.isPending} data-testid="button-save-tier">
+              {createTierMutation.isPending && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
+              Add Tier
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Tier Dialog */}
+      <Dialog open={!!editingTier} onOpenChange={(open) => !open && setEditingTier(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Pricing Tier</DialogTitle>
+            <DialogDescription>
+              Update this revenue tier's range and share rate.
+            </DialogDescription>
+          </DialogHeader>
+          {editingTier && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-tier-min">Minimum Revenue ($)</Label>
+                  <Input
+                    id="edit-tier-min"
+                    type="number"
+                    value={editingTier.minRevenue}
+                    onChange={(e) => setEditingTier({ ...editingTier, minRevenue: e.target.value })}
+                    data-testid="input-edit-tier-min"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-tier-max">Maximum Revenue ($)</Label>
+                  <Input
+                    id="edit-tier-max"
+                    type="number"
+                    value={editingTier.maxRevenue || ""}
+                    onChange={(e) => setEditingTier({ ...editingTier, maxRevenue: e.target.value || null })}
+                    placeholder="Leave empty for unlimited"
+                    data-testid="input-edit-tier-max"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-tier-rate">Share Rate (%)</Label>
+                <Input
+                  id="edit-tier-rate"
+                  type="number"
+                  value={editingTier.shareRate}
+                  onChange={(e) => setEditingTier({ ...editingTier, shareRate: e.target.value })}
+                  data-testid="input-edit-tier-rate"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingTier(null)}>Cancel</Button>
+            <Button onClick={handleUpdateTier} disabled={updateTierMutation.isPending} data-testid="button-update-tier">
+              {updateTierMutation.isPending && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1053,12 +1462,6 @@ export default function SettingsPage() {
                 </div>
               </div>
               
-              <Separator />
-              
-              <div className="space-y-2">
-                <Label htmlFor="default-share-rate">Default Share Rate (%)</Label>
-                <Input id="default-share-rate" type="number" defaultValue="15" className="max-w-xs" />
-              </div>
             </CardContent>
           </Card>
 

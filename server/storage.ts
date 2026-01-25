@@ -19,10 +19,12 @@ import {
   type ScoringWeights, type InsertScoringWeights,
   type TerritoryManager, type InsertTerritoryManager,
   type CustomCategory, type InsertCustomCategory,
+  type RevShareTier, type InsertRevShareTier,
   users, accounts, products, productCategories, orders, orderItems,
   segmentProfiles, profileCategories, accountMetrics, accountCategoryGaps,
   tasks, playbooks, playbookTasks, programAccounts, programRevenueSnapshots,
   dataUploads, settings, scoringWeights, territoryManagers, customCategories,
+  revShareTiers,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, gte, lte } from "drizzle-orm";
@@ -141,6 +143,13 @@ export interface IStorage {
   createCustomCategory(category: InsertCustomCategory): Promise<CustomCategory>;
   updateCustomCategory(id: number, category: Partial<InsertCustomCategory>): Promise<CustomCategory | undefined>;
   deleteCustomCategory(id: number): Promise<boolean>;
+
+  // Rev-Share Tiers
+  getRevShareTiers(): Promise<RevShareTier[]>;
+  getRevShareTier(id: number): Promise<RevShareTier | undefined>;
+  createRevShareTier(tier: InsertRevShareTier): Promise<RevShareTier>;
+  updateRevShareTier(id: number, tier: Partial<InsertRevShareTier>): Promise<RevShareTier | undefined>;
+  deleteRevShareTier(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -521,6 +530,31 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCustomCategory(id: number): Promise<boolean> {
     const result = await db.delete(customCategories).where(eq(customCategories.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Rev-Share Tiers
+  async getRevShareTiers(): Promise<RevShareTier[]> {
+    return db.select().from(revShareTiers).orderBy(revShareTiers.displayOrder);
+  }
+
+  async getRevShareTier(id: number): Promise<RevShareTier | undefined> {
+    const [tier] = await db.select().from(revShareTiers).where(eq(revShareTiers.id, id));
+    return tier;
+  }
+
+  async createRevShareTier(tier: InsertRevShareTier): Promise<RevShareTier> {
+    const [created] = await db.insert(revShareTiers).values(tier).returning();
+    return created;
+  }
+
+  async updateRevShareTier(id: number, tier: Partial<InsertRevShareTier>): Promise<RevShareTier | undefined> {
+    const [updated] = await db.update(revShareTiers).set(tier).where(eq(revShareTiers.id, id)).returning();
+    return updated;
+  }
+
+  async deleteRevShareTier(id: number): Promise<boolean> {
+    const result = await db.delete(revShareTiers).where(eq(revShareTiers.id, id)).returning();
     return result.length > 0;
   }
 }
