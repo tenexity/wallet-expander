@@ -196,6 +196,65 @@ function RevenueTrackingManager() {
     queryKey: ["/api/rev-share-tiers"],
   });
 
+  // Calculate tiered fee for a given revenue amount
+  // Uses proper tier boundary calculation: revenueInTier = max(0, min(revenue, maxRev) - minRev)
+  const calculateTieredFee = (revenue: number): { totalFee: number; breakdown: Array<{ tier: string; rate: number; revenueInTier: number; fee: number }> } => {
+    if (revenue <= 0) {
+      return { totalFee: 0, breakdown: [] };
+    }
+    
+    if (tiers.length === 0) {
+      // Default to 15% if no tiers
+      const fee = revenue * 0.15;
+      return { 
+        totalFee: fee, 
+        breakdown: [{ tier: "$0+", rate: 15, revenueInTier: revenue, fee }] 
+      };
+    }
+
+    const activeTiers = tiers
+      .filter(t => t.isActive)
+      .sort((a, b) => parseFloat(a.minRevenue) - parseFloat(b.minRevenue));
+
+    if (activeTiers.length === 0) {
+      const fee = revenue * 0.15;
+      return { 
+        totalFee: fee, 
+        breakdown: [{ tier: "$0+", rate: 15, revenueInTier: revenue, fee }] 
+      };
+    }
+
+    let totalFee = 0;
+    const breakdown: Array<{ tier: string; rate: number; revenueInTier: number; fee: number }> = [];
+
+    for (const tier of activeTiers) {
+      const minRev = parseFloat(tier.minRevenue);
+      const maxRev = tier.maxRevenue ? parseFloat(tier.maxRevenue) : Infinity;
+      const rate = parseFloat(tier.shareRate);
+
+      // Skip tiers where revenue hasn't reached the minimum threshold
+      if (revenue <= minRev) continue;
+
+      // Calculate how much revenue falls into this tier's range
+      // revenueInTier = max(0, min(revenue, maxRev) - minRev)
+      const cappedRevenue = Math.min(revenue, maxRev);
+      const revenueInTier = Math.max(0, cappedRevenue - minRev);
+
+      if (revenueInTier > 0) {
+        const fee = revenueInTier * (rate / 100);
+        totalFee += fee;
+        breakdown.push({
+          tier: `${formatCurrency(minRev)} - ${maxRev === Infinity ? "Unlimited" : formatCurrency(maxRev)}`,
+          rate,
+          revenueInTier,
+          fee,
+        });
+      }
+    }
+
+    return { totalFee, breakdown };
+  };
+
   const activeAccounts = enrolledAccounts?.filter(a => a.status === "active") || [];
   const totalIncremental = activeAccounts.reduce((sum, a) => sum + (a.incrementalRevenue || 0), 0);
 
@@ -493,7 +552,7 @@ function RevenueTrackingManager() {
                 {formatCurrency(totalFees)}
               </p>
               <p className="text-sm text-muted-foreground">
-                Blended rate: {effectiveRate.toFixed(1)}%
+                Calculated using tiered pricing
               </p>
             </div>
           </div>
@@ -505,30 +564,34 @@ function RevenueTrackingManager() {
         <Card data-testid="card-tier-breakdown">
           <CardHeader>
             <CardTitle className="text-base">Fee Calculation Breakdown</CardTitle>
-            <CardDescription>How your fee is calculated across pricing tiers</CardDescription>
+            <CardDescription>How your total fee is calculated across pricing tiers</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Tier</TableHead>
+                  <TableHead>Tier Range</TableHead>
                   <TableHead className="text-right">Rate</TableHead>
                   <TableHead className="text-right">Revenue in Tier</TableHead>
+                  <TableHead className="text-center">Calculation</TableHead>
                   <TableHead className="text-right">Fee</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {feeCalculation.breakdown.map((item, idx) => (
                   <TableRow key={idx}>
-                    <TableCell>{item.tier}</TableCell>
+                    <TableCell className="font-medium">{item.tier}</TableCell>
                     <TableCell className="text-right">{item.rate}%</TableCell>
                     <TableCell className="text-right">{formatCurrency(item.revenueInTier)}</TableCell>
+                    <TableCell className="text-center text-sm text-muted-foreground">
+                      {formatCurrency(item.revenueInTier)} × {item.rate}%
+                    </TableCell>
                     <TableCell className="text-right font-medium text-primary">{formatCurrency(item.fee)}</TableCell>
                   </TableRow>
                 ))}
                 <TableRow className="bg-muted/50">
-                  <TableCell colSpan={2} className="font-bold">Total</TableCell>
-                  <TableCell className="text-right font-bold">{formatCurrency(totalIncremental)}</TableCell>
+                  <TableCell colSpan={3} className="font-bold">Total Fee</TableCell>
+                  <TableCell className="text-center font-bold text-muted-foreground">Sum of all tiers</TableCell>
                   <TableCell className="text-right font-bold text-primary">{formatCurrency(totalFees)}</TableCell>
                 </TableRow>
               </TableBody>
@@ -562,12 +625,17 @@ function RevenueTrackingManager() {
             </div>
             <div className="flex items-center justify-between py-3 border-b">
               <div>
-                <p className="font-medium">Effective Blended Rate</p>
+                <p className="font-medium">Pricing Tiers</p>
                 <p className="text-sm text-muted-foreground">
-                  Based on tiered pricing
+                  {tiers.filter(t => t.isActive).length} active tier{tiers.filter(t => t.isActive).length !== 1 ? "s" : ""} configured
                 </p>
               </div>
-              <p className="text-xl font-bold" data-testid="text-revshare-rate">{effectiveRate.toFixed(1)}%</p>
+              <p className="text-xl font-bold" data-testid="text-revshare-rate">
+                {tiers.filter(t => t.isActive).length > 0 
+                  ? `${tiers.filter(t => t.isActive).map(t => `${parseFloat(t.shareRate)}%`).join(", ")}`
+                  : "15% default"
+                }
+              </p>
             </div>
             <div className="flex items-center justify-between py-3">
               <div>
@@ -628,7 +696,7 @@ function RevenueTrackingManager() {
         <CardHeader>
           <CardTitle className="text-base">Fee Breakdown by Account</CardTitle>
           <CardDescription>
-            Revenue share owed per enrolled account
+            Revenue share owed per enrolled account (calculated using tiered pricing)
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -639,40 +707,72 @@ function RevenueTrackingManager() {
               <p className="text-sm">Enroll accounts from the Revenue Tracking page to see fee breakdowns.</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Account</TableHead>
-                  <TableHead className="text-right">Incremental Revenue</TableHead>
-                  <TableHead className="text-right">Fee ({effectiveRate.toFixed(1)}%)</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {activeAccounts.map((account) => {
-                  const accountFee = (account.incrementalRevenue || 0) * (effectiveRate / 100);
-                  return (
-                    <TableRow key={account.id}>
-                      <TableCell className="font-medium">{account.accountName}</TableCell>
-                      <TableCell className="text-right text-chart-2">
-                        {formatCurrency(account.incrementalRevenue || 0)}
-                      </TableCell>
-                      <TableCell className="text-right font-medium text-primary">
-                        {formatCurrency(accountFee)}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-                <TableRow className="bg-muted/50">
-                  <TableCell className="font-bold">Total</TableCell>
-                  <TableCell className="text-right font-bold text-chart-2">
-                    {formatCurrency(totalIncremental)}
-                  </TableCell>
-                  <TableCell className="text-right font-bold text-primary">
-                    {formatCurrency(totalFees)}
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+            <div className="space-y-4">
+              {activeAccounts.map((account) => {
+                const accountRevenue = account.incrementalRevenue || 0;
+                const accountCalc = calculateTieredFee(accountRevenue);
+                return (
+                  <div key={account.id} className="border rounded-md p-4" data-testid={`account-fee-${account.id}`}>
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-medium">{account.accountName}</h4>
+                      <span className="text-sm text-muted-foreground">
+                        Incremental Revenue: <span className="font-medium text-chart-2">{formatCurrency(accountRevenue)}</span>
+                      </span>
+                    </div>
+                    {accountCalc.breakdown.length > 0 && (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-sm">Tier</TableHead>
+                            <TableHead className="text-right text-sm">Revenue</TableHead>
+                            <TableHead className="text-center text-sm">Calculation</TableHead>
+                            <TableHead className="text-right text-sm">Fee</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {accountCalc.breakdown.map((item, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="text-sm">{item.tier}</TableCell>
+                              <TableCell className="text-right text-sm">{formatCurrency(item.revenueInTier)}</TableCell>
+                              <TableCell className="text-center text-sm text-muted-foreground">
+                                {formatCurrency(item.revenueInTier)} × {item.rate}%
+                              </TableCell>
+                              <TableCell className="text-right text-sm font-medium text-primary">
+                                {formatCurrency(item.fee)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          <TableRow className="bg-muted/50">
+                            <TableCell colSpan={3} className="font-medium text-sm">Account Total</TableCell>
+                            <TableCell className="text-right font-bold text-primary">
+                              {formatCurrency(accountCalc.totalFee)}
+                            </TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
+                );
+              })}
+              <div className="border-t pt-4 mt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-bold">Grand Total</p>
+                    <p className="text-sm text-muted-foreground">
+                      Sum of all account fees
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">
+                      Total Revenue: <span className="font-medium text-chart-2">{formatCurrency(totalIncremental)}</span>
+                    </p>
+                    <p className="text-2xl font-bold text-primary">
+                      {formatCurrency(activeAccounts.reduce((sum, acc) => sum + calculateTieredFee(acc.incrementalRevenue || 0).totalFee, 0))}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>
