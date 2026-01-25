@@ -47,6 +47,7 @@ The application follows a client-server architecture.
     - **Custom Categories:** Allows full CRUD operations for product categories, which are integrated into AI analysis for ICP and playbook generation.
     - **Scoring Settings:** Customizable weighting factors for opportunity scoring (Gap Size, Revenue Potential, Category Count).
     - **Territory Manager Administration:** CRUD operations for Territory Managers, including territory assignments and task linkage.
+    - **Email Notifications:** Integrated with Resend for sending task notification emails to Territory Managers when tasks are assigned. Configurable sender settings and notification preferences in Settings > Email tab. Requires RESEND_API_KEY secret.
 
 **Project Structure:**
 - `client/`: Frontend application.
@@ -62,4 +63,5 @@ The application follows a client-server architecture.
 - **Recharts:** Used for rendering interactive charts and data visualizations on the frontend.
 - **shadcn/ui:** Component library for building the user interface.
 - **@hello-pangea/dnd:** Library used for drag-and-drop functionality on the dashboard.
+- **Resend:** Email delivery service for sending task notifications to Territory Managers.
 - **Tenexity:** Acknowledged in the sidebar footer with logo.
