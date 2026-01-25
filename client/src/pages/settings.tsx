@@ -694,9 +694,9 @@ function RevenueTrackingManager() {
 
       <Card data-testid="card-fee-breakdown">
         <CardHeader>
-          <CardTitle className="text-base">Fee Breakdown by Account</CardTitle>
+          <CardTitle className="text-base">Fee Breakdown by Tier</CardTitle>
           <CardDescription>
-            Revenue share owed per enrolled account (calculated using tiered pricing)
+            Revenue share organized by pricing tier with account details
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -707,71 +707,109 @@ function RevenueTrackingManager() {
               <p className="text-sm">Enroll accounts from the Revenue Tracking page to see fee breakdowns.</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {activeAccounts.map((account) => {
-                const accountRevenue = account.incrementalRevenue || 0;
-                const accountCalc = calculateTieredFee(accountRevenue);
+            <div className="space-y-6">
+              {(() => {
+                // Build tier-grouped data structure
+                const tierData: Record<string, {
+                  tierName: string;
+                  rate: number;
+                  totalRevenue: number;
+                  totalFee: number;
+                  accounts: Array<{ name: string; revenue: number; fee: number }>;
+                }> = {};
+
+                // Collect all account contributions by tier
+                activeAccounts.forEach((account) => {
+                  const accountRevenue = account.incrementalRevenue || 0;
+                  const accountCalc = calculateTieredFee(accountRevenue);
+                  
+                  accountCalc.breakdown.forEach((item) => {
+                    if (!tierData[item.tier]) {
+                      tierData[item.tier] = {
+                        tierName: item.tier,
+                        rate: item.rate,
+                        totalRevenue: 0,
+                        totalFee: 0,
+                        accounts: [],
+                      };
+                    }
+                    tierData[item.tier].totalRevenue += item.revenueInTier;
+                    tierData[item.tier].totalFee += item.fee;
+                    tierData[item.tier].accounts.push({
+                      name: account.accountName || `Account ${account.id}`,
+                      revenue: item.revenueInTier,
+                      fee: item.fee,
+                    });
+                  });
+                });
+
+                // Sort tiers by their revenue range (parse first number from tier name)
+                const sortedTiers = Object.values(tierData).sort((a, b) => {
+                  const aMin = parseFloat(a.tierName.replace(/[^0-9.]/g, '')) || 0;
+                  const bMin = parseFloat(b.tierName.replace(/[^0-9.]/g, '')) || 0;
+                  return aMin - bMin;
+                });
+
+                const grandTotalFee = sortedTiers.reduce((sum, tier) => sum + tier.totalFee, 0);
+
                 return (
-                  <div key={account.id} className="border rounded-md p-4" data-testid={`account-fee-${account.id}`}>
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-medium">{account.accountName}</h4>
-                      <span className="text-sm text-muted-foreground">
-                        Incremental Revenue: <span className="font-medium text-chart-2">{formatCurrency(accountRevenue)}</span>
-                      </span>
-                    </div>
-                    {accountCalc.breakdown.length > 0 && (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-sm">Tier</TableHead>
-                            <TableHead className="text-right text-sm">Revenue</TableHead>
-                            <TableHead className="text-center text-sm">Calculation</TableHead>
-                            <TableHead className="text-right text-sm">Fee</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {accountCalc.breakdown.map((item, idx) => (
-                            <TableRow key={idx}>
-                              <TableCell className="text-sm">{item.tier}</TableCell>
-                              <TableCell className="text-right text-sm">{formatCurrency(item.revenueInTier)}</TableCell>
-                              <TableCell className="text-center text-sm text-muted-foreground">
-                                {formatCurrency(item.revenueInTier)} × {item.rate}%
-                              </TableCell>
-                              <TableCell className="text-right text-sm font-medium text-primary">
-                                {formatCurrency(item.fee)}
-                              </TableCell>
-                            </TableRow>
+                  <>
+                    {sortedTiers.map((tier, tierIdx) => (
+                      <div key={tierIdx} className="border rounded-md" data-testid={`tier-breakdown-${tierIdx}`}>
+                        {/* Tier Header with Total */}
+                        <div className="flex items-center justify-between p-4 bg-muted/30">
+                          <div>
+                            <h4 className="font-semibold">{tier.tierName}</h4>
+                            <p className="text-sm text-muted-foreground">@ {tier.rate}% rate</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-primary">{formatCurrency(tier.totalFee)}</p>
+                            <p className="text-xs text-muted-foreground">from {formatCurrency(tier.totalRevenue)} revenue</p>
+                          </div>
+                        </div>
+                        {/* Indented Account List */}
+                        <div className="px-4 py-2 space-y-1">
+                          {tier.accounts
+                            .sort((a, b) => b.fee - a.fee) // Sort by fee descending
+                            .map((acc, accIdx) => (
+                            <div 
+                              key={accIdx} 
+                              className="flex items-center justify-between py-1.5 pl-4 border-l-2 border-muted-foreground/20"
+                              data-testid={`tier-${tierIdx}-account-${accIdx}`}
+                            >
+                              <span className="text-sm">{acc.name}</span>
+                              <div className="flex items-center gap-4 text-sm">
+                                <span className="text-muted-foreground">{formatCurrency(acc.revenue)}</span>
+                                <span className="font-medium text-primary w-20 text-right">{formatCurrency(acc.fee)}</span>
+                              </div>
+                            </div>
                           ))}
-                          <TableRow className="bg-muted/50">
-                            <TableCell colSpan={3} className="font-medium text-sm">Account Total</TableCell>
-                            <TableCell className="text-right font-bold text-primary">
-                              {formatCurrency(accountCalc.totalFee)}
-                            </TableCell>
-                          </TableRow>
-                        </TableBody>
-                      </Table>
-                    )}
-                  </div>
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {/* Grand Total */}
+                    <div className="border-t pt-4 mt-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-bold">Grand Total</p>
+                          <p className="text-sm text-muted-foreground">
+                            Sum of all tier fees
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-muted-foreground">
+                            Total Revenue: <span className="font-medium text-chart-2">{formatCurrency(totalIncremental)}</span>
+                          </p>
+                          <p className="text-2xl font-bold text-primary">
+                            {formatCurrency(grandTotalFee)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </>
                 );
-              })}
-              <div className="border-t pt-4 mt-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-bold">Grand Total</p>
-                    <p className="text-sm text-muted-foreground">
-                      Sum of all account fees
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground">
-                      Total Revenue: <span className="font-medium text-chart-2">{formatCurrency(totalIncremental)}</span>
-                    </p>
-                    <p className="text-2xl font-bold text-primary">
-                      {formatCurrency(activeAccounts.reduce((sum, acc) => sum + calculateTieredFee(acc.incrementalRevenue || 0).totalFee, 0))}
-                    </p>
-                  </div>
-                </div>
-              </div>
+              })()}
             </div>
           )}
         </CardContent>
