@@ -16,11 +16,13 @@ import Playbooks from "@/pages/playbooks";
 import Revenue from "@/pages/revenue";
 import Settings from "@/pages/settings";
 import ScoringSettings from "@/pages/scoring-settings";
+import WorkflowGuide from "@/pages/workflow-guide";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/workflow-guide" component={WorkflowGuide} />
       <Route path="/data-uploads" component={DataUploads} />
       <Route path="/accounts" component={Accounts} />
       <Route path="/icp-builder" component={ICPBuilder} />

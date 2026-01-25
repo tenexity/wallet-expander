@@ -9,6 +9,7 @@ import {
   TrendingUp,
   Settings,
   LogOut,
+  GitBranch,
 } from "lucide-react";
 import {
   Sidebar,
@@ -38,10 +39,10 @@ const mainNavItems = [
     tooltip: "Overview of KPIs, top opportunities, and your daily focus tasks",
   },
   {
-    title: "Data Uploads",
-    url: "/data-uploads",
-    icon: Upload,
-    tooltip: "Import accounts, products, categories, and order history from CSV files",
+    title: "Workflow Guide",
+    url: "/workflow-guide",
+    icon: GitBranch,
+    tooltip: "Visual guide showing setup, monthly, weekly, and daily workflows",
   },
   {
     title: "Accounts",
@@ -70,6 +71,12 @@ const mainNavItems = [
 ];
 
 const adminNavItems = [
+  {
+    title: "Data Uploads",
+    url: "/data-uploads",
+    icon: Upload,
+    tooltip: "Import accounts, products, categories, and order history from CSV files",
+  },
   {
     title: "Settings",
     url: "/settings",
