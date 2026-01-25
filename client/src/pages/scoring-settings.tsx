@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
@@ -18,6 +19,9 @@ import {
   Layers,
   AlertCircle,
   CheckCircle,
+  ChevronDown,
+  ChevronRight,
+  BookOpen,
 } from "lucide-react";
 import { Link } from "wouter";
 import {
@@ -58,6 +62,7 @@ export default function ScoringSettings() {
   const [revenuePotentialWeight, setRevenuePotentialWeight] = useState(DEFAULT_WEIGHTS.revenuePotentialWeight);
   const [categoryCountWeight, setCategoryCountWeight] = useState(DEFAULT_WEIGHTS.categoryCountWeight);
   const [hasChanges, setHasChanges] = useState(false);
+  const [isInstructionsOpen, setIsInstructionsOpen] = useState(false);
 
   useEffect(() => {
     if (scoringWeights) {
@@ -358,6 +363,79 @@ export default function ScoringSettings() {
             The final score ranges from 0-100, with higher scores indicating greater opportunity.
           </p>
         </CardContent>
+      </Card>
+
+      <Card>
+        <Collapsible open={isInstructionsOpen} onOpenChange={setIsInstructionsOpen}>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer hover-elevate">
+              <CardTitle className="flex items-center justify-between gap-2 text-lg">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-5 w-5 text-primary" />
+                  Instructions
+                </div>
+                {isInstructionsOpen ? (
+                  <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                )}
+              </CardTitle>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="pt-0 space-y-6">
+              <div>
+                <h4 className="font-semibold text-foreground mb-2">How to Change Weightings</h4>
+                <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                  <li>Use the sliders to adjust each factor's weight, or type a value directly in the input box</li>
+                  <li>Weights are adjusted in increments of 5% when using the slider</li>
+                  <li>All three weights must add up to exactly 100% before you can save</li>
+                  <li>Click "Save Changes" to apply your new weights to all account scores</li>
+                  <li>Use "Reset to Defaults" to restore the original balanced weights (40/30/30)</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-foreground mb-2">Understanding Each Factor</h4>
+                <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                  <li><strong>Gap Size:</strong> Measures how far an account falls below your ICP targets. Higher gap = more room for growth.</li>
+                  <li><strong>Revenue Potential:</strong> Based on the account's current revenue and estimated upside. Larger accounts offer bigger absolute gains.</li>
+                  <li><strong>Category Count:</strong> Number of product categories with gaps. More gaps may indicate broader opportunity or declining engagement.</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-foreground mb-2">Impact on Account Prioritization</h4>
+                <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                  <li>Higher weights increase that factor's influence on the final Opportunity Score</li>
+                  <li>Accounts with strong performance in heavily-weighted factors will rank higher</li>
+                  <li>Changes apply to all accounts immediately after saving</li>
+                  <li>The Accounts page will re-sort based on the new scores</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-foreground mb-2">Common Weighting Strategies</h4>
+                <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                  <li><strong>Balanced (40/30/30):</strong> Default approach that considers all factors roughly equally</li>
+                  <li><strong>Revenue-Focused (30/50/20):</strong> Prioritize accounts with highest dollar potential for maximum revenue impact</li>
+                  <li><strong>Gap-Focused (60/20/20):</strong> Target accounts with the most room for improvement regardless of size</li>
+                  <li><strong>Breadth-Focused (25/25/50):</strong> Focus on accounts with gaps across many categories for deeper penetration</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-foreground mb-2">Tips for Best Results</h4>
+                <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                  <li>Start with the default weights and adjust based on your sales strategy</li>
+                  <li>Review the top 10 accounts after changing weights to verify the results match your expectations</li>
+                  <li>Consider your team's capacity - revenue-focused may yield fewer, larger opportunities</li>
+                  <li>Revisit weights quarterly as your business priorities evolve</li>
+                </ul>
+              </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Collapsible>
       </Card>
     </div>
   );
