@@ -16,6 +16,7 @@ import {
   CalendarDays,
   CalendarClock,
 } from "lucide-react";
+import teeterTotterImage from "@assets/teeter-totter-workflow.png";
 
 interface WorkflowStep {
   id: string;
@@ -181,6 +182,23 @@ export default function WorkflowGuide() {
           Visual overview of how to use the AI VP Dashboard. Click any step to navigate directly to that feature.
         </p>
       </div>
+
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-col items-center gap-4">
+            <img 
+              src={teeterTotterImage} 
+              alt="Workflow diagram showing Account Enrollment as the central fulcrum, with data preparation activities on the left and sales execution activities on the right" 
+              className="w-full max-w-4xl rounded-lg border border-border"
+              data-testid="img-teeter-totter"
+            />
+            <p className="text-sm text-muted-foreground text-center max-w-2xl">
+              Account Enrollment is the central pivot point of this system. On the left, prepare your data through uploads, configuration, and ICP analysis. 
+              Once enrolled, execute sales activities on the right through playbooks, tasks, and revenue tracking.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="pb-4">
