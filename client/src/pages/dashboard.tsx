@@ -183,11 +183,11 @@ interface LayoutItem {
 
 const DEFAULT_LAYOUT: LayoutItem[] = [
   { i: "daily-focus", x: 0, y: 0, w: 12, h: 4, heightPreset: 'standard', minW: 6, minH: 3 },
-  { i: "top-opportunities", x: 0, y: 4, w: 8, h: 5, heightPreset: 'tall', minW: 4, minH: 4 },
-  { i: "segment-breakdown", x: 8, y: 4, w: 4, h: 5, heightPreset: 'tall', minW: 3, minH: 4 },
-  { i: "recent-tasks", x: 0, y: 9, w: 4, h: 5, heightPreset: 'standard', minW: 3, minH: 4 },
-  { i: "icp-profiles", x: 4, y: 9, w: 4, h: 5, heightPreset: 'standard', minW: 3, minH: 4 },
-  { i: "revenue-chart", x: 8, y: 9, w: 4, h: 5, heightPreset: 'tall', minW: 4, minH: 4 },
+  { i: "top-opportunities", x: 0, y: 4, w: 6, h: 5, heightPreset: 'tall', minW: 4, minH: 4 },
+  { i: "segment-breakdown", x: 6, y: 4, w: 6, h: 5, heightPreset: 'standard', minW: 3, minH: 4 },
+  { i: "recent-tasks", x: 0, y: 9, w: 4, h: 5, heightPreset: 'tall', minW: 3, minH: 4 },
+  { i: "icp-profiles", x: 4, y: 9, w: 8, h: 5, heightPreset: 'standard', minW: 3, minH: 4 },
+  { i: "revenue-chart", x: 0, y: 14, w: 12, h: 5, heightPreset: 'tall', minW: 4, minH: 4 },
 ];
 
 const BLOCK_LABELS: Record<string, string> = {
@@ -722,7 +722,7 @@ export default function Dashboard() {
     switch (blockId) {
       case "daily-focus":
         return (
-          <Card className="h-full border-primary/20 bg-primary/5 overflow-hidden" data-testid="card-daily-focus">
+          <Card className="h-full flex flex-col border-primary/20 bg-primary/5 overflow-hidden" data-testid="card-daily-focus">
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shrink-0">
@@ -851,7 +851,7 @@ export default function Dashboard() {
               </div>
             </CardHeader>
             {!isCollapsed && (
-              <CardContent className="overflow-auto">
+              <CardContent className="flex-1 overflow-y-auto overflow-x-hidden">
                 {isDailyFocusLoading ? (
                   <div className="space-y-2">
                     {[1, 2, 3].map((i) => (
@@ -930,7 +930,7 @@ export default function Dashboard() {
 
       case "top-opportunities":
         return (
-          <Card className="h-full overflow-hidden">
+          <Card className="h-full flex flex-col overflow-hidden">
             {renderBlockHeader(
               blockId,
               "Top Opportunities",
@@ -943,7 +943,7 @@ export default function Dashboard() {
               )
             )}
             {!isCollapsed && (
-              <CardContent className="overflow-auto">
+              <CardContent className="flex-1 overflow-y-auto overflow-x-auto">
                 <DataTable
                   columns={opportunityColumns}
                   data={displayStats.topOpportunities}
@@ -957,7 +957,7 @@ export default function Dashboard() {
 
       case "segment-breakdown":
         return (
-          <Card className="h-full overflow-hidden">
+          <Card className="h-full flex flex-col overflow-hidden">
             {renderBlockHeader(
               blockId,
               "Segment Breakdown",
@@ -965,7 +965,7 @@ export default function Dashboard() {
               "Distribution of your accounts across customer segments (HVAC, Plumbing, Mechanical). Each segment has its own ICP profile defining expected category mix."
             )}
             {!isCollapsed && (
-              <CardContent className="overflow-auto">
+              <CardContent className="flex-1 overflow-y-auto overflow-x-hidden">
                 <div className="h-48">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -1015,7 +1015,7 @@ export default function Dashboard() {
 
       case "recent-tasks":
         return (
-          <Card className="h-full overflow-hidden">
+          <Card className="h-full flex flex-col overflow-hidden">
             {renderBlockHeader(
               blockId,
               "Recent Tasks",
@@ -1028,7 +1028,7 @@ export default function Dashboard() {
               )
             )}
             {!isCollapsed && (
-              <CardContent className="overflow-auto">
+              <CardContent className="flex-1 overflow-y-auto overflow-x-auto">
                 <DataTable
                   columns={taskColumns}
                   data={displayStats.recentTasks}
@@ -1041,7 +1041,7 @@ export default function Dashboard() {
 
       case "icp-profiles":
         return (
-          <Card className="h-full overflow-hidden">
+          <Card className="h-full flex flex-col overflow-hidden">
             {renderBlockHeader(
               blockId,
               "ICP Profiles",
@@ -1054,7 +1054,7 @@ export default function Dashboard() {
               )
             )}
             {!isCollapsed && (
-              <CardContent className="overflow-auto">
+              <CardContent className="flex-1 overflow-y-auto overflow-x-hidden">
                 <div className="space-y-4">
                   {displayStats.icpProfiles.map((profile) => (
                     <div
@@ -1087,7 +1087,7 @@ export default function Dashboard() {
 
       case "revenue-chart":
         return (
-          <Card className="h-full overflow-hidden">
+          <Card className="h-full flex flex-col overflow-hidden">
             {renderBlockHeader(
               blockId,
               "Revenue by Segment",
@@ -1095,7 +1095,7 @@ export default function Dashboard() {
               "Total revenue contribution by customer segment. Compare segment performance to identify growth opportunities and track the impact of wallet share capture efforts."
             )}
             {!isCollapsed && (
-              <CardContent className="overflow-auto">
+              <CardContent className="flex-1 overflow-y-auto overflow-x-auto">
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={displayStats.segmentBreakdown}>
