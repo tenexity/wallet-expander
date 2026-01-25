@@ -32,7 +32,15 @@ import {
   Lock,
   Unlock,
   Move,
+  Maximize2,
+  RectangleHorizontal,
+  RectangleVertical,
 } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Tooltip,
   TooltipContent,
@@ -134,12 +142,39 @@ const LAYOUT_LOCKED_KEY = "dashboard_layout_locked";
 const GRID_COLS = 12;
 const ROW_HEIGHT = 80;
 
+type WidthPreset = 3 | 4 | 6 | 8 | 9 | 12;
+type HeightPreset = 'compact' | 'standard' | 'tall' | 'auto';
+
+const WIDTH_OPTIONS: { value: WidthPreset; label: string; icon: string }[] = [
+  { value: 3, label: 'Quarter', icon: '▢' },
+  { value: 4, label: 'Third', icon: '▢▢' },
+  { value: 6, label: 'Half', icon: '▢▢▢' },
+  { value: 8, label: 'Two-thirds', icon: '▢▢▢▢' },
+  { value: 9, label: '3/4', icon: '▢▢▢▢▢' },
+  { value: 12, label: 'Full', icon: '▢▢▢▢▢▢' },
+];
+
+const HEIGHT_OPTIONS: { value: HeightPreset; label: string; pixels: string }[] = [
+  { value: 'compact', label: 'Compact', pixels: '180px' },
+  { value: 'standard', label: 'Standard', pixels: '300px' },
+  { value: 'tall', label: 'Tall', pixels: '420px' },
+  { value: 'auto', label: 'Auto', pixels: 'auto' },
+];
+
+const HEIGHT_CLASSES: Record<HeightPreset, string> = {
+  compact: 'h-[180px]',
+  standard: 'h-[300px]',
+  tall: 'h-[420px]',
+  auto: 'h-auto min-h-[180px]',
+};
+
 interface LayoutItem {
   i: string;
   x: number;
   y: number;
-  w: number;
+  w: WidthPreset;
   h: number;
+  heightPreset: HeightPreset;
   minW?: number;
   minH?: number;
   maxW?: number;
@@ -147,12 +182,12 @@ interface LayoutItem {
 }
 
 const DEFAULT_LAYOUT: LayoutItem[] = [
-  { i: "daily-focus", x: 0, y: 0, w: 12, h: 4, minW: 6, minH: 3 },
-  { i: "top-opportunities", x: 0, y: 4, w: 8, h: 5, minW: 4, minH: 4 },
-  { i: "segment-breakdown", x: 8, y: 4, w: 4, h: 5, minW: 3, minH: 4 },
-  { i: "recent-tasks", x: 0, y: 9, w: 4, h: 5, minW: 3, minH: 4 },
-  { i: "icp-profiles", x: 4, y: 9, w: 4, h: 5, minW: 3, minH: 4 },
-  { i: "revenue-chart", x: 8, y: 9, w: 4, h: 5, minW: 4, minH: 4 },
+  { i: "daily-focus", x: 0, y: 0, w: 12, h: 4, heightPreset: 'standard', minW: 6, minH: 3 },
+  { i: "top-opportunities", x: 0, y: 4, w: 8, h: 5, heightPreset: 'tall', minW: 4, minH: 4 },
+  { i: "segment-breakdown", x: 8, y: 4, w: 4, h: 5, heightPreset: 'tall', minW: 3, minH: 4 },
+  { i: "recent-tasks", x: 0, y: 9, w: 4, h: 5, heightPreset: 'standard', minW: 3, minH: 4 },
+  { i: "icp-profiles", x: 4, y: 9, w: 4, h: 5, heightPreset: 'standard', minW: 3, minH: 4 },
+  { i: "revenue-chart", x: 8, y: 9, w: 4, h: 5, heightPreset: 'tall', minW: 4, minH: 4 },
 ];
 
 const BLOCK_LABELS: Record<string, string> = {
@@ -178,7 +213,14 @@ export default function Dashboard() {
       try {
         const parsed = JSON.parse(savedLayout);
         if (Array.isArray(parsed) && parsed.length === DEFAULT_LAYOUT.length) {
-          setLayout(parsed);
+          const migratedLayout = parsed.map((item: LayoutItem, index: number) => ({
+            ...item,
+            heightPreset: item.heightPreset ?? DEFAULT_LAYOUT[index]?.heightPreset ?? 'standard',
+          }));
+          setLayout(migratedLayout);
+          if (parsed.some((item: LayoutItem) => !item.heightPreset)) {
+            localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(migratedLayout));
+          }
         }
       } catch (e) {
         console.error("Failed to parse saved layout");
@@ -306,6 +348,23 @@ export default function Dashboard() {
     const newLocked = !isLayoutLocked;
     setIsLayoutLocked(newLocked);
     localStorage.setItem(LAYOUT_LOCKED_KEY, String(newLocked));
+  };
+
+  const updateBlockSize = (blockId: string, width?: WidthPreset, height?: HeightPreset) => {
+    setLayout(prevLayout => {
+      const newLayout = prevLayout.map(item => {
+        if (item.i === blockId) {
+          return {
+            ...item,
+            w: width ?? item.w,
+            heightPreset: height ?? item.heightPreset,
+          };
+        }
+        return item;
+      });
+      localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(newLayout));
+      return newLayout;
+    });
   };
 
   const toggleCollapsed = (blockId: string) => {
@@ -539,6 +598,9 @@ export default function Dashboard() {
 
   const renderBlockHeader = (blockId: string, title: string, subtitle?: string, tooltipContent?: string, actions?: React.ReactNode) => {
     const isCollapsed = collapsedBlocks.has(blockId);
+    const currentBlock = layout.find(item => item.i === blockId);
+    const currentWidth = currentBlock?.w ?? 6;
+    const currentHeight = currentBlock?.heightPreset ?? 'standard';
     
     return (
       <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
@@ -581,15 +643,73 @@ export default function Dashboard() {
             </TooltipContent>
           </Tooltip>
           {!isLayoutLocked && (
-            <div 
-              className="drag-handle cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded" 
-              data-testid={`drag-handle-${blockId}`}
-              draggable
-              onDragStart={(e) => handleDragStart(e, blockId)}
-              onDragEnd={handleDragEnd}
-            >
-              <Move className="h-4 w-4 text-muted-foreground" />
-            </div>
+            <>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    data-testid={`resize-${blockId}`}
+                  >
+                    <Maximize2 className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64 p-3" align="end">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        <RectangleHorizontal className="h-4 w-4" />
+                        <span>Width</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {WIDTH_OPTIONS.map((option) => (
+                          <Button
+                            key={option.value}
+                            variant={currentWidth === option.value ? "default" : "outline"}
+                            size="sm"
+                            className="text-xs px-2 h-7"
+                            onClick={() => updateBlockSize(blockId, option.value, undefined)}
+                            data-testid={`width-${blockId}-${option.value}`}
+                          >
+                            {option.label}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        <RectangleVertical className="h-4 w-4" />
+                        <span>Height</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {HEIGHT_OPTIONS.map((option) => (
+                          <Button
+                            key={option.value}
+                            variant={currentHeight === option.value ? "default" : "outline"}
+                            size="sm"
+                            className="text-xs px-2 h-7"
+                            onClick={() => updateBlockSize(blockId, undefined, option.value)}
+                            data-testid={`height-${blockId}-${option.value}`}
+                          >
+                            {option.label}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <div 
+                className="drag-handle cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded" 
+                data-testid={`drag-handle-${blockId}`}
+                draggable
+                onDragStart={(e) => handleDragStart(e, blockId)}
+                onDragEnd={handleDragEnd}
+              >
+                <Move className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </>
           )}
         </div>
       </CardHeader>
@@ -660,15 +780,73 @@ export default function Dashboard() {
                   </TooltipContent>
                 </Tooltip>
                 {!isLayoutLocked && (
-                  <div 
-                    className="drag-handle cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded" 
-                    data-testid={`drag-handle-${blockId}`}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, blockId)}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <Move className="h-4 w-4 text-muted-foreground" />
-                  </div>
+                  <>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          data-testid={`resize-${blockId}`}
+                        >
+                          <Maximize2 className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64 p-3" align="end">
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm font-medium">
+                              <RectangleHorizontal className="h-4 w-4" />
+                              <span>Width</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {WIDTH_OPTIONS.map((option) => (
+                                <Button
+                                  key={option.value}
+                                  variant={(layout.find(item => item.i === blockId)?.w ?? 12) === option.value ? "default" : "outline"}
+                                  size="sm"
+                                  className="text-xs px-2 h-7"
+                                  onClick={() => updateBlockSize(blockId, option.value, undefined)}
+                                  data-testid={`width-${blockId}-${option.value}`}
+                                >
+                                  {option.label}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm font-medium">
+                              <RectangleVertical className="h-4 w-4" />
+                              <span>Height</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {HEIGHT_OPTIONS.map((option) => (
+                                <Button
+                                  key={option.value}
+                                  variant={(layout.find(item => item.i === blockId)?.heightPreset ?? 'standard') === option.value ? "default" : "outline"}
+                                  size="sm"
+                                  className="text-xs px-2 h-7"
+                                  onClick={() => updateBlockSize(blockId, undefined, option.value)}
+                                  data-testid={`height-${blockId}-${option.value}`}
+                                >
+                                  {option.label}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    <div 
+                      className="drag-handle cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded" 
+                      data-testid={`drag-handle-${blockId}`}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, blockId)}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <Move className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </>
                 )}
               </div>
             </CardHeader>
@@ -1114,7 +1292,7 @@ export default function Dashboard() {
         <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border border-dashed">
           <Move className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm text-muted-foreground">
-            Drag blocks to reorder. Click "Layout Locked" when done.
+            Drag blocks to reorder. Click the resize icon to adjust width and height. Lock when done.
           </span>
         </div>
       )}
@@ -1123,6 +1301,20 @@ export default function Dashboard() {
         {layout.map((item) => {
           const isBeingDragged = draggedId === item.i;
           const isDragOver = dragOverId === item.i && draggedId !== item.i;
+          const isCollapsed = collapsedBlocks.has(item.i);
+          const heightClass = isCollapsed ? 'h-auto' : HEIGHT_CLASSES[item.heightPreset];
+          
+          const getWidthClasses = (w: WidthPreset) => {
+            switch (w) {
+              case 3: return "col-span-12 sm:col-span-6 lg:col-span-3";
+              case 4: return "col-span-12 sm:col-span-6 lg:col-span-4";
+              case 6: return "col-span-12 md:col-span-6";
+              case 8: return "col-span-12 lg:col-span-8";
+              case 9: return "col-span-12 lg:col-span-9";
+              case 12: return "col-span-12";
+              default: return "col-span-12 md:col-span-6";
+            }
+          };
           
           return (
             <div
@@ -1133,10 +1325,8 @@ export default function Dashboard() {
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, item.i)}
               className={`
-                ${item.w === 12 ? "col-span-12" : ""}
-                ${item.w === 8 ? "col-span-12 lg:col-span-8" : ""}
-                ${item.w === 4 ? "col-span-12 sm:col-span-6 lg:col-span-4" : ""}
-                ${item.w === 6 ? "col-span-12 md:col-span-6" : ""}
+                ${getWidthClasses(item.w)}
+                ${heightClass}
                 transition-all duration-200 ease-in-out
                 ${isBeingDragged ? "opacity-50 scale-95" : ""}
                 ${isDragOver ? "ring-2 ring-primary ring-offset-2" : ""}
