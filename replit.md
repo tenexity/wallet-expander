@@ -29,6 +29,7 @@ The application follows a client-server architecture.
     - **Workflow Guide:** Visual swim lane chart showing Setup (one-time), Monthly, Weekly, and Daily workflows with clickable steps that navigate directly to corresponding features.
     - **Top Opportunities Block:** Enhanced dashboard block showing top 10 accounts with sortable columns (Account, Segment, Region, Revenue, Penetration, Score, Enrolled), column visibility toggle with localStorage persistence, and direct link to accounts page.
     - **Revenue by Segment:** Chart connected to live enrolled accounts data from revenue tracking, with fallback to segment breakdown when no enrolled accounts exist.
+    - **Promotional Landing Page:** Marketing website at `/promo` route featuring hero section with value propositions, features showcase, tiered pricing (Starter/Professional/Enterprise), testimonials, and demo request form with Zod validation. Includes SEO meta tags. Renders outside the main dashboard layout.
 
 **Navigation Structure:**
 - **Main Section:** Dashboard, Revenue Tracking, Workflow Guide, Accounts, ICP Builder, Playbooks
