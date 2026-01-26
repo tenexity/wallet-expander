@@ -1,5 +1,6 @@
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import {
   LayoutDashboard,
   Upload,
@@ -85,6 +86,44 @@ const adminNavItems = [
   },
 ];
 
+function UserProfile() {
+  const { user } = useAuth();
+  
+  const displayName = user?.firstName && user?.lastName 
+    ? `${user.firstName} ${user.lastName}` 
+    : user?.email?.split('@')[0] || 'User';
+  
+  const initials = user?.firstName && user?.lastName
+    ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
+    : displayName.slice(0, 2).toUpperCase();
+
+  return (
+    <div className="flex items-center gap-3">
+      <SidebarMenuButton asChild className="flex-1 h-auto py-1" data-testid="link-profile">
+        <Link href="/settings">
+          <Avatar className="h-8 w-8">
+            {user?.profileImageUrl && (
+              <AvatarImage src={user.profileImageUrl} alt={displayName} />
+            )}
+            <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground text-xs">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col flex-1 min-w-0">
+            <span className="text-sm font-medium truncate">{displayName}</span>
+            <span className="text-xs opacity-60">Admin</span>
+          </div>
+        </Link>
+      </SidebarMenuButton>
+      <SidebarMenuButton asChild size="sm" className="h-8 w-8 p-0 shrink-0" data-testid="button-logout">
+        <a href="/api/logout">
+          <LogOut className="h-4 w-4" />
+        </a>
+      </SidebarMenuButton>
+    </div>
+  );
+}
+
 export function AppSidebar() {
   const [location, navigate] = useLocation();
 
@@ -167,26 +206,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="p-4 space-y-4">
-        <div className="flex items-center gap-3">
-          <SidebarMenuButton asChild className="flex-1 h-auto py-1" data-testid="link-profile">
-            <Link href="/settings">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground text-xs">
-                  GM
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col flex-1 min-w-0">
-                <span className="text-sm font-medium truncate">Graham</span>
-                <span className="text-xs opacity-60">Admin</span>
-              </div>
-            </Link>
-          </SidebarMenuButton>
-          <SidebarMenuButton asChild size="sm" className="h-8 w-8 p-0 shrink-0" data-testid="button-logout">
-            <Link href="/promo">
-              <LogOut className="h-4 w-4" />
-            </Link>
-          </SidebarMenuButton>
-        </div>
+        <UserProfile />
         <div className="border-t border-sidebar-border pt-3">
           <div className="flex items-center justify-center gap-2 text-xs text-sidebar-foreground/50">
             <span>Created with care by</span>

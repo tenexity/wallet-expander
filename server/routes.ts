@@ -25,6 +25,7 @@ import {
   isEmailConfigured,
   DEFAULT_EMAIL_SETTINGS,
 } from "./email-service";
+import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 
 function safeParseGapCategories(gapCategories: unknown): string[] {
   if (Array.isArray(gapCategories)) {
@@ -47,6 +48,10 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // ============ Setup Authentication ============
+  await setupAuth(app);
+  registerAuthRoutes(app);
+
   // ============ Dashboard Stats ============
   app.get("/api/dashboard/stats", async (req, res) => {
     try {
@@ -1822,9 +1827,9 @@ KEY TALKING POINTS:
       const validated = insertRevShareTierSchema.parse(req.body);
       
       // Validate min/max relationship
-      const minRev = parseFloat(validated.minRevenue);
+      const minRev = parseFloat(validated.minRevenue ?? "0");
       const maxRev = validated.maxRevenue ? parseFloat(validated.maxRevenue) : null;
-      const shareRate = parseFloat(validated.shareRate);
+      const shareRate = parseFloat(validated.shareRate ?? "0");
       
       if (isNaN(minRev) || minRev < 0) {
         return res.status(400).json({ message: "Minimum revenue must be a non-negative number" });

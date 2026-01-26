@@ -199,11 +199,11 @@ export default function Landing() {
 
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <Link href="/">
+            <a href="/api/login">
               <Button variant="outline" size="sm" data-testid="button-login">
                 Login
               </Button>
-            </Link>
+            </a>
             <Button
               size="sm"
               onClick={() => scrollToSection("signup")}

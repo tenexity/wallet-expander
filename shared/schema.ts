@@ -1,29 +1,63 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, serial, numeric, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, serial, numeric, boolean, timestamp, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Re-export chat models for the integration
 export * from "./models/chat";
 
-// ============ USERS ============
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-  role: text("role").notNull().default("manager"), // admin, manager
-  name: text("name"),
+// Re-export auth models (users and sessions from Replit Auth)
+export * from "./models/auth";
+
+// ============ TENANTS (Organizations/Customers) ============
+export const tenants = pgTable("tenants", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(), // URL-friendly identifier
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
-  role: true,
-  name: true,
+export const insertTenantSchema = createInsertSchema(tenants).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export type InsertTenant = z.infer<typeof insertTenantSchema>;
+export type Tenant = typeof tenants.$inferSelect;
+
+// ============ USER ROLES (Permission levels per tenant) ============
+// Roles: super_admin (full access), reviewer (view + approve), viewer (read-only)
+export const userRoles = pgTable("user_roles", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull(), // References users.id from Replit Auth
+  tenantId: integer("tenant_id").notNull(), // References tenants.id
+  role: text("role").notNull().default("viewer"), // super_admin, reviewer, viewer
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_user_roles_user_id").on(table.userId),
+  index("idx_user_roles_tenant_id").on(table.tenantId),
+]);
+
+export const insertUserRoleSchema = createInsertSchema(userRoles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertUserRole = z.infer<typeof insertUserRoleSchema>;
+export type UserRole = typeof userRoles.$inferSelect;
+
+// Role permission levels
+export const ROLE_PERMISSIONS = {
+  super_admin: ['read', 'write', 'delete', 'manage_users', 'manage_settings'],
+  reviewer: ['read', 'approve'],
+  viewer: ['read'],
+} as const;
+
+export type RoleType = keyof typeof ROLE_PERMISSIONS;
 
 // ============ PRODUCT CATEGORIES ============
 export const productCategories = pgTable("product_categories", {
