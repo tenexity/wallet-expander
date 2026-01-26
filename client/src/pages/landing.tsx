@@ -82,57 +82,6 @@ const features = [
   },
 ];
 
-const pricingPlans = [
-  {
-    name: "Starter",
-    price: "$499",
-    period: "/month",
-    description: "Perfect for small sales teams getting started",
-    features: [
-      "Up to 500 accounts",
-      "3 Territory Managers",
-      "Basic ICP profiles",
-      "Email support",
-      "Monthly reports",
-    ],
-    cta: "Start Free Trial",
-    popular: false,
-  },
-  {
-    name: "Professional",
-    price: "$999",
-    period: "/month",
-    description: "Best for growing teams focused on expansion",
-    features: [
-      "Up to 2,500 accounts",
-      "10 Territory Managers",
-      "Advanced AI analysis",
-      "Custom playbooks",
-      "Priority support",
-      "Weekly insights",
-      "API access",
-    ],
-    cta: "Start Free Trial",
-    popular: true,
-  },
-  {
-    name: "Enterprise",
-    price: "Custom",
-    period: "",
-    description: "For large organizations with complex needs",
-    features: [
-      "Unlimited accounts",
-      "Unlimited Territory Managers",
-      "Custom integrations",
-      "Dedicated success manager",
-      "On-premise option",
-      "SLA guarantee",
-      "Custom training",
-    ],
-    cta: "Contact Sales",
-    popular: false,
-  },
-];
 
 const stats = [
   { value: "23%", label: "Average Revenue Increase" },
@@ -393,68 +342,75 @@ export default function Landing() {
 
       <section id="pricing" className="py-20 bg-muted/30">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
+          <div className="max-w-3xl mx-auto text-center">
             <Badge variant="secondary" className="mb-4" data-testid="badge-pricing">
-              Pricing
+              Fee-for-Success Pricing
             </Badge>
             <h2 className="text-3xl md:text-4xl font-bold mb-4" data-testid="text-pricing-title">
-              Simple, Transparent Pricing
+              We Only Win When You Win
             </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Choose the plan that fits your team size and needs. All plans include
-              a 14-day free trial.
+            <p className="text-lg text-muted-foreground mb-12">
+              Our success-based pricing model aligns our objectives with yours.
+              No monthly fees eating into your budget—you only pay when you recover revenue.
             </p>
-          </div>
 
-          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {pricingPlans.map((plan, index) => (
-              <Card
-                key={index}
-                className={`relative flex flex-col ${
-                  plan.popular ? "border-primary shadow-lg scale-105" : ""
-                }`}
-                data-testid={`card-pricing-${plan.name.toLowerCase()}`}
+            <Card className="p-8 md:p-12 text-center" data-testid="card-pricing-success">
+              <div className="mb-8">
+                <div className="flex items-baseline justify-center gap-2 mb-2">
+                  <span className="text-5xl md:text-6xl font-bold text-primary" data-testid="text-success-fee">15%</span>
+                  <span className="text-xl text-muted-foreground">success fee</span>
+                </div>
+                <p className="text-muted-foreground" data-testid="text-fee-description">
+                  of incremental revenue recovered from enrolled accounts
+                </p>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-6 mb-8">
+                <div className="p-4 rounded-md bg-muted/50" data-testid="pricing-benefit-risk">
+                  <Shield className="h-6 w-6 text-primary mx-auto mb-2" />
+                  <h4 className="font-medium mb-1">Zero Risk</h4>
+                  <p className="text-sm text-muted-foreground">
+                    No revenue recovered means no fees owed
+                  </p>
+                </div>
+                <div className="p-4 rounded-md bg-muted/50" data-testid="pricing-benefit-aligned">
+                  <Target className="h-6 w-6 text-primary mx-auto mb-2" />
+                  <h4 className="font-medium mb-1">Aligned Incentives</h4>
+                  <p className="text-sm text-muted-foreground">
+                    We're motivated to maximize your results
+                  </p>
+                </div>
+                <div className="p-4 rounded-md bg-muted/50" data-testid="pricing-benefit-volume">
+                  <TrendingUp className="h-6 w-6 text-primary mx-auto mb-2" />
+                  <h4 className="font-medium mb-1">Volume Discounts</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Success fee declines as you grow
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                size="lg"
+                onClick={() => scrollToSection("signup")}
+                className="mb-8"
+                data-testid="button-pricing-demo"
               >
-                {plan.popular && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <Badge className="bg-primary text-primary-foreground" data-testid="badge-most-popular">
-                      Most Popular
-                    </Badge>
-                  </div>
-                )}
-                <CardHeader className="text-center pb-2">
-                  <CardTitle className="text-xl">{plan.name}</CardTitle>
-                  <CardDescription>{plan.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-1 flex flex-col">
-                  <div className="text-center mb-6">
-                    <span className="text-4xl font-bold" data-testid={`text-price-${plan.name.toLowerCase()}`}>
-                      {plan.price}
-                    </span>
-                    <span className="text-muted-foreground">{plan.period}</span>
-                  </div>
+                Request a Demo
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
 
-                  <ul className="space-y-3 mb-6 flex-1">
-                    {plan.features.map((feature, featureIndex) => (
-                      <li key={featureIndex} className="flex items-start gap-2">
-                        <CheckCircle className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                        <span className="text-sm">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <Button
-                    className="w-full"
-                    variant={plan.popular ? "default" : "outline"}
-                    onClick={() => scrollToSection("signup")}
-                    data-testid={`button-pricing-${plan.name.toLowerCase()}`}
-                  >
-                    {plan.cta}
-                    <ChevronRight className="ml-1 h-4 w-4" />
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
+              <div className="border-t pt-6 space-y-2 text-xs text-muted-foreground" data-testid="pricing-fine-print">
+                <p data-testid="text-setup-fee">
+                  One-time setup fee of $1,200 covers onboarding, data integration, and initial AI training.
+                </p>
+                <p data-testid="text-volume-discount">
+                  Success fee starts at 15% and declines based on volume thresholds.
+                </p>
+                <p data-testid="text-hybrid-option">
+                  Hybrid pricing available: reduced monthly subscription + lower success fee. Contact us for details.
+                </p>
+              </div>
+            </Card>
           </div>
         </div>
       </section>
