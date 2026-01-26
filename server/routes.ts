@@ -1563,7 +1563,7 @@ KEY TALKING POINTS:
   });
 
   // ============ Data Uploads ============
-  app.get("/api/data-uploads", requireAuth, async (req, res) => {
+  app.get("/api/data-uploads", authWithAdmin, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const uploads = await tenantStorage.getDataUploads();
@@ -1598,7 +1598,7 @@ KEY TALKING POINTS:
   });
 
   // ============ Settings ============
-  app.get("/api/settings", requireAuth, async (req, res) => {
+  app.get("/api/settings", authWithAdmin, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const settings = await tenantStorage.getSettings();

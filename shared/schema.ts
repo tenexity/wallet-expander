@@ -141,12 +141,15 @@ export type Order = typeof orders.$inferSelect;
 // ============ ORDER ITEMS ============
 export const orderItems = pgTable("order_items", {
   id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id"), // Multi-tenant isolation
   orderId: integer("order_id").notNull(),
   productId: integer("product_id").notNull(),
   quantity: numeric("quantity").notNull(),
   unitPrice: numeric("unit_price").notNull(),
   lineTotal: numeric("line_total").notNull(),
-});
+}, (table) => [
+  index("idx_order_items_tenant_id").on(table.tenantId),
+]);
 
 export const insertOrderItemSchema = createInsertSchema(orderItems).omit({
   id: true,
@@ -184,13 +187,16 @@ export type SegmentProfile = typeof segmentProfiles.$inferSelect;
 // ============ PROFILE CATEGORIES ============
 export const profileCategories = pgTable("profile_categories", {
   id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id"), // Multi-tenant isolation
   profileId: integer("profile_id").notNull(),
   categoryId: integer("category_id").notNull(),
   expectedPct: numeric("expected_pct"),
   importance: numeric("importance").default("1"),
   isRequired: boolean("is_required").default(false),
   notes: text("notes"),
-});
+}, (table) => [
+  index("idx_profile_categories_tenant_id").on(table.tenantId),
+]);
 
 export const insertProfileCategorySchema = createInsertSchema(profileCategories).omit({
   id: true,
@@ -202,12 +208,15 @@ export type ProfileCategory = typeof profileCategories.$inferSelect;
 // ============ PROFILE REVIEW LOG ============
 export const profileReviewLog = pgTable("profile_review_log", {
   id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id"), // Multi-tenant isolation
   profileId: integer("profile_id").notNull(),
   reviewer: text("reviewer").notNull(),
   action: text("action"), // created, adjusted, approved
   notes: text("notes"),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`),
-});
+}, (table) => [
+  index("idx_profile_review_log_tenant_id").on(table.tenantId),
+]);
 
 export const insertProfileReviewLogSchema = createInsertSchema(profileReviewLog).omit({
   id: true,
@@ -317,9 +326,12 @@ export type Playbook = typeof playbooks.$inferSelect;
 // ============ PLAYBOOK TASKS ============
 export const playbookTasks = pgTable("playbook_tasks", {
   id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id"), // Multi-tenant isolation
   playbookId: integer("playbook_id").notNull(),
   taskId: integer("task_id").notNull(),
-});
+}, (table) => [
+  index("idx_playbook_tasks_tenant_id").on(table.tenantId),
+]);
 
 export const insertPlaybookTaskSchema = createInsertSchema(playbookTasks).omit({
   id: true,

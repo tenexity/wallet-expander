@@ -2,7 +2,7 @@ import { db } from "../db";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
 import {
   accounts, products, productCategories, orders, orderItems,
-  segmentProfiles, profileCategories, accountMetrics, accountCategoryGaps,
+  segmentProfiles, profileCategories, profileReviewLog, accountMetrics, accountCategoryGaps,
   tasks, playbooks, playbookTasks, programAccounts, programRevenueSnapshots,
   dataUploads, settings, scoringWeights, territoryManagers, customCategories,
   revShareTiers,
@@ -10,7 +10,10 @@ import {
   type Product, type InsertProduct,
   type ProductCategory, type InsertProductCategory,
   type Order, type InsertOrder,
+  type OrderItem, type InsertOrderItem,
   type SegmentProfile, type InsertSegmentProfile,
+  type ProfileCategory, type InsertProfileCategory,
+  type ProfileReviewLog, type InsertProfileReviewLog,
   type Task, type InsertTask,
   type Playbook, type InsertPlaybook,
   type PlaybookTask, type InsertPlaybookTask,
@@ -78,6 +81,52 @@ export class TenantStorage {
   async createOrder(order: InsertOrder): Promise<Order> {
     const [created] = await db.insert(orders)
       .values({ ...order, tenantId: this.tenantId })
+      .returning();
+    return created;
+  }
+
+  // Order Items with tenant scoping
+  async getOrderItems(orderId: number): Promise<OrderItem[]> {
+    return db.select().from(orderItems)
+      .where(and(eq(orderItems.orderId, orderId), eq(orderItems.tenantId, this.tenantId)));
+  }
+
+  async createOrderItem(item: InsertOrderItem): Promise<OrderItem> {
+    const [created] = await db.insert(orderItems)
+      .values({ ...item, tenantId: this.tenantId })
+      .returning();
+    return created;
+  }
+
+  // Profile Categories with tenant scoping
+  async getProfileCategories(profileId: number): Promise<ProfileCategory[]> {
+    return db.select().from(profileCategories)
+      .where(and(eq(profileCategories.profileId, profileId), eq(profileCategories.tenantId, this.tenantId)));
+  }
+
+  async createProfileCategory(category: InsertProfileCategory): Promise<ProfileCategory> {
+    const [created] = await db.insert(profileCategories)
+      .values({ ...category, tenantId: this.tenantId })
+      .returning();
+    return created;
+  }
+
+  async deleteProfileCategories(profileId: number): Promise<boolean> {
+    await db.delete(profileCategories)
+      .where(and(eq(profileCategories.profileId, profileId), eq(profileCategories.tenantId, this.tenantId)));
+    return true;
+  }
+
+  // Profile Review Log with tenant scoping
+  async getProfileReviewLog(profileId: number): Promise<ProfileReviewLog[]> {
+    return db.select().from(profileReviewLog)
+      .where(and(eq(profileReviewLog.profileId, profileId), eq(profileReviewLog.tenantId, this.tenantId)))
+      .orderBy(desc(profileReviewLog.createdAt));
+  }
+
+  async createProfileReviewLog(log: InsertProfileReviewLog): Promise<ProfileReviewLog> {
+    const [created] = await db.insert(profileReviewLog)
+      .values({ ...log, tenantId: this.tenantId })
       .returning();
     return created;
   }
@@ -175,11 +224,14 @@ export class TenantStorage {
   }
 
   async getPlaybookTasks(playbookId: number): Promise<PlaybookTask[]> {
-    return db.select().from(playbookTasks).where(eq(playbookTasks.playbookId, playbookId));
+    return db.select().from(playbookTasks)
+      .where(and(eq(playbookTasks.playbookId, playbookId), eq(playbookTasks.tenantId, this.tenantId)));
   }
 
   async createPlaybookTask(playbookTask: InsertPlaybookTask): Promise<PlaybookTask> {
-    const [created] = await db.insert(playbookTasks).values(playbookTask).returning();
+    const [created] = await db.insert(playbookTasks)
+      .values({ ...playbookTask, tenantId: this.tenantId })
+      .returning();
     return created;
   }
 
