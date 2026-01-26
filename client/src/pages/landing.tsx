@@ -33,7 +33,17 @@ import {
   Mail,
   Building2,
   ChevronRight,
+  Check,
+  UserCheck,
+  ClipboardList,
 } from "lucide-react";
+
+import mockupDashboard from "@/assets/images/mockup-dashboard.png";
+import mockupEnrollment from "@/assets/images/mockup-enrollment.png";
+import mockupGapAnalysis from "@/assets/images/mockup-gap-analysis.png";
+import mockupIcpBuilder from "@/assets/images/mockup-icp-builder.png";
+import mockupRevenue from "@/assets/images/mockup-revenue.png";
+import mockupPlaybooks from "@/assets/images/mockup-playbooks.png";
 
 const demoFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -43,42 +53,90 @@ const demoFormSchema = z.object({
 
 type DemoFormValues = z.infer<typeof demoFormSchema>;
 
-const features = [
+const showcaseFeatures = [
   {
-    icon: Target,
-    title: "AI-Powered Gap Analysis",
-    description:
-      "Automatically identify wallet share leakage by analyzing purchasing patterns against Ideal Customer Profiles for each market segment.",
+    id: "enrollment",
+    badge: "Controlled Enrollment",
+    title: "Target the Right Accounts for Predictable Results",
+    description: "Take control of your revenue recovery by strategically selecting and enrolling high-potential accounts. Our scoring system identifies which accounts have the greatest opportunity, so your team focuses efforts where they'll have the biggest impact.",
+    image: mockupEnrollment,
+    imageAlt: "Account enrollment selection interface showing opportunity scores",
+    benefits: [
+      "Score accounts by opportunity size and close potential",
+      "Enroll accounts strategically based on capacity",
+      "Create a predictable pipeline of target accounts",
+      "Avoid overwhelming your team with unfocused outreach",
+    ],
   },
   {
-    icon: BarChart3,
-    title: "Opportunity Scoring",
-    description:
-      "Prioritize accounts with intelligent scoring based on category gaps, revenue potential, and historical purchase behavior.",
+    id: "dashboard",
+    badge: "Pipeline Visibility",
+    title: "Track Every Enrolled Account's Progress",
+    description: "Your dashboard shows exactly where each enrolled account stands in the revenue recovery journey. Monitor progress, identify accounts that need attention, and celebrate wins as accounts hit their targets and graduate.",
+    image: mockupDashboard,
+    imageAlt: "Dashboard showing enrolled accounts pipeline with progress indicators",
+    benefits: [
+      "Real-time visibility into all enrolled accounts",
+      "Progress indicators show journey to graduation",
+      "Quick identification of accounts needing attention",
+      "Celebrate wins as accounts graduate successfully",
+    ],
   },
   {
-    icon: Users,
-    title: "ICP Builder",
-    description:
-      "Build and refine Ideal Customer Profiles by segment using AI analysis of your best-performing accounts.",
+    id: "gap-analysis",
+    badge: "AI-Powered Insights",
+    title: "Pinpoint Exactly Where You're Leaving Money on the Table",
+    description: "Our AI compares each account's purchasing patterns against their segment's Ideal Customer Profile. Instantly see which product categories are underperforming and quantify the revenue opportunity in each gap.",
+    image: mockupGapAnalysis,
+    imageAlt: "Gap analysis showing category penetration compared to benchmarks",
+    benefits: [
+      "Visual comparison against segment benchmarks",
+      "Category-by-category gap identification",
+      "Quantified revenue opportunity per gap",
+      "Prioritized recommendations for where to focus",
+    ],
   },
   {
-    icon: FileText,
-    title: "Sales Playbooks",
-    description:
-      "Generate personalized call scripts, email templates, and action plans tailored to each account's specific gaps.",
+    id: "icp-builder",
+    badge: "Segment Intelligence",
+    title: "Know What Great Looks Like for Each Segment",
+    description: "Build and refine Ideal Customer Profiles based on AI analysis of your best-performing accounts. Understand what top accounts in each segment purchase, so you can guide others to the same success.",
+    image: mockupIcpBuilder,
+    imageAlt: "ICP Builder showing segment profiles and purchase patterns",
+    benefits: [
+      "AI-generated profiles from your best accounts",
+      "Segment-specific purchase patterns revealed",
+      "Data-driven benchmarks for gap scoring",
+      "Continuous refinement as you gather more data",
+    ],
   },
   {
-    icon: DollarSign,
-    title: "Revenue Tracking",
-    description:
-      "Track incremental revenue from enrolled accounts, monitor progress toward graduation goals, and calculate ROI.",
+    id: "revenue",
+    badge: "Results Tracking",
+    title: "Measure Incremental Revenue from Every Enrolled Account",
+    description: "Track the incremental revenue generated from each enrolled account from enrollment through graduation. Set clear goals, monitor progress, and prove ROI with transparent reporting that ties efforts to results.",
+    image: mockupRevenue,
+    imageAlt: "Revenue tracking dashboard showing graduation progress",
+    benefits: [
+      "Baseline vs. current revenue comparison",
+      "Graduation goals with progress tracking",
+      "Clear attribution of incremental revenue",
+      "ROI reporting for leadership visibility",
+    ],
   },
   {
-    icon: Zap,
-    title: "Task Automation",
-    description:
-      "Automatically generate and assign tasks to Territory Managers with email notifications and progress tracking.",
+    id: "playbooks",
+    badge: "Structured Follow-Up",
+    title: "Methodical Outreach That Drives Consistent Results",
+    description: "AI generates personalized playbooks for each enrolled account with specific tasks, call scripts, and email templates. Your team executes with precision, ensuring no opportunity falls through the cracks.",
+    image: mockupPlaybooks,
+    imageAlt: "AI-generated playbook with tasks and scripts",
+    benefits: [
+      "AI-personalized scripts for each account's gaps",
+      "Structured task sequences with due dates",
+      "Email templates ready to customize and send",
+      "Automatic task assignment to Territory Managers",
+    ],
   },
 ];
 
@@ -305,37 +363,68 @@ export default function Landing() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <Badge variant="secondary" className="mb-4" data-testid="badge-features">
-              Features
+              Platform Features
             </Badge>
             <h2 className="text-3xl md:text-4xl font-bold mb-4" data-testid="text-features-title">
-              Everything You Need to Expand Wallet Share
+              A Complete System for Predictable Revenue Recovery
             </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Powerful AI-driven tools designed for Territory Managers and Sales
-              Leaders to identify and capture revenue opportunities.
+            <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+              Control your pipeline with strategic account enrollment. Track every enrolled account from targeting through graduation. 
+              Drive consistent results with methodical, AI-powered follow-up.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((feature, index) => (
-              <Card
-                key={index}
-                className="hover-elevate transition-all duration-300"
-                data-testid={`card-feature-${index}`}
-              >
-                <CardHeader>
-                  <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center mb-3">
-                    <feature.icon className="h-5 w-5 text-primary" />
+          <div className="space-y-24">
+            {showcaseFeatures.map((feature, index) => {
+              const isEven = index % 2 === 0;
+              return (
+                <div
+                  key={feature.id}
+                  className={`flex flex-col ${isEven ? 'lg:flex-row' : 'lg:flex-row-reverse'} gap-8 lg:gap-16 items-center`}
+                  data-testid={`feature-showcase-${feature.id}`}
+                >
+                  <div className="w-full lg:w-1/2">
+                    <div className="relative group">
+                      <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-primary/5 rounded-lg blur-sm opacity-75 group-hover:opacity-100 transition duration-300" />
+                      <div className="relative rounded-lg overflow-hidden shadow-xl border border-border/50 bg-card">
+                        <img
+                          src={feature.image}
+                          alt={feature.imageAlt}
+                          className="w-full h-auto"
+                          data-testid={`image-${feature.id}`}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <CardTitle className="text-lg">{feature.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription className="text-sm leading-relaxed">
-                    {feature.description}
-                  </CardDescription>
-                </CardContent>
-              </Card>
-            ))}
+
+                  <div className="w-full lg:w-1/2 space-y-6">
+                    <Badge variant="outline" className="text-xs font-medium" data-testid={`badge-${feature.id}`}>
+                      {feature.badge}
+                    </Badge>
+                    <h3 className="text-2xl md:text-3xl font-bold leading-tight" data-testid={`title-${feature.id}`}>
+                      {feature.title}
+                    </h3>
+                    <p className="text-muted-foreground text-lg leading-relaxed" data-testid={`description-${feature.id}`}>
+                      {feature.description}
+                    </p>
+                    <ul className="space-y-3">
+                      {feature.benefits.map((benefit, benefitIndex) => (
+                        <li
+                          key={benefitIndex}
+                          className="flex items-start gap-3"
+                          data-testid={`benefit-${feature.id}-${benefitIndex}`}
+                        >
+                          <div className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center mt-0.5">
+                            <Check className="w-3 h-3 text-primary" />
+                          </div>
+                          <span className="text-sm text-muted-foreground">{benefit}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
