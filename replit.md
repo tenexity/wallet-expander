@@ -38,7 +38,9 @@ The application follows a client-server architecture.
 **Backend:**
 - **Technology:** Express.js with Node.js.
 - **Database Interaction:** PostgreSQL managed by Neon, with Drizzle ORM for type-safe database access.
-- **API:** RESTful API endpoints for dashboard statistics, account management, ICP profiles, task management, playbook generation, revenue tracking, data uploads, and custom category management.
+- **Authentication:** Replit Auth (OpenID Connect) providing Google, GitHub, and email/password login options. Session management via PostgreSQL with connect-pg-simple.
+- **API:** RESTful API endpoints for dashboard statistics, account management, ICP profiles, task management, playbook generation, revenue tracking, data uploads, and custom category management. All API routes are protected with authentication middleware.
+- **Multi-Tenancy:** All data tables include a `tenantId` column for organization-level data isolation. User roles (`super_admin`, `reviewer`, `viewer`) control access permissions.
 - **Core Features:**
     - **Data Uploads:** Supports CSV imports for accounts, orders, products, and categories.
     - **Account Insights:** Provides gap analysis, opportunity scores, and category penetration metrics for accounts.
@@ -57,7 +59,7 @@ The application follows a client-server architecture.
 - `server/`: Backend application, including database connection, API routes, storage, and seeding scripts.
 - `shared/`: Shared schema definitions and AI chat models.
 
-**Database Schema:** Key tables include `accounts`, `products`, `orders`, `segment_profiles`, `account_metrics`, `tasks`, `playbooks`, `program_accounts`, `custom_categories`, `settings`, `territory_managers`, and `rev_share_tiers`.
+**Database Schema:** Key tables include `users`, `sessions`, `tenants`, `user_roles`, `accounts`, `products`, `orders`, `segment_profiles`, `account_metrics`, `tasks`, `playbooks`, `program_accounts`, `custom_categories`, `settings`, `territory_managers`, and `rev_share_tiers`.
 
 ## External Dependencies
 
