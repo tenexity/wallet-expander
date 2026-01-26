@@ -38,12 +38,12 @@ import {
   ClipboardList,
 } from "lucide-react";
 
-import mockupDashboard from "@/assets/images/mockup-dashboard.png";
-import mockupEnrollment from "@/assets/images/mockup-enrollment.png";
-import mockupGapAnalysis from "@/assets/images/mockup-gap-analysis.png";
-import mockupIcpBuilder from "@/assets/images/mockup-icp-builder.png";
-import mockupRevenue from "@/assets/images/mockup-revenue.png";
-import mockupPlaybooks from "@/assets/images/mockup-playbooks.png";
+import screenshotDashboard from "@/assets/images/screenshot-dashboard.png";
+import screenshotEnrollment from "@/assets/images/screenshot-enrollment.png";
+import screenshotGapAnalysis from "@/assets/images/screenshot-gap-analysis.png";
+import screenshotIcpBuilder from "@/assets/images/screenshot-icp-builder.png";
+import screenshotRevenue from "@/assets/images/screenshot-revenue.png";
+import screenshotPlaybooks from "@/assets/images/screenshot-playbooks.png";
 
 const demoFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -59,7 +59,7 @@ const showcaseFeatures = [
     badge: "Controlled Enrollment",
     title: "Target the Right Accounts for Predictable Results",
     description: "Take control of your revenue recovery by strategically selecting and enrolling high-potential accounts. Our scoring system identifies which accounts have the greatest opportunity, so your team focuses efforts where they'll have the biggest impact.",
-    image: mockupEnrollment,
+    image: screenshotEnrollment,
     imageAlt: "Account enrollment selection interface showing opportunity scores",
     benefits: [
       "Score accounts by opportunity size and close potential",
@@ -73,7 +73,7 @@ const showcaseFeatures = [
     badge: "Pipeline Visibility",
     title: "Track Every Enrolled Account's Progress",
     description: "Your dashboard shows exactly where each enrolled account stands in the revenue recovery journey. Monitor progress, identify accounts that need attention, and celebrate wins as accounts hit their targets and graduate.",
-    image: mockupDashboard,
+    image: screenshotDashboard,
     imageAlt: "Dashboard showing enrolled accounts pipeline with progress indicators",
     benefits: [
       "Real-time visibility into all enrolled accounts",
@@ -87,7 +87,7 @@ const showcaseFeatures = [
     badge: "AI-Powered Insights",
     title: "Pinpoint Exactly Where You're Leaving Money on the Table",
     description: "Our AI compares each account's purchasing patterns against their segment's Ideal Customer Profile. Instantly see which product categories are underperforming and quantify the revenue opportunity in each gap.",
-    image: mockupGapAnalysis,
+    image: screenshotGapAnalysis,
     imageAlt: "Gap analysis showing category penetration compared to benchmarks",
     benefits: [
       "Visual comparison against segment benchmarks",
@@ -101,7 +101,7 @@ const showcaseFeatures = [
     badge: "Segment Intelligence",
     title: "Know What Great Looks Like for Each Segment",
     description: "Build and refine Ideal Customer Profiles based on AI analysis of your best-performing accounts. Understand what top accounts in each segment purchase, so you can guide others to the same success.",
-    image: mockupIcpBuilder,
+    image: screenshotIcpBuilder,
     imageAlt: "ICP Builder showing segment profiles and purchase patterns",
     benefits: [
       "AI-generated profiles from your best accounts",
@@ -115,7 +115,7 @@ const showcaseFeatures = [
     badge: "Results Tracking",
     title: "Measure Incremental Revenue from Every Enrolled Account",
     description: "Track the incremental revenue generated from each enrolled account from enrollment through graduation. Set clear goals, monitor progress, and prove ROI with transparent reporting that ties efforts to results.",
-    image: mockupRevenue,
+    image: screenshotRevenue,
     imageAlt: "Revenue tracking dashboard showing graduation progress",
     benefits: [
       "Baseline vs. current revenue comparison",
@@ -129,7 +129,7 @@ const showcaseFeatures = [
     badge: "Structured Follow-Up",
     title: "Methodical Outreach That Drives Consistent Results",
     description: "AI generates personalized playbooks for each enrolled account with specific tasks, call scripts, and email templates. Your team executes with precision, ensuring no opportunity falls through the cracks.",
-    image: mockupPlaybooks,
+    image: screenshotPlaybooks,
     imageAlt: "AI-generated playbook with tasks and scripts",
     benefits: [
       "AI-personalized scripts for each account's gaps",
