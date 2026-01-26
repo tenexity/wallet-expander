@@ -1573,7 +1573,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/data-uploads", requireAuth, async (req, res) => {
+  app.post("/api/data-uploads", authWithAdmin, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       // In real implementation, this would handle file upload
@@ -1619,7 +1619,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.put("/api/settings/:key", requireAuth, async (req, res) => {
+  app.put("/api/settings/:key", authWithAdmin, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const { key } = req.params;
@@ -1632,7 +1632,7 @@ KEY TALKING POINTS:
   });
 
   // Logo upload endpoint - handles base64 encoded images
-  app.post("/api/settings/logo", requireAuth, async (req, res) => {
+  app.post("/api/settings/logo", authWithAdmin, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const { logo } = req.body;
@@ -1646,7 +1646,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.delete("/api/settings/logo", requireAuth, async (req, res) => {
+  app.delete("/api/settings/logo", authWithAdmin, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       await tenantStorage.upsertSetting({ key: "companyLogo", value: "" });
@@ -1755,7 +1755,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/territory-managers", requireAuth, async (req, res) => {
+  app.post("/api/territory-managers", authWithAdmin, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const data = insertTerritoryManagerSchema.parse(req.body);
@@ -1812,7 +1812,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/custom-categories", requireAuth, async (req, res) => {
+  app.post("/api/custom-categories", authWithAdmin, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const parsed = insertCustomCategorySchema.safeParse(req.body);
@@ -1904,7 +1904,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/rev-share-tiers", requireAuth, async (req, res) => {
+  app.post("/api/rev-share-tiers", authWithAdmin, async (req, res) => {
     try {
       const validated = insertRevShareTierSchema.parse(req.body);
       
@@ -2049,7 +2049,7 @@ KEY TALKING POINTS:
   });
 
   // Seed default tier if none exist
-  app.post("/api/rev-share-tiers/seed-default", requireAuth, async (req, res) => {
+  app.post("/api/rev-share-tiers/seed-default", authWithAdmin, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const existing = await tenantStorage.getRevShareTiers();
