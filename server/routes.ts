@@ -52,8 +52,13 @@ export async function registerRoutes(
   await setupAuth(app);
   registerAuthRoutes(app);
 
+  // ============ Protected API Routes ============
+  // All routes below require authentication
+  // Helper function to extract tenant context from authenticated user (for future use)
+  const requireAuth = isAuthenticated;
+
   // ============ Dashboard Stats ============
-  app.get("/api/dashboard/stats", async (req, res) => {
+  app.get("/api/dashboard/stats", requireAuth, async (req, res) => {
     try {
       const stats = await storage.getDashboardStats();
       const allAccounts = await storage.getAccounts();
@@ -126,7 +131,7 @@ export async function registerRoutes(
   });
 
   // ============ Daily Focus ============
-  app.get("/api/daily-focus", async (req, res) => {
+  app.get("/api/daily-focus", requireAuth, async (req, res) => {
     try {
       const allTasks = await storage.getTasks();
       const allAccounts = await storage.getAccounts();
@@ -190,7 +195,7 @@ export async function registerRoutes(
   });
 
   // ============ Accounts ============
-  app.get("/api/accounts", async (req, res) => {
+  app.get("/api/accounts", requireAuth, async (req, res) => {
     try {
       const allAccounts = await storage.getAccounts();
       const programAccounts = await storage.getProgramAccounts();
@@ -232,7 +237,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/accounts/:id", async (req, res) => {
+  app.get("/api/accounts/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const account = await storage.getAccount(id);
@@ -245,7 +250,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/accounts", async (req, res) => {
+  app.post("/api/accounts", requireAuth, async (req, res) => {
     try {
       const data = insertAccountSchema.parse(req.body);
       const account = await storage.createAccount(data);
@@ -259,7 +264,7 @@ export async function registerRoutes(
   });
 
   // Enroll account in growth program and auto-generate playbook
-  app.post("/api/accounts/:id/enroll", async (req, res) => {
+  app.post("/api/accounts/:id/enroll", requireAuth, async (req, res) => {
     try {
       const accountId = parseInt(req.params.id);
       const account = await storage.getAccount(accountId);
@@ -422,7 +427,7 @@ KEY TALKING POINTS:
   });
 
   // ============ Segment Profiles ============
-  app.get("/api/segment-profiles", async (req, res) => {
+  app.get("/api/segment-profiles", requireAuth, async (req, res) => {
     try {
       const profiles = await storage.getSegmentProfiles();
       const allAccounts = await storage.getAccounts();
@@ -458,7 +463,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.get("/api/segment-profiles/:id", async (req, res) => {
+  app.get("/api/segment-profiles/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const profile = await storage.getSegmentProfile(id);
@@ -472,7 +477,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/segment-profiles", async (req, res) => {
+  app.post("/api/segment-profiles", requireAuth, async (req, res) => {
     try {
       const data = insertSegmentProfileSchema.parse(req.body);
       const profile = await storage.createSegmentProfile(data);
@@ -485,7 +490,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.patch("/api/segment-profiles/:id", async (req, res) => {
+  app.patch("/api/segment-profiles/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const profile = await storage.updateSegmentProfile(id, req.body);
@@ -498,7 +503,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/segment-profiles/:id/approve", async (req, res) => {
+  app.post("/api/segment-profiles/:id/approve", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const approvedBy = req.body.approvedBy || "Admin";
@@ -512,7 +517,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.delete("/api/segment-profiles/:id", async (req, res) => {
+  app.delete("/api/segment-profiles/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const success = await storage.deleteSegmentProfile(id);
@@ -526,7 +531,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/segment-profiles/analyze", async (req, res) => {
+  app.post("/api/segment-profiles/analyze", requireAuth, async (req, res) => {
     try {
       const { segment } = req.body;
       if (!segment) {
@@ -550,7 +555,7 @@ KEY TALKING POINTS:
   });
 
   // ============ Data Insights (for ICP Builder) ============
-  app.get("/api/data-insights/:segment", async (req, res) => {
+  app.get("/api/data-insights/:segment", requireAuth, async (req, res) => {
     try {
       const { segment } = req.params;
       
@@ -882,7 +887,7 @@ KEY TALKING POINTS:
   });
 
   // ============ Tasks ============
-  app.get("/api/tasks", async (req, res) => {
+  app.get("/api/tasks", requireAuth, async (req, res) => {
     try {
       let allTasks = await storage.getTasks();
       const allAccounts = await storage.getAccounts();
@@ -910,7 +915,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.get("/api/tasks/:id", async (req, res) => {
+  app.get("/api/tasks/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const task = await storage.getTask(id);
@@ -923,7 +928,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/tasks", async (req, res) => {
+  app.post("/api/tasks", requireAuth, async (req, res) => {
     try {
       const data = insertTaskSchema.parse(req.body);
       const task = await storage.createTask(data);
@@ -949,7 +954,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.patch("/api/tasks/:id", async (req, res) => {
+  app.patch("/api/tasks/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const task = await storage.updateTask(id, req.body);
@@ -962,7 +967,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/tasks/:id/complete", async (req, res) => {
+  app.post("/api/tasks/:id/complete", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const { outcome } = req.body;
@@ -981,7 +986,7 @@ KEY TALKING POINTS:
   });
 
   // ============ Playbooks ============
-  app.get("/api/playbooks", async (req, res) => {
+  app.get("/api/playbooks", requireAuth, async (req, res) => {
     try {
       const allPlaybooks = await storage.getPlaybooks();
       const allTasks = await storage.getTasks();
@@ -1020,7 +1025,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.get("/api/playbooks/:id/tasks", async (req, res) => {
+  app.get("/api/playbooks/:id/tasks", requireAuth, async (req, res) => {
     try {
       const playbookId = parseInt(req.params.id);
       const playbookTaskLinks = await storage.getPlaybookTasks(playbookId);
@@ -1046,7 +1051,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/playbooks", async (req, res) => {
+  app.post("/api/playbooks", requireAuth, async (req, res) => {
     try {
       const data = insertPlaybookSchema.parse(req.body);
       const playbook = await storage.createPlaybook(data);
@@ -1059,7 +1064,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/playbooks/generate", async (req, res) => {
+  app.post("/api/playbooks/generate", requireAuth, async (req, res) => {
     try {
       const { name, segment, topN = 10, priorityCategories = [] } = req.body;
       
@@ -1151,7 +1156,7 @@ KEY TALKING POINTS:
   });
 
   // ============ Program Accounts ============
-  app.get("/api/program-accounts", async (req, res) => {
+  app.get("/api/program-accounts", requireAuth, async (req, res) => {
     try {
       const programAccounts = await storage.getProgramAccounts();
       const allAccounts = await storage.getAccounts();
@@ -1187,7 +1192,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/program-accounts", async (req, res) => {
+  app.post("/api/program-accounts", requireAuth, async (req, res) => {
     try {
       const data = insertProgramAccountSchema.parse(req.body);
       const programAccount = await storage.createProgramAccount(data);
@@ -1274,7 +1279,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.patch("/api/program-accounts/:id", async (req, res) => {
+  app.patch("/api/program-accounts/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const programAccount = await storage.updateProgramAccount(id, req.body);
@@ -1288,7 +1293,7 @@ KEY TALKING POINTS:
   });
 
   // Get graduation progress for a program account
-  app.get("/api/program-accounts/:id/graduation-progress", async (req, res) => {
+  app.get("/api/program-accounts/:id/graduation-progress", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const programAccount = await storage.getProgramAccount(id);
@@ -1395,7 +1400,7 @@ KEY TALKING POINTS:
   });
 
   // Graduate an account
-  app.post("/api/program-accounts/:id/graduate", async (req, res) => {
+  app.post("/api/program-accounts/:id/graduate", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const { notes } = req.body;
@@ -1430,7 +1435,7 @@ KEY TALKING POINTS:
   });
 
   // Get all graduation-ready accounts
-  app.get("/api/program-accounts/graduation-ready", async (req, res) => {
+  app.get("/api/program-accounts/graduation-ready", requireAuth, async (req, res) => {
     try {
       const programAccounts = await storage.getProgramAccounts();
       const activeAccounts = programAccounts.filter(pa => pa.status === "active");
@@ -1502,7 +1507,7 @@ KEY TALKING POINTS:
   });
 
   // ============ Data Uploads ============
-  app.get("/api/data-uploads", async (req, res) => {
+  app.get("/api/data-uploads", requireAuth, async (req, res) => {
     try {
       const uploads = await storage.getDataUploads();
       res.json(uploads);
@@ -1511,7 +1516,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/data-uploads", async (req, res) => {
+  app.post("/api/data-uploads", requireAuth, async (req, res) => {
     try {
       // In real implementation, this would handle file upload
       const data = insertDataUploadSchema.parse(req.body);
@@ -1535,7 +1540,7 @@ KEY TALKING POINTS:
   });
 
   // ============ Settings ============
-  app.get("/api/settings", async (req, res) => {
+  app.get("/api/settings", requireAuth, async (req, res) => {
     try {
       const settings = await storage.getSettings();
       res.json(settings);
@@ -1544,7 +1549,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.get("/api/settings/:key", async (req, res) => {
+  app.get("/api/settings/:key", requireAuth, async (req, res) => {
     try {
       const { key } = req.params;
       const setting = await storage.getSetting(key);
@@ -1554,7 +1559,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.put("/api/settings/:key", async (req, res) => {
+  app.put("/api/settings/:key", requireAuth, async (req, res) => {
     try {
       const { key } = req.params;
       const { value } = req.body;
@@ -1566,7 +1571,7 @@ KEY TALKING POINTS:
   });
 
   // Logo upload endpoint - handles base64 encoded images
-  app.post("/api/settings/logo", async (req, res) => {
+  app.post("/api/settings/logo", requireAuth, async (req, res) => {
     try {
       const { logo } = req.body;
       if (!logo) {
@@ -1579,7 +1584,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.delete("/api/settings/logo", async (req, res) => {
+  app.delete("/api/settings/logo", requireAuth, async (req, res) => {
     try {
       await storage.upsertSetting({ key: "companyLogo", value: "" });
       res.json({ success: true });
@@ -1589,7 +1594,7 @@ KEY TALKING POINTS:
   });
 
   // ============ Categories ============
-  app.get("/api/categories", async (req, res) => {
+  app.get("/api/categories", requireAuth, async (req, res) => {
     try {
       const categories = await storage.getProductCategories();
       res.json(categories);
@@ -1599,7 +1604,7 @@ KEY TALKING POINTS:
   });
 
   // ============ Products ============
-  app.get("/api/products", async (req, res) => {
+  app.get("/api/products", requireAuth, async (req, res) => {
     try {
       const products = await storage.getProducts();
       res.json(products);
@@ -1609,7 +1614,7 @@ KEY TALKING POINTS:
   });
 
   // ============ Scoring Weights ============
-  app.get("/api/scoring-weights", async (req, res) => {
+  app.get("/api/scoring-weights", requireAuth, async (req, res) => {
     try {
       const weights = await storage.getScoringWeights();
       if (!weights) {
@@ -1637,7 +1642,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.put("/api/scoring-weights", async (req, res) => {
+  app.put("/api/scoring-weights", requireAuth, async (req, res) => {
     try {
       const { gapSizeWeight, revenuePotentialWeight, categoryCountWeight, description } = req.body;
       
@@ -1672,7 +1677,7 @@ KEY TALKING POINTS:
   });
 
   // ============ Territory Managers ============
-  app.get("/api/territory-managers", async (req, res) => {
+  app.get("/api/territory-managers", requireAuth, async (req, res) => {
     try {
       const managers = await storage.getTerritoryManagers();
       res.json(managers);
@@ -1682,7 +1687,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/territory-managers", async (req, res) => {
+  app.post("/api/territory-managers", requireAuth, async (req, res) => {
     try {
       const data = insertTerritoryManagerSchema.parse(req.body);
       const manager = await storage.createTerritoryManager(data);
@@ -1696,7 +1701,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.put("/api/territory-managers/:id", async (req, res) => {
+  app.put("/api/territory-managers/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const manager = await storage.updateTerritoryManager(id, req.body);
@@ -1710,7 +1715,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.delete("/api/territory-managers/:id", async (req, res) => {
+  app.delete("/api/territory-managers/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const success = await storage.deleteTerritoryManager(id);
@@ -1725,7 +1730,7 @@ KEY TALKING POINTS:
   });
 
   // ============ Custom Categories ============
-  app.get("/api/custom-categories", async (req, res) => {
+  app.get("/api/custom-categories", requireAuth, async (req, res) => {
     try {
       const categories = await storage.getCustomCategories();
       res.json(categories);
@@ -1735,7 +1740,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/custom-categories", async (req, res) => {
+  app.post("/api/custom-categories", requireAuth, async (req, res) => {
     try {
       const parsed = insertCustomCategorySchema.safeParse(req.body);
       if (!parsed.success) {
@@ -1749,7 +1754,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.put("/api/custom-categories/:id", async (req, res) => {
+  app.put("/api/custom-categories/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const category = await storage.updateCustomCategory(id, req.body);
@@ -1763,7 +1768,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.delete("/api/custom-categories/:id", async (req, res) => {
+  app.delete("/api/custom-categories/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const success = await storage.deleteCustomCategory(id);
@@ -1778,7 +1783,7 @@ KEY TALKING POINTS:
   });
 
   // Seed default categories if none exist
-  app.post("/api/custom-categories/seed-defaults", async (req, res) => {
+  app.post("/api/custom-categories/seed-defaults", requireAuth, async (req, res) => {
     try {
       const existing = await storage.getCustomCategories();
       if (existing.length > 0) {
@@ -1812,7 +1817,7 @@ KEY TALKING POINTS:
   });
 
   // ============ Rev-Share Tiers ============
-  app.get("/api/rev-share-tiers", async (req, res) => {
+  app.get("/api/rev-share-tiers", requireAuth, async (req, res) => {
     try {
       const tiers = await storage.getRevShareTiers();
       res.json(tiers);
@@ -1822,7 +1827,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/rev-share-tiers", async (req, res) => {
+  app.post("/api/rev-share-tiers", requireAuth, async (req, res) => {
     try {
       const validated = insertRevShareTierSchema.parse(req.body);
       
@@ -1849,7 +1854,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.put("/api/rev-share-tiers/:id", async (req, res) => {
+  app.put("/api/rev-share-tiers/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       
@@ -1883,7 +1888,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.delete("/api/rev-share-tiers/:id", async (req, res) => {
+  app.delete("/api/rev-share-tiers/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id, 10);
       await storage.deleteRevShareTier(id);
@@ -1895,7 +1900,7 @@ KEY TALKING POINTS:
   });
 
   // Calculate fee based on tiered rates
-  app.post("/api/rev-share-tiers/calculate", async (req, res) => {
+  app.post("/api/rev-share-tiers/calculate", requireAuth, async (req, res) => {
     try {
       const { incrementalRevenue } = req.body;
       if (typeof incrementalRevenue !== 'number' || incrementalRevenue < 0) {
@@ -1963,7 +1968,7 @@ KEY TALKING POINTS:
   });
 
   // Seed default tier if none exist
-  app.post("/api/rev-share-tiers/seed-default", async (req, res) => {
+  app.post("/api/rev-share-tiers/seed-default", requireAuth, async (req, res) => {
     try {
       const existing = await storage.getRevShareTiers();
       if (existing.length > 0) {
@@ -1986,7 +1991,7 @@ KEY TALKING POINTS:
   });
 
   // ============ Email Settings ============
-  app.get("/api/email/settings", async (req, res) => {
+  app.get("/api/email/settings", requireAuth, async (req, res) => {
     try {
       const settings = await getEmailSettings();
       res.json({
@@ -1998,7 +2003,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.patch("/api/email/settings", async (req, res) => {
+  app.patch("/api/email/settings", requireAuth, async (req, res) => {
     try {
       const validatedData = updateEmailSettingsSchema.parse(req.body);
       const settings = await saveEmailSettings(validatedData);
@@ -2011,7 +2016,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/email/test", async (req, res) => {
+  app.post("/api/email/test", requireAuth, async (req, res) => {
     try {
       const { email } = req.body;
       if (!email) {

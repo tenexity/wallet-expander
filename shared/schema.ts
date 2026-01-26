@@ -62,9 +62,12 @@ export type RoleType = keyof typeof ROLE_PERMISSIONS;
 // ============ PRODUCT CATEGORIES ============
 export const productCategories = pgTable("product_categories", {
   id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id"), // Multi-tenant isolation
   name: text("name").notNull(),
   parentId: integer("parent_id"),
-});
+}, (table) => [
+  index("idx_product_categories_tenant_id").on(table.tenantId),
+]);
 
 export const insertProductCategorySchema = createInsertSchema(productCategories).omit({
   id: true,
@@ -76,12 +79,15 @@ export type ProductCategory = typeof productCategories.$inferSelect;
 // ============ PRODUCTS ============
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
-  sku: text("sku").notNull().unique(),
+  tenantId: integer("tenant_id"), // Multi-tenant isolation
+  sku: text("sku").notNull(),
   name: text("name"),
   categoryId: integer("category_id"),
   unitCost: numeric("unit_cost"),
   unitPrice: numeric("unit_price"),
-});
+}, (table) => [
+  index("idx_products_tenant_id").on(table.tenantId),
+]);
 
 export const insertProductSchema = createInsertSchema(products).omit({
   id: true,
@@ -93,14 +99,17 @@ export type Product = typeof products.$inferSelect;
 // ============ ACCOUNTS ============
 export const accounts = pgTable("accounts", {
   id: serial("id").primaryKey(),
-  externalId: text("external_id").unique(),
+  tenantId: integer("tenant_id"), // Multi-tenant isolation
+  externalId: text("external_id"),
   name: text("name").notNull(),
   segment: text("segment"), // HVAC, plumbing, mechanical, etc.
   region: text("region"),
   assignedTm: text("assigned_tm"),
   status: text("status").default("active"), // active, inactive, prospect
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`),
-});
+}, (table) => [
+  index("idx_accounts_tenant_id").on(table.tenantId),
+]);
 
 export const insertAccountSchema = createInsertSchema(accounts).omit({
   id: true,
@@ -113,11 +122,14 @@ export type Account = typeof accounts.$inferSelect;
 // ============ ORDERS ============
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id"), // Multi-tenant isolation
   accountId: integer("account_id").notNull(),
   orderDate: timestamp("order_date").notNull(),
   totalAmount: numeric("total_amount").notNull(),
   marginAmount: numeric("margin_amount"),
-});
+}, (table) => [
+  index("idx_orders_tenant_id").on(table.tenantId),
+]);
 
 export const insertOrderSchema = createInsertSchema(orders).omit({
   id: true,
@@ -146,6 +158,7 @@ export type OrderItem = typeof orderItems.$inferSelect;
 // ============ SEGMENT PROFILES (ICP Definitions) ============
 export const segmentProfiles = pgTable("segment_profiles", {
   id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id"), // Multi-tenant isolation
   segment: text("segment").notNull(),
   name: text("name").notNull(),
   description: text("description"),
@@ -155,7 +168,9 @@ export const segmentProfiles = pgTable("segment_profiles", {
   approvedAt: timestamp("approved_at"),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`),
-});
+}, (table) => [
+  index("idx_segment_profiles_tenant_id").on(table.tenantId),
+]);
 
 export const insertSegmentProfileSchema = createInsertSchema(segmentProfiles).omit({
   id: true,
@@ -248,6 +263,7 @@ export type AccountCategoryGap = typeof accountCategoryGaps.$inferSelect;
 // ============ TASKS ============
 export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id"), // Multi-tenant isolation
   accountId: integer("account_id").notNull(),
   playbookId: integer("playbook_id"),
   assignedTm: text("assigned_tm"),
@@ -262,7 +278,9 @@ export const tasks = pgTable("tasks", {
   completedAt: timestamp("completed_at"),
   outcome: text("outcome"),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`),
-});
+}, (table) => [
+  index("idx_tasks_tenant_id").on(table.tenantId),
+]);
 
 export const insertTaskSchema = createInsertSchema(tasks).omit({
   id: true,
@@ -278,12 +296,15 @@ export type Task = typeof tasks.$inferSelect;
 // ============ PLAYBOOKS ============
 export const playbooks = pgTable("playbooks", {
   id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id"), // Multi-tenant isolation
   name: text("name").notNull(),
   generatedBy: text("generated_by"),
   generatedAt: timestamp("generated_at").default(sql`CURRENT_TIMESTAMP`),
   filtersUsed: jsonb("filters_used"),
   taskCount: integer("task_count"),
-});
+}, (table) => [
+  index("idx_playbooks_tenant_id").on(table.tenantId),
+]);
 
 export const insertPlaybookSchema = createInsertSchema(playbooks).omit({
   id: true,
@@ -310,7 +331,8 @@ export type PlaybookTask = typeof playbookTasks.$inferSelect;
 // ============ PROGRAM ACCOUNTS (Enrollment) ============
 export const programAccounts = pgTable("program_accounts", {
   id: serial("id").primaryKey(),
-  accountId: integer("account_id").notNull().unique(),
+  tenantId: integer("tenant_id"), // Multi-tenant isolation
+  accountId: integer("account_id").notNull(),
   enrolledAt: timestamp("enrolled_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   enrolledBy: text("enrolled_by"),
   baselineStart: timestamp("baseline_start").notNull(),
@@ -327,7 +349,9 @@ export const programAccounts = pgTable("program_accounts", {
   graduationCriteria: text("graduation_criteria").default("any"), // 'any' or 'all' - meet any objective vs all
   graduatedAt: timestamp("graduated_at"), // When account was graduated
   graduationNotes: text("graduation_notes"), // Notes about graduation/success
-});
+}, (table) => [
+  index("idx_program_accounts_tenant_id").on(table.tenantId),
+]);
 
 export const insertProgramAccountSchema = createInsertSchema(programAccounts).omit({
   id: true,
@@ -362,6 +386,7 @@ export type ProgramRevenueSnapshot = typeof programRevenueSnapshots.$inferSelect
 // ============ DATA UPLOADS ============
 export const dataUploads = pgTable("data_uploads", {
   id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id"), // Multi-tenant isolation
   uploadType: text("upload_type").notNull(), // accounts, orders, products, categories
   fileName: text("file_name").notNull(),
   rowCount: integer("row_count"),
@@ -369,7 +394,9 @@ export const dataUploads = pgTable("data_uploads", {
   errorMessage: text("error_message"),
   uploadedBy: text("uploaded_by"),
   uploadedAt: timestamp("uploaded_at").default(sql`CURRENT_TIMESTAMP`),
-});
+}, (table) => [
+  index("idx_data_uploads_tenant_id").on(table.tenantId),
+]);
 
 export const insertDataUploadSchema = createInsertSchema(dataUploads).omit({
   id: true,
@@ -382,10 +409,13 @@ export type DataUpload = typeof dataUploads.$inferSelect;
 // ============ SETTINGS ============
 export const settings = pgTable("settings", {
   id: serial("id").primaryKey(),
-  key: text("key").notNull().unique(),
+  tenantId: integer("tenant_id"), // Multi-tenant isolation (null = global settings)
+  key: text("key").notNull(),
   value: text("value"),
   updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`),
-});
+}, (table) => [
+  index("idx_settings_tenant_id").on(table.tenantId),
+]);
 
 export const insertSettingSchema = createInsertSchema(settings).omit({
   id: true,
@@ -398,6 +428,7 @@ export type Setting = typeof settings.$inferSelect;
 // ============ SCORING WEIGHTS ============
 export const scoringWeights = pgTable("scoring_weights", {
   id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id"), // Multi-tenant isolation
   name: text("name").notNull().default("default"),
   gapSizeWeight: numeric("gap_size_weight").notNull().default("40"),
   revenuePotentialWeight: numeric("revenue_potential_weight").notNull().default("30"),
@@ -406,7 +437,9 @@ export const scoringWeights = pgTable("scoring_weights", {
   isActive: boolean("is_active").default(true),
   updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`),
   updatedBy: text("updated_by"),
-});
+}, (table) => [
+  index("idx_scoring_weights_tenant_id").on(table.tenantId),
+]);
 
 export const insertScoringWeightsSchema = createInsertSchema(scoringWeights).omit({
   id: true,
@@ -426,12 +459,15 @@ export const DEFAULT_SCORING_WEIGHTS = {
 // ============ TERRITORY MANAGERS ============
 export const territoryManagers = pgTable("territory_managers", {
   id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id"), // Multi-tenant isolation
   name: text("name").notNull(),
-  email: text("email").notNull().unique(),
+  email: text("email").notNull(),
   territories: text("territories").array(),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`),
-});
+}, (table) => [
+  index("idx_territory_managers_tenant_id").on(table.tenantId),
+]);
 
 export const insertTerritoryManagerSchema = createInsertSchema(territoryManagers).omit({
   id: true,
@@ -444,11 +480,14 @@ export type TerritoryManager = typeof territoryManagers.$inferSelect;
 // ============ CUSTOM CATEGORY CONFIG ============
 export const customCategories = pgTable("custom_categories", {
   id: serial("id").primaryKey(),
-  name: text("name").notNull().unique(),
+  tenantId: integer("tenant_id"), // Multi-tenant isolation
+  name: text("name").notNull(),
   displayOrder: integer("display_order").default(0),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`),
-});
+}, (table) => [
+  index("idx_custom_categories_tenant_id").on(table.tenantId),
+]);
 
 export const insertCustomCategorySchema = createInsertSchema(customCategories).omit({
   id: true,
@@ -477,6 +516,7 @@ export type DashboardLayout = typeof dashboardLayouts.$inferSelect;
 // ============ REV-SHARE TIERS ============
 export const revShareTiers = pgTable("rev_share_tiers", {
   id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id"), // Multi-tenant isolation
   minRevenue: numeric("min_revenue").notNull().default("0"), // Tier starts at this revenue amount
   maxRevenue: numeric("max_revenue"), // Tier ends at this amount (null = unlimited)
   shareRate: numeric("share_rate").notNull().default("15"), // Percentage rate for this tier
@@ -484,7 +524,9 @@ export const revShareTiers = pgTable("rev_share_tiers", {
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`),
   updatedAt: timestamp("updated_at").default(sql`CURRENT_TIMESTAMP`),
-});
+}, (table) => [
+  index("idx_rev_share_tiers_tenant_id").on(table.tenantId),
+]);
 
 export const insertRevShareTierSchema = createInsertSchema(revShareTiers).omit({
   id: true,
