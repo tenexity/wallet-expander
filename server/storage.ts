@@ -1,5 +1,5 @@
 import { 
-  type User, type InsertUser,
+  type User, type UpsertUser,
   type Account, type InsertAccount,
   type Product, type InsertProduct,
   type ProductCategory, type InsertProductCategory,
@@ -32,8 +32,8 @@ import { eq, desc, and, sql, gte, lte } from "drizzle-orm";
 export interface IStorage {
   // Users
   getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  createUser(user: UpsertUser): Promise<User>;
 
   // Accounts
   getAccounts(): Promise<Account[]>;
@@ -159,12 +159,12 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
     return user;
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
+  async createUser(insertUser: UpsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
   }

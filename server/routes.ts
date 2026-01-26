@@ -26,6 +26,15 @@ import {
   DEFAULT_EMAIL_SETTINGS,
 } from "./email-service";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
+import { withTenantContext, requireRole, requirePermission, type TenantContext } from "./middleware/tenantContext";
+import { getTenantStorage, TenantStorage } from "./storage/tenantStorage";
+
+function getStorage(req: any): TenantStorage {
+  if (!req.tenantContext?.tenantId) {
+    throw new Error("Tenant context not available");
+  }
+  return getTenantStorage(req.tenantContext.tenantId);
+}
 
 function safeParseGapCategories(gapCategories: unknown): string[] {
   if (Array.isArray(gapCategories)) {
@@ -53,17 +62,34 @@ export async function registerRoutes(
   registerAuthRoutes(app);
 
   // ============ Protected API Routes ============
-  // All routes below require authentication
-  // Helper function to extract tenant context from authenticated user (for future use)
-  const requireAuth = isAuthenticated;
+  // All routes below require authentication and tenant context
+  // Middleware chain: isAuthenticated -> withTenantContext
+  // This ensures every protected route has access to req.tenantContext
+  const authWithTenant = [isAuthenticated, withTenantContext];
+  
+  // Helper for routes that need write permissions
+  const authWithWrite = [...authWithTenant, requirePermission("write")];
+  
+  // Helper for admin routes that need manage_users or manage_settings
+  const authWithAdmin = [...authWithTenant, requirePermission("manage_settings")];
+  
+  // Legacy alias for backward compatibility during migration
+  const requireAuth = authWithTenant;
 
   // ============ Dashboard Stats ============
   app.get("/api/dashboard/stats", requireAuth, async (req, res) => {
     try {
-      const stats = await storage.getDashboardStats();
-      const allAccounts = await storage.getAccounts();
-      const allProfiles = await storage.getSegmentProfiles();
-      const allTasks = await storage.getTasks();
+      const tenantStorage = getStorage(req);
+      const allAccounts = await tenantStorage.getAccounts();
+      const allProfiles = await tenantStorage.getSegmentProfiles();
+      const allTasks = await tenantStorage.getTasks();
+      const programAccounts = await tenantStorage.getProgramAccounts();
+
+      // Calculate basic dashboard stats
+      const totalAccounts = allAccounts.length;
+      const enrolledAccounts = programAccounts.length;
+      const totalRevenue = 0; // Will be computed from metrics if needed
+      const incrementalRevenue = 0; // Will be computed from snapshots if needed
 
       // Get segment breakdown
       const segmentBreakdown = allAccounts.reduce((acc, account) => {
@@ -83,11 +109,11 @@ export async function registerRoutes(
       }));
 
       // Get top opportunities (accounts with highest opportunity scores)
+      const categories = await tenantStorage.getProductCategories();
       const accountsWithMetrics = await Promise.all(
         allAccounts.slice(0, 10).map(async account => {
-          const metrics = await storage.getAccountMetrics(account.id);
-          const gaps = await storage.getAccountCategoryGaps(account.id);
-          const categories = await storage.getProductCategories();
+          const metrics = await tenantStorage.getAccountMetrics(account.id);
+          const gaps = await tenantStorage.getAccountCategoryGaps(account.id);
           
           const estimatedValue = gaps.reduce((sum, g) => sum + parseFloat(g.estimatedOpportunity || "0"), 0);
           
@@ -118,7 +144,10 @@ export async function registerRoutes(
       });
 
       res.json({
-        ...stats,
+        totalAccounts,
+        enrolledAccounts,
+        totalRevenue,
+        incrementalRevenue,
         segmentBreakdown: Object.values(segmentBreakdown),
         icpProfiles,
         topOpportunities: accountsWithMetrics.sort((a, b) => b.opportunityScore - a.opportunityScore).slice(0, 5),
@@ -133,8 +162,9 @@ export async function registerRoutes(
   // ============ Daily Focus ============
   app.get("/api/daily-focus", requireAuth, async (req, res) => {
     try {
-      const allTasks = await storage.getTasks();
-      const allAccounts = await storage.getAccounts();
+      const tenantStorage = getStorage(req);
+      const allTasks = await tenantStorage.getTasks();
+      const allAccounts = await tenantStorage.getAccounts();
       
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -197,15 +227,16 @@ export async function registerRoutes(
   // ============ Accounts ============
   app.get("/api/accounts", requireAuth, async (req, res) => {
     try {
-      const allAccounts = await storage.getAccounts();
-      const programAccounts = await storage.getProgramAccounts();
+      const tenantStorage = getStorage(req);
+      const allAccounts = await tenantStorage.getAccounts();
+      const programAccounts = await tenantStorage.getProgramAccounts();
       const enrolledAccountIds = new Set(programAccounts.map(p => p.accountId));
 
       const accountsWithMetrics = await Promise.all(
         allAccounts.map(async account => {
-          const metrics = await storage.getAccountMetrics(account.id);
-          const gaps = await storage.getAccountCategoryGaps(account.id);
-          const categories = await storage.getProductCategories();
+          const metrics = await tenantStorage.getAccountMetrics(account.id);
+          const gaps = await tenantStorage.getAccountCategoryGaps(account.id);
+          const categories = await tenantStorage.getProductCategories();
 
           return {
             id: account.id,
@@ -239,8 +270,9 @@ export async function registerRoutes(
 
   app.get("/api/accounts/:id", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
-      const account = await storage.getAccount(id);
+      const account = await tenantStorage.getAccount(id);
       if (!account) {
         return res.status(404).json({ message: "Account not found" });
       }
@@ -252,8 +284,9 @@ export async function registerRoutes(
 
   app.post("/api/accounts", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const data = insertAccountSchema.parse(req.body);
-      const account = await storage.createAccount(data);
+      const account = await tenantStorage.createAccount(data);
       res.status(201).json(account);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -266,22 +299,23 @@ export async function registerRoutes(
   // Enroll account in growth program and auto-generate playbook
   app.post("/api/accounts/:id/enroll", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const accountId = parseInt(req.params.id);
-      const account = await storage.getAccount(accountId);
+      const account = await tenantStorage.getAccount(accountId);
       
       if (!account) {
         return res.status(404).json({ message: "Account not found" });
       }
 
       // Check if already enrolled
-      const programAccounts = await storage.getProgramAccounts();
+      const programAccounts = await tenantStorage.getProgramAccounts();
       const alreadyEnrolled = programAccounts.find(pa => pa.accountId === accountId);
       if (alreadyEnrolled) {
         return res.status(400).json({ message: "Account is already enrolled" });
       }
 
       // Get account metrics for baseline
-      const metrics = await storage.getAccountMetrics(accountId);
+      const metrics = await tenantStorage.getAccountMetrics(accountId);
       const baselineRevenue = metrics ? parseFloat(metrics.last12mRevenue || "0") : 50000;
 
       // Calculate baseline period (last 12 months)
@@ -291,7 +325,7 @@ export async function registerRoutes(
       baselineStart.setFullYear(baselineStart.getFullYear() - 1);
 
       // Enroll the account in the program
-      const programAccount = await storage.createProgramAccount({
+      const programAccount = await tenantStorage.createProgramAccount({
         accountId: accountId,
         baselineStart: baselineStart,
         baselineEnd: baselineEnd,
@@ -302,8 +336,8 @@ export async function registerRoutes(
       });
 
       // Auto-generate playbook for the enrolled account
-      const gaps = await storage.getAccountCategoryGaps(accountId);
-      const categories = await storage.getProductCategories();
+      const gaps = await tenantStorage.getAccountCategoryGaps(accountId);
+      const categories = await tenantStorage.getProductCategories();
 
       // Get top 3 gap categories for this account
       const topGaps = gaps.slice(0, 3).map(g => {
@@ -314,7 +348,7 @@ export async function registerRoutes(
       let playbook = null;
       if (topGaps.length > 0) {
         // Create the playbook (generatedAt uses database default)
-        playbook = await storage.createPlaybook({
+        playbook = await tenantStorage.createPlaybook({
           name: `${account.name} Growth Plan`,
           generatedBy: "AI",
           filtersUsed: {
@@ -388,7 +422,7 @@ KEY TALKING POINTS:
 - Delivery scheduling and jobsite logistics`;
           }
 
-          await storage.createTask({
+          await tenantStorage.createTask({
             accountId: accountId,
             playbookId: playbook.id,
             assignedTm: account.assignedTm || null,
@@ -404,7 +438,7 @@ KEY TALKING POINTS:
         }
 
         // Get task count for response
-        const playbookTaskList = await storage.getPlaybookTasks(playbook.id);
+        const playbookTaskList = await tenantStorage.getPlaybookTasks(playbook.id);
         playbook = {
           ...playbook,
           taskCount: playbookTaskList.length,
@@ -429,13 +463,14 @@ KEY TALKING POINTS:
   // ============ Segment Profiles ============
   app.get("/api/segment-profiles", requireAuth, async (req, res) => {
     try {
-      const profiles = await storage.getSegmentProfiles();
-      const allAccounts = await storage.getAccounts();
+      const tenantStorage = getStorage(req);
+      const profiles = await tenantStorage.getSegmentProfiles();
+      const allAccounts = await tenantStorage.getAccounts();
 
       const profilesWithDetails = await Promise.all(
         profiles.map(async profile => {
-          const categories = await storage.getProfileCategories(profile.id);
-          const allCategories = await storage.getProductCategories();
+          const categories = await tenantStorage.getProfileCategories(profile.id);
+          const allCategories = await tenantStorage.getProductCategories();
           
           return {
             ...profile,
@@ -465,12 +500,13 @@ KEY TALKING POINTS:
 
   app.get("/api/segment-profiles/:id", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
-      const profile = await storage.getSegmentProfile(id);
+      const profile = await tenantStorage.getSegmentProfile(id);
       if (!profile) {
         return res.status(404).json({ message: "Profile not found" });
       }
-      const categories = await storage.getProfileCategories(id);
+      const categories = await tenantStorage.getProfileCategories(id);
       res.json({ ...profile, categories });
     } catch (error) {
       res.status(500).json({ message: "Failed to get profile" });
@@ -479,8 +515,9 @@ KEY TALKING POINTS:
 
   app.post("/api/segment-profiles", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const data = insertSegmentProfileSchema.parse(req.body);
-      const profile = await storage.createSegmentProfile(data);
+      const profile = await tenantStorage.createSegmentProfile(data);
       res.status(201).json(profile);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -492,8 +529,9 @@ KEY TALKING POINTS:
 
   app.patch("/api/segment-profiles/:id", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
-      const profile = await storage.updateSegmentProfile(id, req.body);
+      const profile = await tenantStorage.updateSegmentProfile(id, req.body);
       if (!profile) {
         return res.status(404).json({ message: "Profile not found" });
       }
@@ -505,9 +543,10 @@ KEY TALKING POINTS:
 
   app.post("/api/segment-profiles/:id/approve", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
       const approvedBy = req.body.approvedBy || "Admin";
-      const profile = await storage.approveSegmentProfile(id, approvedBy);
+      const profile = await tenantStorage.approveSegmentProfile(id, approvedBy);
       if (!profile) {
         return res.status(404).json({ message: "Profile not found" });
       }
@@ -519,8 +558,9 @@ KEY TALKING POINTS:
 
   app.delete("/api/segment-profiles/:id", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
-      const success = await storage.deleteSegmentProfile(id);
+      const success = await tenantStorage.deleteSegmentProfile(id);
       if (!success) {
         return res.status(404).json({ message: "Profile not found" });
       }
@@ -557,18 +597,19 @@ KEY TALKING POINTS:
   // ============ Data Insights (for ICP Builder) ============
   app.get("/api/data-insights/:segment", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const { segment } = req.params;
       
-      const allAccounts = await storage.getAccounts();
-      const allProfiles = await storage.getSegmentProfiles();
-      const productCats = await storage.getProductCategories();
+      const allAccounts = await tenantStorage.getAccounts();
+      const allProfiles = await tenantStorage.getSegmentProfiles();
+      const productCats = await tenantStorage.getProductCategories();
       
       const segmentAccounts = allAccounts.filter(a => a.segment === segment);
       const segmentProfile = allProfiles.find(p => p.segment === segment);
       
       const accountsWithMetrics = await Promise.all(
         segmentAccounts.map(async (account) => {
-          const metrics = await storage.getAccountMetrics(account.id);
+          const metrics = await tenantStorage.getAccountMetrics(account.id);
           return { account, metrics };
         })
       );
@@ -601,7 +642,7 @@ KEY TALKING POINTS:
         Array.from(allSegments).map(async (seg) => {
           const accounts = allAccounts.filter(a => a.segment === seg);
           const metricsPromises = accounts.map(async (acc) => {
-            const m = await storage.getAccountMetrics(acc.id);
+            const m = await tenantStorage.getAccountMetrics(acc.id);
             return m?.last12mRevenue ? parseFloat(m.last12mRevenue) : 0;
           });
           const revenues = await Promise.all(metricsPromises);
@@ -625,7 +666,7 @@ KEY TALKING POINTS:
       }> = [];
 
       if (segmentProfile) {
-        const cats = await storage.getProfileCategories(segmentProfile.id);
+        const cats = await tenantStorage.getProfileCategories(segmentProfile.id);
         profileCategories = cats.map(cat => {
           const categoryInfo = productCats.find(c => c.id === cat.categoryId);
           return {
@@ -656,7 +697,7 @@ KEY TALKING POINTS:
       }>> = {};
 
       for (const { account, metrics } of classACustomers) {
-        const accountGaps = await storage.getAccountCategoryGaps(account.id);
+        const accountGaps = await tenantStorage.getAccountCategoryGaps(account.id);
         const revenue = metrics?.last12mRevenue ? parseFloat(metrics.last12mRevenue) : 0;
         
         for (const gap of accountGaps) {
@@ -718,7 +759,7 @@ KEY TALKING POINTS:
 
       const allGaps = await Promise.all(
         segmentAccounts.map(async (acc) => {
-          const gaps = await storage.getAccountCategoryGaps(acc.id);
+          const gaps = await tenantStorage.getAccountCategoryGaps(acc.id);
           return gaps;
         })
       );
@@ -748,7 +789,7 @@ KEY TALKING POINTS:
       const NEAR_ICP_THRESHOLD = 20;
       const accountAlignments = await Promise.all(
         segmentAccounts.map(async (acc) => {
-          const gaps = await storage.getAccountCategoryGaps(acc.id);
+          const gaps = await tenantStorage.getAccountCategoryGaps(acc.id);
           if (gaps.length === 0) return { account: acc, isNearICP: false };
           const avgAccountGap = gaps.reduce((sum, g) => sum + (g.gapPct ? parseFloat(g.gapPct) : 0), 0) / gaps.length;
           return { account: acc, isNearICP: avgAccountGap <= NEAR_ICP_THRESHOLD };
@@ -762,7 +803,7 @@ KEY TALKING POINTS:
 
       const quickWins = await Promise.all(
         segmentAccounts.slice(0, 3).map(async (account, idx) => {
-          const accountGaps = await storage.getAccountCategoryGaps(account.id);
+          const accountGaps = await tenantStorage.getAccountCategoryGaps(account.id);
           const topAccountGap = accountGaps
             .sort((a, b) => {
               const aOpp = a.estimatedOpportunity ? parseFloat(a.estimatedOpportunity) : 0;
@@ -794,7 +835,7 @@ KEY TALKING POINTS:
           const tmAccounts = segmentAccounts.filter(a => a.assignedTm === tm);
           const tmMetrics = await Promise.all(
             tmAccounts.map(async (acc) => {
-              const m = await storage.getAccountMetrics(acc.id);
+              const m = await tenantStorage.getAccountMetrics(acc.id);
               return m?.categoryPenetration ? parseFloat(m.categoryPenetration) : 50;
             })
           );
@@ -889,8 +930,9 @@ KEY TALKING POINTS:
   // ============ Tasks ============
   app.get("/api/tasks", requireAuth, async (req, res) => {
     try {
-      let allTasks = await storage.getTasks();
-      const allAccounts = await storage.getAccounts();
+      const tenantStorage = getStorage(req);
+      let allTasks = await tenantStorage.getTasks();
+      const allAccounts = await tenantStorage.getAccounts();
 
       // Optional filter by playbook
       const playbookId = req.query.playbookId ? parseInt(req.query.playbookId as string) : null;
@@ -917,8 +959,9 @@ KEY TALKING POINTS:
 
   app.get("/api/tasks/:id", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
-      const task = await storage.getTask(id);
+      const task = await tenantStorage.getTask(id);
       if (!task) {
         return res.status(404).json({ message: "Task not found" });
       }
@@ -930,13 +973,14 @@ KEY TALKING POINTS:
 
   app.post("/api/tasks", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const data = insertTaskSchema.parse(req.body);
-      const task = await storage.createTask(data);
+      const task = await tenantStorage.createTask(data);
       
       // Send email notification if configured
       if (task.assignedTmId) {
-        const territoryManager = await storage.getTerritoryManager(task.assignedTmId);
-        const account = await storage.getAccount(task.accountId);
+        const territoryManager = await tenantStorage.getTerritoryManager(task.assignedTmId);
+        const account = await tenantStorage.getAccount(task.accountId);
         if (territoryManager && account) {
           // Fire and forget - don't block the response
           sendTaskNotification(task, account, territoryManager).catch(err => {
@@ -956,8 +1000,9 @@ KEY TALKING POINTS:
 
   app.patch("/api/tasks/:id", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
-      const task = await storage.updateTask(id, req.body);
+      const task = await tenantStorage.updateTask(id, req.body);
       if (!task) {
         return res.status(404).json({ message: "Task not found" });
       }
@@ -969,9 +1014,10 @@ KEY TALKING POINTS:
 
   app.post("/api/tasks/:id/complete", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
       const { outcome } = req.body;
-      const task = await storage.updateTask(id, {
+      const task = await tenantStorage.updateTask(id, {
         status: "completed",
         completedAt: new Date(),
         outcome,
@@ -988,13 +1034,14 @@ KEY TALKING POINTS:
   // ============ Playbooks ============
   app.get("/api/playbooks", requireAuth, async (req, res) => {
     try {
-      const allPlaybooks = await storage.getPlaybooks();
-      const allTasks = await storage.getTasks();
-      const allAccounts = await storage.getAccounts();
+      const tenantStorage = getStorage(req);
+      const allPlaybooks = await tenantStorage.getPlaybooks();
+      const allTasks = await tenantStorage.getTasks();
+      const allAccounts = await tenantStorage.getAccounts();
 
       const playbooksWithStats = await Promise.all(
         allPlaybooks.map(async playbook => {
-          const playbookTaskLinks = await storage.getPlaybookTasks(playbook.id);
+          const playbookTaskLinks = await tenantStorage.getPlaybookTasks(playbook.id);
           const taskIds = new Set(playbookTaskLinks.map(pt => pt.taskId));
           const playbookTasks = allTasks.filter(t => taskIds.has(t.id));
           
@@ -1027,10 +1074,11 @@ KEY TALKING POINTS:
 
   app.get("/api/playbooks/:id/tasks", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const playbookId = parseInt(req.params.id);
-      const playbookTaskLinks = await storage.getPlaybookTasks(playbookId);
-      const allTasks = await storage.getTasks();
-      const allAccounts = await storage.getAccounts();
+      const playbookTaskLinks = await tenantStorage.getPlaybookTasks(playbookId);
+      const allTasks = await tenantStorage.getTasks();
+      const allAccounts = await tenantStorage.getAccounts();
       
       const taskIds = new Set(playbookTaskLinks.map(pt => pt.taskId));
       const playbookTasks = allTasks.filter(t => taskIds.has(t.id));
@@ -1053,8 +1101,9 @@ KEY TALKING POINTS:
 
   app.post("/api/playbooks", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const data = insertPlaybookSchema.parse(req.body);
-      const playbook = await storage.createPlaybook(data);
+      const playbook = await tenantStorage.createPlaybook(data);
       res.status(201).json(playbook);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1066,11 +1115,12 @@ KEY TALKING POINTS:
 
   app.post("/api/playbooks/generate", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const { name, segment, topN = 10, priorityCategories = [] } = req.body;
       
       // Get accounts with gap data
-      const allAccounts = await storage.getAccounts();
-      const categories = await storage.getProductCategories();
+      const allAccounts = await tenantStorage.getAccounts();
+      const categories = await tenantStorage.getProductCategories();
       
       // Filter accounts by segment if specified
       let targetAccounts = segment 
@@ -1080,8 +1130,8 @@ KEY TALKING POINTS:
       // Get account metrics and gaps
       const accountsWithGaps = await Promise.all(
         targetAccounts.slice(0, topN).map(async account => {
-          const metrics = await storage.getAccountMetrics(account.id);
-          const gaps = await storage.getAccountCategoryGaps(account.id);
+          const metrics = await tenantStorage.getAccountMetrics(account.id);
+          const gaps = await tenantStorage.getAccountCategoryGaps(account.id);
           
           const gapCategories = gaps.map(g => {
             const cat = categories.find(c => c.id === g.categoryId);
@@ -1109,7 +1159,7 @@ KEY TALKING POINTS:
       );
 
       // Create playbook
-      const playbook = await storage.createPlaybook({
+      const playbook = await tenantStorage.createPlaybook({
         name: name || `${segment || "All Segments"} Playbook - ${new Date().toLocaleDateString()}`,
         generatedBy: "AI",
         filtersUsed: { segment, topN, priorityCategories },
@@ -1117,14 +1167,14 @@ KEY TALKING POINTS:
       });
 
       // Get territory managers to link tasks by name
-      const territoryManagers = await storage.getTerritoryManagers();
+      const territoryManagers = await tenantStorage.getTerritoryManagers();
 
       // Create tasks in database and link to playbook
       for (const task of generatedTasks) {
         // Try to find TM by name and link by ID
         const tm = territoryManagers.find(t => t.name === task.assignedTm);
         
-        const createdTask = await storage.createTask({
+        const createdTask = await tenantStorage.createTask({
           accountId: task.accountId,
           playbookId: playbook.id,
           assignedTm: task.assignedTm,
@@ -1139,7 +1189,7 @@ KEY TALKING POINTS:
         });
         
         // Also link task to playbook via join table for backwards compatibility
-        await storage.createPlaybookTask({
+        await tenantStorage.createPlaybookTask({
           playbookId: playbook.id,
           taskId: createdTask.id,
         });
@@ -1158,13 +1208,14 @@ KEY TALKING POINTS:
   // ============ Program Accounts ============
   app.get("/api/program-accounts", requireAuth, async (req, res) => {
     try {
-      const programAccounts = await storage.getProgramAccounts();
-      const allAccounts = await storage.getAccounts();
+      const tenantStorage = getStorage(req);
+      const programAccounts = await tenantStorage.getProgramAccounts();
+      const allAccounts = await tenantStorage.getAccounts();
 
       const accountsWithDetails = await Promise.all(
         programAccounts.map(async pa => {
           const account = allAccounts.find(a => a.id === pa.accountId);
-          const snapshots = await storage.getProgramRevenueSnapshots(pa.id);
+          const snapshots = await tenantStorage.getProgramRevenueSnapshots(pa.id);
           const currentRevenue = snapshots.reduce((sum, s) => sum + parseFloat(s.periodRevenue || "0"), 0);
           const incrementalRevenue = snapshots.reduce((sum, s) => sum + parseFloat(s.incrementalRevenue || "0"), 0);
           const feeAmount = snapshots.reduce((sum, s) => sum + parseFloat(s.feeAmount || "0"), 0);
@@ -1194,15 +1245,16 @@ KEY TALKING POINTS:
 
   app.post("/api/program-accounts", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const data = insertProgramAccountSchema.parse(req.body);
-      const programAccount = await storage.createProgramAccount(data);
+      const programAccount = await tenantStorage.createProgramAccount(data);
       
       // Auto-generate a playbook for this enrolled account
-      const account = await storage.getAccount(programAccount.accountId);
+      const account = await tenantStorage.getAccount(programAccount.accountId);
       if (account) {
-        const categories = await storage.getProductCategories();
-        const metrics = await storage.getAccountMetrics(account.id);
-        const gaps = await storage.getAccountCategoryGaps(account.id);
+        const categories = await tenantStorage.getProductCategories();
+        const metrics = await tenantStorage.getAccountMetrics(account.id);
+        const gaps = await tenantStorage.getAccountCategoryGaps(account.id);
         
         const gapCategories = gaps.map(g => {
           const cat = categories.find(c => c.id === g.categoryId);
@@ -1223,7 +1275,7 @@ KEY TALKING POINTS:
           const generatedTasks = await generatePlaybookTasks(accountData, []);
 
           // Create playbook
-          const playbook = await storage.createPlaybook({
+          const playbook = await tenantStorage.createPlaybook({
             name: `${account.name} Growth Playbook`,
             generatedBy: "AI",
             filtersUsed: { accountId: account.id, enrolledAt: new Date().toISOString() },
@@ -1231,13 +1283,13 @@ KEY TALKING POINTS:
           });
 
           // Get territory managers to link tasks by name
-          const territoryManagers = await storage.getTerritoryManagers();
+          const territoryManagers = await tenantStorage.getTerritoryManagers();
 
           // Create tasks in database and link to playbook
           for (const task of generatedTasks) {
             const tm = territoryManagers.find(t => t.name === task.assignedTm);
             
-            const createdTask = await storage.createTask({
+            const createdTask = await tenantStorage.createTask({
               accountId: task.accountId,
               playbookId: playbook.id,
               assignedTm: task.assignedTm,
@@ -1251,7 +1303,7 @@ KEY TALKING POINTS:
               dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
             });
             
-            await storage.createPlaybookTask({
+            await tenantStorage.createPlaybookTask({
               playbookId: playbook.id,
               taskId: createdTask.id,
             });
@@ -1281,8 +1333,9 @@ KEY TALKING POINTS:
 
   app.patch("/api/program-accounts/:id", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
-      const programAccount = await storage.updateProgramAccount(id, req.body);
+      const programAccount = await tenantStorage.updateProgramAccount(id, req.body);
       if (!programAccount) {
         return res.status(404).json({ message: "Program account not found" });
       }
@@ -1295,15 +1348,16 @@ KEY TALKING POINTS:
   // Get graduation progress for a program account
   app.get("/api/program-accounts/:id/graduation-progress", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
-      const programAccount = await storage.getProgramAccount(id);
+      const programAccount = await tenantStorage.getProgramAccount(id);
       if (!programAccount) {
         return res.status(404).json({ message: "Program account not found" });
       }
 
-      const account = await storage.getAccount(programAccount.accountId);
-      const metrics = await storage.getAccountMetrics(programAccount.accountId);
-      const snapshots = await storage.getProgramRevenueSnapshots(id);
+      const account = await tenantStorage.getAccount(programAccount.accountId);
+      const metrics = await tenantStorage.getAccountMetrics(programAccount.accountId);
+      const snapshots = await tenantStorage.getProgramRevenueSnapshots(id);
 
       // Calculate current penetration from account metrics
       const currentPenetration = metrics ? parseFloat(metrics.categoryPenetration || "0") : 0;
@@ -1402,10 +1456,11 @@ KEY TALKING POINTS:
   // Graduate an account
   app.post("/api/program-accounts/:id/graduate", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
       const { notes } = req.body;
 
-      const programAccount = await storage.getProgramAccount(id);
+      const programAccount = await tenantStorage.getProgramAccount(id);
       if (!programAccount) {
         return res.status(404).json({ message: "Program account not found" });
       }
@@ -1414,13 +1469,13 @@ KEY TALKING POINTS:
         return res.status(400).json({ message: "Account is already graduated" });
       }
 
-      const updatedAccount = await storage.updateProgramAccount(id, {
+      const updatedAccount = await tenantStorage.updateProgramAccount(id, {
         status: "graduated",
         graduatedAt: new Date(),
         graduationNotes: notes || null,
       });
 
-      const account = await storage.getAccount(programAccount.accountId);
+      const account = await tenantStorage.getAccount(programAccount.accountId);
       
       res.json({
         success: true,
@@ -1437,15 +1492,16 @@ KEY TALKING POINTS:
   // Get all graduation-ready accounts
   app.get("/api/program-accounts/graduation-ready", requireAuth, async (req, res) => {
     try {
-      const programAccounts = await storage.getProgramAccounts();
+      const tenantStorage = getStorage(req);
+      const programAccounts = await tenantStorage.getProgramAccounts();
       const activeAccounts = programAccounts.filter(pa => pa.status === "active");
       
       const readyAccounts = [];
       
       for (const pa of activeAccounts) {
-        const account = await storage.getAccount(pa.accountId);
-        const metrics = await storage.getAccountMetrics(pa.accountId);
-        const snapshots = await storage.getProgramRevenueSnapshots(pa.id);
+        const account = await tenantStorage.getAccount(pa.accountId);
+        const metrics = await tenantStorage.getAccountMetrics(pa.accountId);
+        const snapshots = await tenantStorage.getProgramRevenueSnapshots(pa.id);
 
         const currentPenetration = metrics ? parseFloat(metrics.categoryPenetration || "0") : 0;
         const targetPenetration = pa.targetPenetration ? parseFloat(pa.targetPenetration) : null;
@@ -1509,7 +1565,8 @@ KEY TALKING POINTS:
   // ============ Data Uploads ============
   app.get("/api/data-uploads", requireAuth, async (req, res) => {
     try {
-      const uploads = await storage.getDataUploads();
+      const tenantStorage = getStorage(req);
+      const uploads = await tenantStorage.getDataUploads();
       res.json(uploads);
     } catch (error) {
       res.status(500).json({ message: "Failed to get uploads" });
@@ -1518,13 +1575,14 @@ KEY TALKING POINTS:
 
   app.post("/api/data-uploads", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       // In real implementation, this would handle file upload
       const data = insertDataUploadSchema.parse(req.body);
-      const upload = await storage.createDataUpload(data);
+      const upload = await tenantStorage.createDataUpload(data);
       
       // Simulate processing
       setTimeout(async () => {
-        await storage.updateDataUpload(upload.id, {
+        await tenantStorage.updateDataUpload(upload.id, {
           status: "completed",
           rowCount: Math.floor(Math.random() * 1000 + 100),
         });
@@ -1542,7 +1600,8 @@ KEY TALKING POINTS:
   // ============ Settings ============
   app.get("/api/settings", requireAuth, async (req, res) => {
     try {
-      const settings = await storage.getSettings();
+      const tenantStorage = getStorage(req);
+      const settings = await tenantStorage.getSettings();
       res.json(settings);
     } catch (error) {
       res.status(500).json({ message: "Failed to get settings" });
@@ -1551,8 +1610,9 @@ KEY TALKING POINTS:
 
   app.get("/api/settings/:key", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const { key } = req.params;
-      const setting = await storage.getSetting(key);
+      const setting = await tenantStorage.getSetting(key);
       res.json(setting || { key, value: null });
     } catch (error) {
       res.status(500).json({ message: "Failed to get setting" });
@@ -1561,9 +1621,10 @@ KEY TALKING POINTS:
 
   app.put("/api/settings/:key", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const { key } = req.params;
       const { value } = req.body;
-      const setting = await storage.upsertSetting({ key, value });
+      const setting = await tenantStorage.upsertSetting({ key, value });
       res.json(setting);
     } catch (error) {
       res.status(500).json({ message: "Failed to update setting" });
@@ -1573,11 +1634,12 @@ KEY TALKING POINTS:
   // Logo upload endpoint - handles base64 encoded images
   app.post("/api/settings/logo", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const { logo } = req.body;
       if (!logo) {
         return res.status(400).json({ message: "No logo provided" });
       }
-      const setting = await storage.upsertSetting({ key: "companyLogo", value: logo });
+      const setting = await tenantStorage.upsertSetting({ key: "companyLogo", value: logo });
       res.json(setting);
     } catch (error) {
       res.status(500).json({ message: "Failed to upload logo" });
@@ -1586,7 +1648,8 @@ KEY TALKING POINTS:
 
   app.delete("/api/settings/logo", requireAuth, async (req, res) => {
     try {
-      await storage.upsertSetting({ key: "companyLogo", value: "" });
+      const tenantStorage = getStorage(req);
+      await tenantStorage.upsertSetting({ key: "companyLogo", value: "" });
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: "Failed to remove logo" });
@@ -1596,7 +1659,8 @@ KEY TALKING POINTS:
   // ============ Categories ============
   app.get("/api/categories", requireAuth, async (req, res) => {
     try {
-      const categories = await storage.getProductCategories();
+      const tenantStorage = getStorage(req);
+      const categories = await tenantStorage.getProductCategories();
       res.json(categories);
     } catch (error) {
       res.status(500).json({ message: "Failed to get categories" });
@@ -1606,7 +1670,8 @@ KEY TALKING POINTS:
   // ============ Products ============
   app.get("/api/products", requireAuth, async (req, res) => {
     try {
-      const products = await storage.getProducts();
+      const tenantStorage = getStorage(req);
+      const products = await tenantStorage.getProducts();
       res.json(products);
     } catch (error) {
       res.status(500).json({ message: "Failed to get products" });
@@ -1616,7 +1681,8 @@ KEY TALKING POINTS:
   // ============ Scoring Weights ============
   app.get("/api/scoring-weights", requireAuth, async (req, res) => {
     try {
-      const weights = await storage.getScoringWeights();
+      const tenantStorage = getStorage(req);
+      const weights = await tenantStorage.getScoringWeights();
       if (!weights) {
         // Return default weights if none configured
         res.json({
@@ -1654,7 +1720,8 @@ KEY TALKING POINTS:
         });
       }
 
-      const weights = await storage.upsertScoringWeights({
+      const tenantStorage = getStorage(req);
+      const weights = await tenantStorage.upsertScoringWeights({
         name: "default",
         gapSizeWeight: gapSizeWeight.toString(),
         revenuePotentialWeight: revenuePotentialWeight.toString(),
@@ -1679,7 +1746,8 @@ KEY TALKING POINTS:
   // ============ Territory Managers ============
   app.get("/api/territory-managers", requireAuth, async (req, res) => {
     try {
-      const managers = await storage.getTerritoryManagers();
+      const tenantStorage = getStorage(req);
+      const managers = await tenantStorage.getTerritoryManagers();
       res.json(managers);
     } catch (error) {
       console.error("Get territory managers error:", error);
@@ -1689,8 +1757,9 @@ KEY TALKING POINTS:
 
   app.post("/api/territory-managers", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const data = insertTerritoryManagerSchema.parse(req.body);
-      const manager = await storage.createTerritoryManager(data);
+      const manager = await tenantStorage.createTerritoryManager(data);
       res.status(201).json(manager);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1703,8 +1772,9 @@ KEY TALKING POINTS:
 
   app.put("/api/territory-managers/:id", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
-      const manager = await storage.updateTerritoryManager(id, req.body);
+      const manager = await tenantStorage.updateTerritoryManager(id, req.body);
       if (!manager) {
         return res.status(404).json({ message: "Territory manager not found" });
       }
@@ -1717,8 +1787,9 @@ KEY TALKING POINTS:
 
   app.delete("/api/territory-managers/:id", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
-      const success = await storage.deleteTerritoryManager(id);
+      const success = await tenantStorage.deleteTerritoryManager(id);
       if (!success) {
         return res.status(404).json({ message: "Territory manager not found" });
       }
@@ -1732,7 +1803,8 @@ KEY TALKING POINTS:
   // ============ Custom Categories ============
   app.get("/api/custom-categories", requireAuth, async (req, res) => {
     try {
-      const categories = await storage.getCustomCategories();
+      const tenantStorage = getStorage(req);
+      const categories = await tenantStorage.getCustomCategories();
       res.json(categories);
     } catch (error) {
       console.error("Get custom categories error:", error);
@@ -1742,11 +1814,12 @@ KEY TALKING POINTS:
 
   app.post("/api/custom-categories", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const parsed = insertCustomCategorySchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid category data", errors: parsed.error.errors });
       }
-      const category = await storage.createCustomCategory(parsed.data);
+      const category = await tenantStorage.createCustomCategory(parsed.data);
       res.status(201).json(category);
     } catch (error) {
       console.error("Create custom category error:", error);
@@ -1756,8 +1829,9 @@ KEY TALKING POINTS:
 
   app.put("/api/custom-categories/:id", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
-      const category = await storage.updateCustomCategory(id, req.body);
+      const category = await tenantStorage.updateCustomCategory(id, req.body);
       if (!category) {
         return res.status(404).json({ message: "Category not found" });
       }
@@ -1770,8 +1844,9 @@ KEY TALKING POINTS:
 
   app.delete("/api/custom-categories/:id", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
-      const success = await storage.deleteCustomCategory(id);
+      const success = await tenantStorage.deleteCustomCategory(id);
       if (!success) {
         return res.status(404).json({ message: "Category not found" });
       }
@@ -1785,7 +1860,8 @@ KEY TALKING POINTS:
   // Seed default categories if none exist
   app.post("/api/custom-categories/seed-defaults", requireAuth, async (req, res) => {
     try {
-      const existing = await storage.getCustomCategories();
+      const tenantStorage = getStorage(req);
+      const existing = await tenantStorage.getCustomCategories();
       if (existing.length > 0) {
         return res.json({ message: "Categories already exist", categories: existing });
       }
@@ -1805,7 +1881,7 @@ KEY TALKING POINTS:
 
       const created = [];
       for (const cat of defaults) {
-        const category = await storage.createCustomCategory(cat);
+        const category = await tenantStorage.createCustomCategory(cat);
         created.push(category);
       }
       
@@ -1819,7 +1895,8 @@ KEY TALKING POINTS:
   // ============ Rev-Share Tiers ============
   app.get("/api/rev-share-tiers", requireAuth, async (req, res) => {
     try {
-      const tiers = await storage.getRevShareTiers();
+      const tenantStorage = getStorage(req);
+      const tiers = await tenantStorage.getRevShareTiers();
       res.json(tiers);
     } catch (error) {
       console.error("Get rev-share tiers error:", error);
@@ -1846,7 +1923,8 @@ KEY TALKING POINTS:
         return res.status(400).json({ message: "Share rate must be between 0 and 100" });
       }
       
-      const tier = await storage.createRevShareTier(validated);
+      const tenantStorage = getStorage(req);
+      const tier = await tenantStorage.createRevShareTier(validated);
       res.status(201).json(tier);
     } catch (error) {
       console.error("Create rev-share tier error:", error);
@@ -1877,7 +1955,8 @@ KEY TALKING POINTS:
         }
       }
       
-      const tier = await storage.updateRevShareTier(id, req.body);
+      const tenantStorage = getStorage(req);
+      const tier = await tenantStorage.updateRevShareTier(id, req.body);
       if (!tier) {
         return res.status(404).json({ message: "Rev-share tier not found" });
       }
@@ -1890,8 +1969,9 @@ KEY TALKING POINTS:
 
   app.delete("/api/rev-share-tiers/:id", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id, 10);
-      await storage.deleteRevShareTier(id);
+      await tenantStorage.deleteRevShareTier(id);
       res.status(204).send();
     } catch (error) {
       console.error("Delete rev-share tier error:", error);
@@ -1902,12 +1982,13 @@ KEY TALKING POINTS:
   // Calculate fee based on tiered rates
   app.post("/api/rev-share-tiers/calculate", requireAuth, async (req, res) => {
     try {
+      const tenantStorage = getStorage(req);
       const { incrementalRevenue } = req.body;
       if (typeof incrementalRevenue !== 'number' || incrementalRevenue < 0) {
         return res.status(400).json({ message: "Invalid incremental revenue" });
       }
 
-      const tiers = await storage.getRevShareTiers();
+      const tiers = await tenantStorage.getRevShareTiers();
       
       // If no tiers defined, use default 15%
       if (tiers.length === 0) {
@@ -1970,12 +2051,13 @@ KEY TALKING POINTS:
   // Seed default tier if none exist
   app.post("/api/rev-share-tiers/seed-default", requireAuth, async (req, res) => {
     try {
-      const existing = await storage.getRevShareTiers();
+      const tenantStorage = getStorage(req);
+      const existing = await tenantStorage.getRevShareTiers();
       if (existing.length > 0) {
         return res.json({ message: "Tiers already exist", tiers: existing });
       }
 
-      const defaultTier = await storage.createRevShareTier({
+      const defaultTier = await tenantStorage.createRevShareTier({
         minRevenue: "0",
         maxRevenue: null,
         shareRate: "15",
