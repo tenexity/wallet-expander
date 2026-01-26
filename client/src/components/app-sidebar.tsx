@@ -1,4 +1,4 @@
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard,
@@ -168,17 +168,23 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="p-4 space-y-4">
         <div className="flex items-center gap-3">
-          <Avatar className="h-8 w-8">
-            <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground text-xs">
-              GM
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col flex-1 min-w-0">
-            <span className="text-sm font-medium text-sidebar-foreground truncate">Graham</span>
-            <span className="text-xs text-sidebar-foreground/60">Admin</span>
-          </div>
-          <SidebarMenuButton size="sm" className="h-8 w-8 p-0" data-testid="button-logout">
-            <LogOut className="h-4 w-4" />
+          <SidebarMenuButton asChild className="flex-1 h-auto py-1" data-testid="link-profile">
+            <Link href="/settings">
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground text-xs">
+                  GM
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col flex-1 min-w-0">
+                <span className="text-sm font-medium truncate">Graham</span>
+                <span className="text-xs opacity-60">Admin</span>
+              </div>
+            </Link>
+          </SidebarMenuButton>
+          <SidebarMenuButton asChild size="sm" className="h-8 w-8 p-0 shrink-0" data-testid="button-logout">
+            <Link href="/promo">
+              <LogOut className="h-4 w-4" />
+            </Link>
           </SidebarMenuButton>
         </div>
         <div className="border-t border-sidebar-border pt-3">
