@@ -38,9 +38,18 @@ The application follows a client-server architecture.
 **Backend:**
 - **Technology:** Express.js with Node.js.
 - **Database Interaction:** PostgreSQL managed by Neon, with Drizzle ORM for type-safe database access.
-- **Authentication:** Replit Auth (OpenID Connect) providing Google, GitHub, and email/password login options. Session management via PostgreSQL with connect-pg-simple.
+- **Authentication:** Replit Auth (OpenID Connect) providing Google, GitHub, and email/password login options. Session management via PostgreSQL with connect-pg-simple. New users automatically get a tenant created with super_admin role on first login.
 - **API:** RESTful API endpoints for dashboard statistics, account management, ICP profiles, task management, playbook generation, revenue tracking, data uploads, and custom category management. All API routes are protected with authentication middleware.
-- **Multi-Tenancy:** All data tables include a `tenantId` column for organization-level data isolation. User roles (`super_admin`, `reviewer`, `viewer`) control access permissions.
+- **Multi-Tenancy:** Complete tenant isolation system with:
+    - All data tables include a `tenantId` column (including child tables: orderItems, profileCategories, profileReviewLog, playbookTasks).
+    - TenantStorage class provides tenant-scoped data access for all queries.
+    - Tenant context middleware extracts tenantId from user_roles and attaches to request.
+    - Auto-tenant creation for new users with default super_admin role.
+- **Role-Based Access Control:**
+    - `super_admin`: Full access including read, write, delete, manage_users, manage_settings.
+    - `reviewer`: Read and approve permissions.
+    - `viewer`: Read-only access.
+    - Admin routes (settings, data uploads, territory managers, custom categories, rev-share tiers) protected with `authWithAdmin` middleware requiring `manage_settings` permission.
 - **Core Features:**
     - **Data Uploads:** Supports CSV imports for accounts, orders, products, and categories.
     - **Account Insights:** Provides gap analysis, opportunity scores, and category penetration metrics for accounts.
