@@ -54,32 +54,25 @@ export const accountCategoryGaps = pgTable("account_category_gaps", {
 
 ---
 
-### 1.2 HIGH: Missing Input Validation on PATCH Routes
+### 1.2 HIGH: Missing Input Validation on PATCH Routes ✅ RESOLVED
 
-**Location:** `server/routes.ts` - Lines 546-558, 1133-1150
+**Location:** `server/routes.ts`
 
-**Issue:** The PATCH endpoint for segment profiles passes `req.body` directly to the update function without Zod validation.
+**Original Issue:** The PATCH/PUT endpoints passed `req.body` directly to update functions without Zod validation.
 
-```typescript
-// Line 546-558 - No validation on PATCH
-app.patch("/api/segment-profiles/:id", requireAuth, async (req, res) => {
-  const id = parseInt(req.params.id);
-  const profile = await tenantStorage.updateSegmentProfile(id, req.body); // UNSAFE
-```
+**Resolution:**
+All update routes now have proper Zod schema validation using `.partial().parse()`:
 
-**Recommendation:** Add Zod schema validation:
-```typescript
-const updateData = insertSegmentProfileSchema.partial().parse(req.body);
-const profile = await tenantStorage.updateSegmentProfile(id, updateData);
-```
+| Route | Validation |
+|-------|------------|
+| `PATCH /api/segment-profiles/:id` | `insertSegmentProfileSchema.partial().parse(req.body)` |
+| `PATCH /api/tasks/:id` | `insertTaskSchema.partial().parse(req.body)` |
+| `PATCH /api/program-accounts/:id` | `insertProgramAccountSchema.partial().parse(req.body)` |
+| `PUT /api/territory-managers/:id` | `insertTerritoryManagerSchema.partial().parse(req.body)` |
+| `PUT /api/custom-categories/:id` | `insertCustomCategorySchema.partial().parse(req.body)` |
+| `PUT /api/rev-share-tiers/:id` | `insertRevShareTierSchema.partial().parse(req.body)` + business logic validation |
 
-**Affected Routes:**
-- `PATCH /api/segment-profiles/:id`
-- `PATCH /api/tasks/:id`  
-- `PATCH /api/program-accounts/:id`
-- `PATCH /api/territory-managers/:id`
-- `PATCH /api/custom-categories/:id`
-- `PATCH /api/rev-share-tiers/:id`
+All routes also include `isNaN(id)` validation for the ID parameter.
 
 ---
 
