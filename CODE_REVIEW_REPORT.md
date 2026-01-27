@@ -273,17 +273,17 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
 
 ## SUMMARY
 
-### Top 4 Most Critical Issues to Address
+### Top 4 Most Critical Issues (Prioritized for Fix)
 
-1. **Missing Rate Limiting on Auth Endpoints** (Security) - Prevent brute force attacks by adding rate limiting middleware
+1. **~~Missing Rate Limiting on Auth Endpoints~~** (Security) - ✅ **FIXED** - Added express-rate-limit to /api/login (10/15min), /api/callback (10/15min), /api/logout (5/1min)
 
-2. **N+1 Query in Graduation Ready Endpoint** (Performance) - Refactor to use batch queries to prevent linear performance degradation
+2. **~~N+1 Query in Graduation Ready Endpoint~~** (Performance) - ✅ **FIXED** - Refactored to use batch queries (getAccountsBatch, getAccountMetricsBatch, getProgramRevenueSnapshotsBatch) with Map-based O(1) lookups
 
-3. **Missing Integration/API Tests** (Testing) - Add end-to-end tests for critical paths including authentication, subscription, and core business flows
+3. **Missing Integration/API Tests** (Testing) - ⚠️ **PENDING** - Add end-to-end tests for critical paths including authentication, subscription, and core business flows
 
-4. **No Retry Logic/Timeouts for External APIs** (Resilience) - Implement retry mechanisms with exponential backoff and timeouts for OpenAI and Resend API calls
+4. **~~No Retry Logic/Timeouts for External APIs~~** (Resilience) - ✅ **FIXED** - Created withRetry utility with exponential backoff + jitter, applied to all OpenAI (60s timeout) and Resend (30s timeout) API calls
 
-### Technical Debt Score: 6/10
+### Technical Debt Score: 7/10 (improved from 6/10)
 
 **Strengths:**
 - Solid multi-tenant architecture with proper data isolation
@@ -291,19 +291,20 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
 - Proper input validation using Zod schemas
 - Stripe integration with webhook signature verification
 - Batch query patterns for common operations
+- ✅ Rate limiting on authentication endpoints
+- ✅ Retry logic with exponential backoff for external APIs
+- ✅ Configurable timeouts for AI and email services
 
-**Areas for Improvement:**
+**Remaining Areas for Improvement:**
 - Test coverage is thin - only middleware unit tests exist, no integration tests
-- Missing resilience patterns for external dependencies (retries, timeouts)
-- Rate limiting needed on authentication endpoints
 - Business logic mixed into route handlers
+- Add default pagination limits for unbounded queries
 
-### Recommended Priority Order for Fixes
+### Recommended Priority Order for Remaining Fixes
 
-1. **Immediate (Security):** Rate limiting on auth endpoints
-2. **Short-term (Performance):** N+1 query fixes, add default pagination limits
-3. **Medium-term (Reliability):** Retry logic and timeouts for external APIs
-4. **Ongoing (Quality):** Expand test coverage, service layer extraction
+1. **Short-term (Quality):** Expand test coverage with integration tests for critical paths
+2. **Short-term (Performance):** Add default pagination limits to prevent unbounded queries
+3. **Ongoing (Quality):** Extract business logic from route handlers into service layer
 
 ---
 
