@@ -511,31 +511,42 @@ Added comprehensive JSDoc documentation to the TenantStorage class including:
 
 ---
 
-### 6.3 LOW: Outdated Comments
+### 6.3 LOW: Outdated Comments ✅ RESOLVED
 
-**Location:** `server/routes.ts` - Line 84
+**Location:** `server/routes.ts` - Lines 84-96
 
-**Issue:** Comment references "migration" but no migration is in progress.
+**Original Issue:** Comment referenced "migration" but no migration was in progress.
 
+**Resolution:**
+The outdated comment was replaced with clear, accurate documentation of the middleware setup:
 ```typescript
-// Legacy alias for backward compatibility during migration
-const requireAuth = authWithTenant;
+// ============ Protected API Routes ============
+// All routes below require authentication and tenant context
+// Middleware chain: isAuthenticated -> withTenantContext
+
+// Base authentication: requires login + tenant context
+const requireAuth = [isAuthenticated, withTenantContext];
+
+// Write permission: authentication + write permission
+const requireWrite = [...requireAuth, requirePermission("write")];
+
+// Admin permission: authentication + manage_settings permission
+const requireAdmin = [...requireAuth, requirePermission("manage_settings")];
 ```
 
 ---
 
-### 6.4 LOW: Missing Inline Comments
+### 6.4 LOW: Missing Inline Comments ✅ RESOLVED
 
-**Location:** Complex calculation logic
+**Location:** Complex calculation logic in `server/routes.ts`
 
-**Issue:** Business logic lacks explanatory comments.
+**Original Issue:** Business logic lacked explanatory comments.
 
-```typescript
-// Line 802-804 - What does this calculate?
-const avgGap = flatGaps.length > 0
-  ? flatGaps.reduce((sum, g) => sum + (g.gapPct ? parseFloat(g.gapPct) : 0), 0) / flatGaps.length
-  : 30;
-```
+**Resolution:**
+Added inline comments to gap calculation logic:
+- Line 162: Comment explaining `estimatedValue` calculation (sum of category gap opportunities)
+- Line 318: Comment explaining `gapCategories` mapping
+- Line 323-324: Inline comments for `gapPct` (percentage gap vs ICP benchmark) and `estimatedValue` (revenue potential in dollars)
 
 ---
 

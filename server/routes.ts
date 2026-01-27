@@ -156,6 +156,7 @@ export async function registerRoutes(
         const metrics = metricsMap.get(account.id);
         const gaps = gapsMap.get(account.id) || [];
         
+        // Calculate total estimated revenue opportunity by summing all category gaps for this account
         const estimatedValue = gaps.reduce((sum, g) => sum + parseFloat(g.estimatedOpportunity || "0"), 0);
         
         return {
@@ -311,12 +312,13 @@ export async function registerRoutes(
           last12mRevenue: metrics ? parseFloat(metrics.last12mRevenue || "0") : 0,
           categoryPenetration: metrics ? parseFloat(metrics.categoryPenetration || "0") : 0,
           opportunityScore: metrics ? parseFloat(metrics.opportunityScore || "0") : 0,
+          // Map top category gaps to display format with category name and opportunity metrics
           gapCategories: gaps.slice(0, DASHBOARD_LIMITS.ACCOUNT_GAPS_DISPLAY).map(g => {
             const cat = categoryMap.get(g.categoryId);
             return {
               name: cat?.name || "Unknown",
-              gapPct: parseFloat(g.gapPct || "0"),
-              estimatedValue: parseFloat(g.estimatedOpportunity || "0"),
+              gapPct: parseFloat(g.gapPct || "0"), // Percentage gap vs ICP benchmark
+              estimatedValue: parseFloat(g.estimatedOpportunity || "0"), // Revenue potential in dollars
             };
           }),
           enrolled: enrolledAccountIds.has(account.id),
