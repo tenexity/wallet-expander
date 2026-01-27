@@ -16,6 +16,7 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
+  DropdownMenuItem,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -84,14 +85,7 @@ interface DashboardStats {
   enrolledAccounts: number;
   totalRevenue: number;
   incrementalRevenue: number;
-  topOpportunities: Array<{
-    id: number;
-    name: string;
-    segment: string;
-    opportunityScore: number;
-    estimatedValue: number;
-    gapCategories: string[];
-  }>;
+  topOpportunities: AccountWithMetrics[];
   recentTasks: Array<{
     id: number;
     accountName: string;
@@ -359,11 +353,6 @@ export default function Dashboard() {
     queryKey: ["/api/program-accounts/graduation-ready"],
   });
 
-  // Fetch accounts data for the enhanced Top Opportunities table
-  const { data: accounts } = useQuery<AccountWithMetrics[]>({
-    queryKey: ["/api/accounts"],
-  });
-
   // Fetch enrolled accounts for revenue by segment
   const { data: enrolledAccounts } = useQuery<EnrolledAccount[]>({
     queryKey: ["/api/program-accounts"],
@@ -396,11 +385,12 @@ export default function Dashboard() {
     }
   }, [opportunitySortKey]);
 
-  // Sorted and limited accounts for Top Opportunities (top 10)
+  // Sorted accounts for Top Opportunities (top 10 from dashboard stats)
   const sortedTopOpportunities = useMemo(() => {
-    if (!accounts) return [];
+    const opportunities = stats?.topOpportunities || [];
+    if (opportunities.length === 0) return [];
     
-    const sorted = [...accounts].sort((a, b) => {
+    const sorted = [...opportunities].sort((a, b) => {
       let comparison = 0;
       switch (opportunitySortKey) {
         case "opportunityScore":
@@ -413,7 +403,7 @@ export default function Dashboard() {
           comparison = a.segment.localeCompare(b.segment);
           break;
         case "region":
-          comparison = a.region.localeCompare(b.region);
+          comparison = (a.region || "").localeCompare(b.region || "");
           break;
         case "last12mRevenue":
           comparison = a.last12mRevenue - b.last12mRevenue;
@@ -430,8 +420,8 @@ export default function Dashboard() {
       return opportunitySortDir === "asc" ? comparison : -comparison;
     });
     
-    return sorted.slice(0, 10);
-  }, [accounts, opportunitySortKey, opportunitySortDir]);
+    return sorted;
+  }, [stats?.topOpportunities, opportunitySortKey, opportunitySortDir]);
 
   // Revenue by segment from enrolled accounts
   const revenueBySegment = useMemo(() => {
@@ -722,41 +712,82 @@ export default function Dashboard() {
         id: 1,
         name: "ABC Plumbing Co",
         segment: "HVAC",
+        region: "Northeast",
+        assignedTm: "John Smith",
+        status: "active",
+        last12mRevenue: 125000,
+        categoryPenetration: 65,
         opportunityScore: 92,
-        estimatedValue: 45000,
-        gapCategories: ["Ductwork", "Controls", "Insulation"],
+        gapCategories: [
+          { name: "Ductwork", gapPct: 25, estimatedValue: 15000 },
+          { name: "Controls", gapPct: 20, estimatedValue: 12000 },
+          { name: "Insulation", gapPct: 18, estimatedValue: 18000 },
+        ],
+        enrolled: false,
       },
       {
         id: 2,
         name: "Elite HVAC Services",
         segment: "HVAC",
+        region: "Southwest",
+        assignedTm: "Sarah Johnson",
+        status: "active",
+        last12mRevenue: 98000,
+        categoryPenetration: 72,
         opportunityScore: 88,
-        estimatedValue: 38000,
-        gapCategories: ["Copper Fittings", "Valves"],
+        gapCategories: [
+          { name: "Copper Fittings", gapPct: 22, estimatedValue: 20000 },
+          { name: "Valves", gapPct: 18, estimatedValue: 18000 },
+        ],
+        enrolled: true,
       },
       {
         id: 3,
         name: "Metro Mechanical",
         segment: "Mechanical",
+        region: "Midwest",
+        assignedTm: "Mike Williams",
+        status: "active",
+        last12mRevenue: 185000,
+        categoryPenetration: 58,
         opportunityScore: 85,
-        estimatedValue: 52000,
-        gapCategories: ["Pumps", "Motors", "Bearings"],
+        gapCategories: [
+          { name: "Pumps", gapPct: 30, estimatedValue: 25000 },
+          { name: "Motors", gapPct: 22, estimatedValue: 17000 },
+          { name: "Bearings", gapPct: 15, estimatedValue: 10000 },
+        ],
+        enrolled: false,
       },
       {
         id: 4,
         name: "Premier Plumbing",
         segment: "Plumbing",
+        region: "Southeast",
+        assignedTm: "Lisa Brown",
+        status: "active",
+        last12mRevenue: 76000,
+        categoryPenetration: 80,
         opportunityScore: 78,
-        estimatedValue: 31000,
-        gapCategories: ["Fixtures", "Water Heaters"],
+        gapCategories: [
+          { name: "Fixtures", gapPct: 15, estimatedValue: 18000 },
+          { name: "Water Heaters", gapPct: 12, estimatedValue: 13000 },
+        ],
+        enrolled: true,
       },
       {
         id: 5,
         name: "Quality Climate Control",
         segment: "HVAC",
+        region: "West",
+        assignedTm: "Tom Davis",
+        status: "active",
+        last12mRevenue: 62000,
+        categoryPenetration: 88,
         opportunityScore: 68,
-        estimatedValue: 25000,
-        gapCategories: ["Refrigerant"],
+        gapCategories: [
+          { name: "Refrigerant", gapPct: 10, estimatedValue: 25000 },
+        ],
+        enrolled: false,
       },
     ],
     recentTasks: [
@@ -1444,35 +1475,39 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
               <Button 
-                variant={isLayoutLocked ? "default" : "outline"} 
-                size="sm" 
-                onClick={toggleLayoutLock}
-                data-testid="button-toggle-lock"
+                variant="ghost" 
+                size="icon" 
+                data-testid="button-layout-menu"
               >
                 {isLayoutLocked ? (
-                  <>
-                    <Lock className="mr-2 h-4 w-4" />
-                    Layout Locked
-                  </>
+                  <Lock className="h-4 w-4" />
                 ) : (
-                  <>
-                    <Unlock className="mr-2 h-4 w-4" />
-                    Edit Layout
-                  </>
+                  <Unlock className="h-4 w-4" />
                 )}
               </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{isLayoutLocked ? "Unlock to edit dashboard layout" : "Lock layout to prevent changes"}</p>
-            </TooltipContent>
-          </Tooltip>
-          <Button variant="outline" size="sm" onClick={resetLayout} data-testid="button-reset-layout">
-            <RotateCcw className="mr-2 h-4 w-4" />
-            Reset Layout
-          </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuCheckboxItem
+                checked={isLayoutLocked}
+                onCheckedChange={toggleLayoutLock}
+                data-testid="toggle-layout-lock"
+              >
+                <Lock className="mr-2 h-4 w-4" />
+                Lock Layout
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={resetLayout}
+                data-testid="button-reset-layout"
+              >
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Reset Layout
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button asChild data-testid="button-view-opportunities">
             <Link href="/accounts">
               View All Opportunities

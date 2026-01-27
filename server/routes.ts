@@ -146,15 +146,19 @@ export async function registerRoutes(
       const categories = await tenantStorage.getProductCategories();
       const categoryMap = new Map(categories.map(c => [c.id, c]));
       
-      const top10Accounts = allAccounts.slice(0, DASHBOARD_LIMITS.TOP_OPPORTUNITIES);
-      const top10AccountIds = top10Accounts.map(a => a.id);
+      // Get all account IDs for batch queries
+      const allAccountIds = allAccounts.map(a => a.id);
       
       const [metricsMap, gapsMap] = await Promise.all([
-        tenantStorage.getAccountMetricsBatch(top10AccountIds),
-        tenantStorage.getAccountCategoryGapsBatch(top10AccountIds)
+        tenantStorage.getAccountMetricsBatch(allAccountIds),
+        tenantStorage.getAccountCategoryGapsBatch(allAccountIds)
       ]);
       
-      const accountsWithMetrics = top10Accounts.map(account => {
+      // Track which accounts are enrolled
+      const enrolledAccountIds = new Set(programAccounts.map(p => p.accountId));
+      
+      // Build full metrics for all accounts
+      const allAccountsWithMetrics = allAccounts.map(account => {
         const metrics = metricsMap.get(account.id);
         const gaps = gapsMap.get(account.id) || [];
         
@@ -165,14 +169,29 @@ export async function registerRoutes(
           id: account.id,
           name: account.name,
           segment: account.segment || "Unknown",
+          region: account.region || "",
+          assignedTm: account.assignedTm || "",
+          status: account.status || "active",
+          last12mRevenue: metrics ? parseFloat(metrics.last12mRevenue || "0") : 0,
+          categoryPenetration: metrics ? parseFloat(metrics.categoryPenetration || "0") : 0,
           opportunityScore: metrics ? parseFloat(metrics.opportunityScore || "0") : 0,
           estimatedValue: estimatedValue,
           gapCategories: gaps.slice(0, DASHBOARD_LIMITS.TOP_GAPS).map(g => {
             const cat = categoryMap.get(g.categoryId);
-            return cat?.name || "Unknown";
+            return {
+              name: cat?.name || "Unknown",
+              gapPct: parseFloat(g.gapPct || "0"),
+              estimatedValue: parseFloat(g.estimatedOpportunity || "0"),
+            };
           }),
+          enrolled: enrolledAccountIds.has(account.id),
         };
       });
+      
+      // Sort by opportunity score and get top 10
+      const accountsWithMetrics = [...allAccountsWithMetrics]
+        .sort((a, b) => b.opportunityScore - a.opportunityScore)
+        .slice(0, 10);
 
       // Get recent tasks - use Map for O(1) account lookups
       const accountMap = new Map(allAccounts.map(a => [a.id, a]));
@@ -194,7 +213,7 @@ export async function registerRoutes(
         incrementalRevenue,
         segmentBreakdown: Object.values(segmentBreakdown),
         icpProfiles,
-        topOpportunities: accountsWithMetrics.sort((a, b) => b.opportunityScore - a.opportunityScore).slice(0, 5),
+        topOpportunities: accountsWithMetrics,
         recentTasks,
       });
     } catch (error) {
