@@ -25,7 +25,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { analyzeSegment, generatePlaybookTasks } from "./ai-service";
 import { handleRouteError } from "./utils/errorHandler";
-import { DASHBOARD_LIMITS, DEFAULT_VALUES, SCORING } from "./utils/constants";
+import { DASHBOARD_LIMITS, DEFAULT_VALUES, SCORING, PAGINATION } from "./utils/constants";
 import {
   calculateClassACustomers,
   calculateTotalRevenue,
@@ -108,7 +108,7 @@ export async function registerRoutes(
       const tenantStorage = getStorage(req);
       const allAccounts = await tenantStorage.getAccounts();
       const allProfiles = await tenantStorage.getSegmentProfiles();
-      const allTasks = await tenantStorage.getTasks();
+      const allTasks = await tenantStorage.getAllTasks();
       const programAccounts = await tenantStorage.getProgramAccounts();
 
       // Calculate basic dashboard stats
@@ -165,9 +165,10 @@ export async function registerRoutes(
         };
       });
 
-      // Get recent tasks
+      // Get recent tasks - use Map for O(1) account lookups
+      const accountMap = new Map(allAccounts.map(a => [a.id, a]));
       const recentTasks = allTasks.slice(0, DASHBOARD_LIMITS.RECENT_TASKS).map(task => {
-        const account = allAccounts.find(a => a.id === task.accountId);
+        const account = accountMap.get(task.accountId);
         return {
           id: task.id,
           accountName: account?.name || "Unknown",
@@ -196,7 +197,7 @@ export async function registerRoutes(
   app.get("/api/daily-focus", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
-      const allTasks = await tenantStorage.getTasks();
+      const allTasks = await tenantStorage.getAllTasks();
       const allAccounts = await tenantStorage.getAccounts();
       
       // Use UTC to avoid timezone issues with database dates
@@ -210,6 +211,8 @@ export async function registerRoutes(
       tomorrowUTC.setUTCDate(tomorrowUTC.getUTCDate() + 1);
       
       // Filter for tasks due today or overdue (not completed)
+      // Use Map for O(1) account lookups
+      const accountMap = new Map(allAccounts.map(a => [a.id, a]));
       const focusTasks = allTasks
         .filter(task => {
           if (task.status === "completed" || task.status === "skipped") return false;
@@ -222,7 +225,7 @@ export async function registerRoutes(
           return dueDateUTC <= todayUTC;
         })
         .map(task => {
-          const account = allAccounts.find(a => a.id === task.accountId);
+          const account = accountMap.get(task.accountId);
           const dueDate = new Date(task.dueDate!);
           const dueDateUTC = new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate()));
           
@@ -381,10 +384,11 @@ export async function registerRoutes(
       // Auto-generate playbook for the enrolled account
       const gaps = await tenantStorage.getAccountCategoryGaps(accountId);
       const categories = await tenantStorage.getProductCategories();
+      const categoryMap = new Map(categories.map(c => [c.id, c]));
 
-      // Get top 3 gap categories for this account
+      // Get top 3 gap categories for this account - use Map for O(1) lookups
       const topGaps = gaps.slice(0, DASHBOARD_LIMITS.TOP_GAPS).map(g => {
-        const cat = categories.find(c => c.id === g.categoryId);
+        const cat = categoryMap.get(g.categoryId);
         return cat?.name || "Unknown";
       }).filter(name => name !== "Unknown");
 
@@ -510,17 +514,20 @@ KEY TALKING POINTS:
       const profiles = await tenantStorage.getSegmentProfiles();
       const allAccounts = await tenantStorage.getAccounts();
 
+      // Fetch all categories once outside the loop for O(1) lookups
+      const allCategories = await tenantStorage.getProductCategories();
+      const categoryMap = new Map(allCategories.map(c => [c.id, c]));
+      
       const profilesWithDetails = await Promise.all(
         profiles.map(async profile => {
           const categories = await tenantStorage.getProfileCategories(profile.id);
-          const allCategories = await tenantStorage.getProductCategories();
           
           return {
             ...profile,
             minAnnualRevenue: profile.minAnnualRevenue ? parseFloat(profile.minAnnualRevenue) : 0,
             accountCount: allAccounts.filter(a => a.segment === profile.segment).length,
             categories: categories.map(cat => {
-              const categoryInfo = allCategories.find(c => c.id === cat.categoryId);
+              const categoryInfo = categoryMap.get(cat.categoryId);
               return {
                 id: cat.id,
                 categoryName: categoryInfo?.name || "Unknown",
@@ -692,8 +699,9 @@ KEY TALKING POINTS:
 
       if (segmentProfile) {
         const cats = await tenantStorage.getProfileCategories(segmentProfile.id);
+        // Use productCatMap for O(1) lookups instead of .find()
         profileCategories = cats.map(cat => {
-          const categoryInfo = productCats.find(c => c.id === cat.categoryId);
+          const categoryInfo = productCatMap.get(cat.categoryId);
           return {
             categoryName: categoryInfo?.name || "Unknown",
             expectedPct: cat.expectedPct ? parseFloat(cat.expectedPct) : 0,
@@ -868,26 +876,57 @@ KEY TALKING POINTS:
   app.get("/api/tasks", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
-      let allTasks = await tenantStorage.getTasks();
       const allAccounts = await tenantStorage.getAccounts();
 
-      // Optional filter by playbook
+      // Optional filter by playbook - if specified, return all tasks for that playbook
       const playbookId = req.query.playbookId ? parseInt(req.query.playbookId as string) : null;
+      
+      // Pagination parameters with defaults and max limits
+      const page = Math.max(1, parseInt(req.query.page as string) || PAGINATION.DEFAULT_PAGE);
+      const limit = Math.min(
+        PAGINATION.MAX_LIMIT, 
+        Math.max(1, parseInt(req.query.limit as string) || PAGINATION.DEFAULT_LIMIT)
+      );
+
+      // Use Map for O(1) account lookups
+      const accountMap = new Map(allAccounts.map(a => [a.id, a]));
+      
+      let tasksWithDetails;
+      let paginationInfo;
+      
       if (playbookId) {
-        allTasks = allTasks.filter(t => t.playbookId === playbookId);
+        // When filtering by playbook, return all tasks (no pagination)
+        const allTasks = await tenantStorage.getAllTasks();
+        const filteredTasks = allTasks.filter(t => t.playbookId === playbookId);
+        tasksWithDetails = filteredTasks.map(task => {
+          const account = accountMap.get(task.accountId);
+          return {
+            ...task,
+            accountName: account?.name || "Unknown",
+            gapCategories: safeParseGapCategories(task.gapCategories),
+            dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : null,
+          };
+        });
+        paginationInfo = { total: filteredTasks.length, page: 1, limit: filteredTasks.length };
+      } else {
+        // Use paginated query for main task list
+        const result = await tenantStorage.getTasks({ page, limit });
+        tasksWithDetails = result.tasks.map(task => {
+          const account = accountMap.get(task.accountId);
+          return {
+            ...task,
+            accountName: account?.name || "Unknown",
+            gapCategories: safeParseGapCategories(task.gapCategories),
+            dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : null,
+          };
+        });
+        paginationInfo = { total: result.total, page: result.page, limit: result.limit };
       }
 
-      const tasksWithDetails = allTasks.map(task => {
-        const account = allAccounts.find(a => a.id === task.accountId);
-        return {
-          ...task,
-          accountName: account?.name || "Unknown",
-          gapCategories: safeParseGapCategories(task.gapCategories),
-          dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : null,
-        };
+      res.json({
+        tasks: tasksWithDetails,
+        pagination: paginationInfo,
       });
-
-      res.json(tasksWithDetails);
     } catch (error) {
       handleRouteError(error, res, "Get tasks");
     }
@@ -979,9 +1018,11 @@ KEY TALKING POINTS:
     try {
       const tenantStorage = getStorage(req);
       const allPlaybooks = await tenantStorage.getPlaybooks();
-      const allTasks = await tenantStorage.getTasks();
+      const allTasks = await tenantStorage.getAllTasks();
       const allAccounts = await tenantStorage.getAccounts();
 
+      // Use Map for O(1) account lookups
+      const accountMap = new Map(allAccounts.map(a => [a.id, a]));
       const playbooksWithStats = await Promise.all(
         allPlaybooks.map(async playbook => {
           const playbookTaskLinks = await tenantStorage.getPlaybookTasks(playbook.id);
@@ -990,7 +1031,7 @@ KEY TALKING POINTS:
           
           const completedCount = playbookTasks.filter(t => t.status === "completed").length;
           const tasksWithDetails = playbookTasks.map(task => {
-            const account = allAccounts.find(a => a.id === task.accountId);
+            const account = accountMap.get(task.accountId);
             return {
               ...task,
               accountName: account?.name || "Unknown",
@@ -1022,14 +1063,16 @@ KEY TALKING POINTS:
         return res.status(400).json({ message: "Invalid playbook ID" });
       }
       const playbookTaskLinks = await tenantStorage.getPlaybookTasks(playbookId);
-      const allTasks = await tenantStorage.getTasks();
+      const allTasks = await tenantStorage.getAllTasks();
       const allAccounts = await tenantStorage.getAccounts();
       
       const taskIds = new Set(playbookTaskLinks.map(pt => pt.taskId));
       const playbookTasks = allTasks.filter(t => taskIds.has(t.id));
       
+      // Use Map for O(1) account lookups
+      const accountMap = new Map(allAccounts.map(a => [a.id, a]));
       const tasksWithDetails = playbookTasks.map(task => {
-        const account = allAccounts.find(a => a.id === task.accountId);
+        const account = accountMap.get(task.accountId);
         return {
           ...task,
           accountName: account?.name || "Unknown",
@@ -1062,6 +1105,7 @@ KEY TALKING POINTS:
       // Get accounts with gap data
       const allAccounts = await tenantStorage.getAccounts();
       const categories = await tenantStorage.getProductCategories();
+      const categoryMap = new Map(categories.map(c => [c.id, c]));
       
       // Filter accounts by segment if specified
       let targetAccounts = segment 
@@ -1074,8 +1118,9 @@ KEY TALKING POINTS:
           const metrics = await tenantStorage.getAccountMetrics(account.id);
           const gaps = await tenantStorage.getAccountCategoryGaps(account.id);
           
+          // Use Map for O(1) category lookups
           const gapCategories = gaps.map(g => {
-            const cat = categories.find(c => c.id === g.categoryId);
+            const cat = categoryMap.get(g.categoryId);
             return cat?.name || "Unknown";
           }).filter(Boolean);
 
@@ -1107,13 +1152,14 @@ KEY TALKING POINTS:
         taskCount: generatedTasks.length,
       });
 
-      // Get territory managers to link tasks by name
+      // Get territory managers to link tasks by name - use Map for O(1) lookups
       const territoryManagers = await tenantStorage.getTerritoryManagers();
+      const tmMap = new Map(territoryManagers.map(t => [t.name, t]));
 
       // Create tasks in database and link to playbook
       for (const task of generatedTasks) {
         // Try to find TM by name and link by ID
-        const tm = territoryManagers.find(t => t.name === task.assignedTm);
+        const tm = tmMap.get(task.assignedTm);
         
         const createdTask = await tenantStorage.createTask({
           accountId: task.accountId,
@@ -1151,10 +1197,12 @@ KEY TALKING POINTS:
       const tenantStorage = getStorage(req);
       const programAccounts = await tenantStorage.getProgramAccounts();
       const allAccounts = await tenantStorage.getAccounts();
+      // Use Map for O(1) account lookups
+      const accountMap = new Map(allAccounts.map(a => [a.id, a]));
 
       const accountsWithDetails = await Promise.all(
         programAccounts.map(async pa => {
-          const account = allAccounts.find(a => a.id === pa.accountId);
+          const account = accountMap.get(pa.accountId);
           const snapshots = await tenantStorage.getProgramRevenueSnapshots(pa.id);
           const currentRevenue = snapshots.reduce((sum, s) => sum + parseFloat(s.periodRevenue || "0"), 0);
           const incrementalRevenue = snapshots.reduce((sum, s) => sum + parseFloat(s.incrementalRevenue || "0"), 0);
@@ -1192,11 +1240,13 @@ KEY TALKING POINTS:
       const account = await tenantStorage.getAccount(programAccount.accountId);
       if (account) {
         const categories = await tenantStorage.getProductCategories();
+        const categoryMap = new Map(categories.map(c => [c.id, c]));
         const metrics = await tenantStorage.getAccountMetrics(account.id);
         const gaps = await tenantStorage.getAccountCategoryGaps(account.id);
         
+        // Use Map for O(1) category lookups
         const gapCategories = gaps.map(g => {
-          const cat = categories.find(c => c.id === g.categoryId);
+          const cat = categoryMap.get(g.categoryId);
           return cat?.name || "Unknown";
         }).filter(Boolean);
 
@@ -1221,12 +1271,13 @@ KEY TALKING POINTS:
             taskCount: generatedTasks.length,
           });
 
-          // Get territory managers to link tasks by name
+          // Get territory managers to link tasks by name - use Map for O(1) lookups
           const territoryManagers = await tenantStorage.getTerritoryManagers();
+          const tmMap = new Map(territoryManagers.map(t => [t.name, t]));
 
           // Create tasks in database and link to playbook
           for (const task of generatedTasks) {
-            const tm = territoryManagers.find(t => t.name === task.assignedTm);
+            const tm = tmMap.get(task.assignedTm);
             
             const createdTask = await tenantStorage.createTask({
               accountId: task.accountId,

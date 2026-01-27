@@ -223,69 +223,61 @@ The TenantStorage class properly enforces tenant isolation for ALL tables:
 
 ---
 
-### 2.4 MEDIUM: Inefficient Array Operations
+### 2.4 MEDIUM: Inefficient Array Operations ✅ RESOLVED
 
 **Location:** `server/routes.ts` - Multiple locations
 
-**Issue:** Using `.find()` inside loops is O(n*m) complexity.
+**Original Issue:** Using `.find()` inside loops is O(n*m) complexity.
 
-```typescript
-// Line 143
-const cat = categories.find(c => c.id === g.categoryId);
-```
-
-**Recommendation:** Create a Map for O(1) lookups:
-```typescript
-const categoryMap = new Map(categories.map(c => [c.id, c]));
-// Then:
-const cat = categoryMap.get(g.categoryId);
-```
+**Resolution:**
+1. Replaced all `.find()` calls inside loops with Map-based O(1) lookups
+2. Created Maps for accounts, categories, and territory managers before loops
+3. Locations fixed:
+   - Dashboard stats: recentTasks mapping
+   - Daily focus: focusTasks mapping  
+   - Account enrollment: gap category lookups
+   - Tasks listing: account lookups
+   - Playbooks: task account lookups
+   - Playbook generation: category and TM lookups
+   - Program accounts: account and category lookups
+   - Data insights: category pattern lookups
 
 ---
 
-### 2.5 MEDIUM: Missing Database Indexes
+### 2.5 MEDIUM: Missing Database Indexes ✅ RESOLVED
 
 **Location:** `shared/schema.ts`
 
-**Issue:** Some frequently queried columns lack indexes.
+**Original Issue:** Some frequently queried columns lacked indexes.
 
-**Missing indexes on:**
-- `accounts.segment` - Used in filtering
-- `accounts.assignedTm` - Used in filtering
-- `tasks.status` - Used in filtering
-- `tasks.dueDate` - Used in sorting/filtering
-- `programAccounts.accountId` - Used in lookups
-- `accountMetrics.accountId` - Used in lookups (has no tenantId either)
-- `accountCategoryGaps.accountId` - Used in lookups (has no tenantId)
+**Resolution:**
+Added indexes to the following tables:
+1. `accounts`: Added `idx_accounts_segment` and `idx_accounts_assigned_tm`
+2. `tasks`: Added `idx_tasks_status` and `idx_tasks_due_date`
+3. `accountMetrics`: Added `idx_account_metrics_tenant_id` and `idx_account_metrics_account_id`
+4. `accountCategoryGaps`: Added `idx_account_category_gaps_tenant_id` and `idx_account_category_gaps_account_id`
+5. `programAccounts`: Added `idx_program_accounts_account_id`
 
-**Recommendation:** Add indexes for frequently queried columns:
-```typescript
-(table) => [
-  index("idx_accounts_segment").on(table.segment),
-  index("idx_tasks_status").on(table.status),
-]
-```
+Applied with `npm run db:push`.
 
 ---
 
-### 2.6 LOW: Unbounded Query Results
+### 2.6 LOW: Unbounded Query Results ✅ RESOLVED
 
-**Location:** Multiple routes
+**Location:** `/api/tasks` route
 
-**Issue:** Several routes return all records without pagination.
+**Original Issue:** Several routes returned all records without pagination.
 
-```typescript
-const allTasks = await tenantStorage.getTasks(); // Could be thousands
-```
-
-**Recommendation:** Implement pagination:
-```typescript
-app.get("/api/tasks", async (req, res) => {
-  const page = parseInt(req.query.page as string) || 1;
-  const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
-  const tasks = await tenantStorage.getTasks({ page, limit });
-});
-```
+**Resolution:**
+1. Added `PAGINATION` constants in `server/utils/constants.ts`:
+   - `DEFAULT_PAGE: 1`
+   - `DEFAULT_LIMIT: 50`
+   - `MAX_LIMIT: 100`
+2. Updated `TenantStorage.getTasks()` to support pagination with `page` and `limit` options
+3. Added `getAllTasks()` method for internal use where all tasks are needed
+4. Updated `/api/tasks` route to accept `page` and `limit` query parameters
+5. Response now includes pagination metadata: `{ tasks, pagination: { total, page, limit } }`
+6. When filtering by playbookId, all matching tasks are returned (no pagination needed for filtered subset)
 
 ---
 

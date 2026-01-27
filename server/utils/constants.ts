@@ -29,3 +29,9 @@ export const SLICE_LIMITS = {
   TOP_10: 10,
   CATEGORY_SUGGESTIONS: 2,
 } as const;
+
+export const PAGINATION = {
+  DEFAULT_PAGE: 1,
+  DEFAULT_LIMIT: 50,
+  MAX_LIMIT: 100,
+} as const;

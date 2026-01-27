@@ -249,7 +249,30 @@ export class TenantStorage {
     return true;
   }
 
-  async getTasks(): Promise<Task[]> {
+  async getTasks(options?: { page?: number; limit?: number }): Promise<{ tasks: Task[]; total: number; page: number; limit: number }> {
+    const page = options?.page ?? 1;
+    const limit = options?.limit ?? 50;
+    const offset = (page - 1) * limit;
+    
+    const [taskResults, countResult] = await Promise.all([
+      db.select().from(tasks)
+        .where(eq(tasks.tenantId, this.tenantId))
+        .orderBy(desc(tasks.createdAt))
+        .limit(limit)
+        .offset(offset),
+      db.select({ count: sql<number>`count(*)::int` }).from(tasks)
+        .where(eq(tasks.tenantId, this.tenantId))
+    ]);
+    
+    return {
+      tasks: taskResults,
+      total: countResult[0]?.count ?? 0,
+      page,
+      limit,
+    };
+  }
+  
+  async getAllTasks(): Promise<Task[]> {
     return db.select().from(tasks)
       .where(eq(tasks.tenantId, this.tenantId))
       .orderBy(desc(tasks.createdAt));

@@ -132,6 +132,8 @@ export const accounts = pgTable("accounts", {
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [
   index("idx_accounts_tenant_id").on(table.tenantId),
+  index("idx_accounts_segment").on(table.segment),
+  index("idx_accounts_assigned_tm").on(table.assignedTm),
 ]);
 
 export const insertAccountSchema = createInsertSchema(accounts).omit({
@@ -263,7 +265,10 @@ export const accountMetrics = pgTable("account_metrics", {
   categoryGapScore: numeric("category_gap_score"),
   opportunityScore: numeric("opportunity_score"),
   matchedProfileId: integer("matched_profile_id"),
-});
+}, (table) => [
+  index("idx_account_metrics_tenant_id").on(table.tenantId),
+  index("idx_account_metrics_account_id").on(table.accountId),
+]);
 
 export const insertAccountMetricsSchema = createInsertSchema(accountMetrics).omit({
   id: true,
@@ -284,7 +289,10 @@ export const accountCategoryGaps = pgTable("account_category_gaps", {
   gapPct: numeric("gap_pct"),
   estimatedOpportunity: numeric("estimated_opportunity"),
   computedAt: timestamp("computed_at").default(sql`CURRENT_TIMESTAMP`),
-});
+}, (table) => [
+  index("idx_account_category_gaps_tenant_id").on(table.tenantId),
+  index("idx_account_category_gaps_account_id").on(table.accountId),
+]);
 
 export const insertAccountCategoryGapSchema = createInsertSchema(accountCategoryGaps).omit({
   id: true,
@@ -314,6 +322,8 @@ export const tasks = pgTable("tasks", {
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [
   index("idx_tasks_tenant_id").on(table.tenantId),
+  index("idx_tasks_status").on(table.status),
+  index("idx_tasks_due_date").on(table.dueDate),
 ]);
 
 export const insertTaskSchema = createInsertSchema(tasks).omit({
@@ -388,6 +398,7 @@ export const programAccounts = pgTable("program_accounts", {
   graduationNotes: text("graduation_notes"), // Notes about graduation/success
 }, (table) => [
   index("idx_program_accounts_tenant_id").on(table.tenantId),
+  index("idx_program_accounts_account_id").on(table.accountId),
 ]);
 
 export const insertProgramAccountSchema = createInsertSchema(programAccounts).omit({

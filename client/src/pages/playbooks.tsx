@@ -152,9 +152,12 @@ export default function Playbooks() {
     ? `/api/tasks?playbookId=${selectedPlaybookId}`
     : "/api/tasks";
     
-  const { data: tasks, isLoading } = useQuery<Task[]>({
+  const { data: tasksResponse, isLoading } = useQuery<{ tasks: Task[]; pagination: { total: number; page: number; limit: number } }>({
     queryKey: [tasksQueryKey],
   });
+  
+  // Extract tasks array from response (handles new pagination format)
+  const tasks = tasksResponse?.tasks;
 
   // Fetch custom categories for the dialog
   const { data: customCategories } = useQuery<CustomCategory[]>({
