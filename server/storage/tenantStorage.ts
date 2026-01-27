@@ -529,6 +529,52 @@ export class TenantStorage {
     return updated;
   }
 
+  async getProgramRevenueSnapshots(programAccountId: number): Promise<import("@shared/schema").ProgramRevenueSnapshot[]> {
+    return db.select().from(programRevenueSnapshots)
+      .where(eq(programRevenueSnapshots.programAccountId, programAccountId))
+      .orderBy(desc(programRevenueSnapshots.periodEnd));
+  }
+
+  async createProgramRevenueSnapshot(snapshot: import("@shared/schema").InsertProgramRevenueSnapshot): Promise<import("@shared/schema").ProgramRevenueSnapshot> {
+    const [created] = await db.insert(programRevenueSnapshots)
+      .values(snapshot)
+      .returning();
+    return created;
+  }
+
+  async getAccountsBatch(accountIds: number[]): Promise<Map<number, Account>> {
+    if (accountIds.length === 0) return new Map();
+    
+    const allAccounts = await db.select().from(accounts)
+      .where(and(
+        inArray(accounts.id, accountIds),
+        eq(accounts.tenantId, this.tenantId)
+      ));
+    
+    const accountsMap = new Map<number, Account>();
+    for (const account of allAccounts) {
+      accountsMap.set(account.id, account);
+    }
+    return accountsMap;
+  }
+
+  async getProgramRevenueSnapshotsBatch(programAccountIds: number[]): Promise<Map<number, import("@shared/schema").ProgramRevenueSnapshot[]>> {
+    if (programAccountIds.length === 0) return new Map();
+    
+    const allSnapshots = await db.select().from(programRevenueSnapshots)
+      .where(inArray(programRevenueSnapshots.programAccountId, programAccountIds))
+      .orderBy(desc(programRevenueSnapshots.periodEnd));
+    
+    const snapshotsMap = new Map<number, import("@shared/schema").ProgramRevenueSnapshot[]>();
+    for (const snapshot of allSnapshots) {
+      if (!snapshotsMap.has(snapshot.programAccountId)) {
+        snapshotsMap.set(snapshot.programAccountId, []);
+      }
+      snapshotsMap.get(snapshot.programAccountId)!.push(snapshot);
+    }
+    return snapshotsMap;
+  }
+
   async getDataUploads(): Promise<DataUpload[]> {
     return db.select().from(dataUploads)
       .where(eq(dataUploads.tenantId, this.tenantId))

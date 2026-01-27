@@ -1528,15 +1528,30 @@ KEY TALKING POINTS:
   app.get("/api/program-accounts/graduation-ready", requireAuth, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
-      const programAccounts = await tenantStorage.getProgramAccounts();
-      const activeAccounts = programAccounts.filter(pa => pa.status === "active");
+      const allProgramAccounts = await tenantStorage.getProgramAccounts();
+      const activeAccounts = allProgramAccounts.filter(pa => pa.status === "active");
+      
+      if (activeAccounts.length === 0) {
+        return res.json({ count: 0, accounts: [] });
+      }
+
+      const accountIds = activeAccounts.map(pa => pa.accountId);
+      const programAccountIds = activeAccounts.map(pa => pa.id);
+      
+      const [accountsMap, metricsMap, snapshotsMap] = await Promise.all([
+        tenantStorage.getAccountsBatch(accountIds),
+        tenantStorage.getAccountMetricsBatch(accountIds),
+        tenantStorage.getProgramRevenueSnapshotsBatch(programAccountIds),
+      ]);
       
       const readyAccounts = [];
+      const now = new Date();
+      const MS_PER_MONTH = 1000 * 60 * 60 * 24 * 30;
       
       for (const pa of activeAccounts) {
-        const account = await tenantStorage.getAccount(pa.accountId);
-        const metrics = await tenantStorage.getAccountMetrics(pa.accountId);
-        const snapshots = await tenantStorage.getProgramRevenueSnapshots(pa.id);
+        const account = accountsMap.get(pa.accountId);
+        const metrics = metricsMap.get(pa.accountId);
+        const snapshots = snapshotsMap.get(pa.id) || [];
 
         const currentPenetration = metrics ? parseFloat(metrics.categoryPenetration || "0") : 0;
         const targetPenetration = pa.targetPenetration ? parseFloat(pa.targetPenetration) : null;
@@ -1550,10 +1565,7 @@ KEY TALKING POINTS:
           : null;
 
         const enrolledAt = new Date(pa.enrolledAt);
-        const now = new Date();
-        const monthsEnrolled = Math.floor(
-          (now.getTime() - enrolledAt.getTime()) / (1000 * 60 * 60 * 24 * 30)
-        );
+        const monthsEnrolled = Math.floor((now.getTime() - enrolledAt.getTime()) / MS_PER_MONTH);
         const targetDurationMonths = pa.targetDurationMonths || null;
 
         const objectivesMet = {

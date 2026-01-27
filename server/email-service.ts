@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 import { storage } from './storage';
 import type { Task, TerritoryManager, Account } from '@shared/schema';
+import { withRetry } from './utils/retry';
 
 let resendClient: Resend | null = null;
 
@@ -75,12 +76,15 @@ export async function sendEmail(
   }
 
   try {
-    const result = await client.emails.send({
-      from: `${settings.fromName} <${settings.fromEmail}>`,
-      to: [to],
-      subject,
-      html: htmlContent,
-    });
+    const result = await withRetry(
+      () => client.emails.send({
+        from: `${settings.fromName} <${settings.fromEmail}>`,
+        to: [to],
+        subject,
+        html: htmlContent,
+      }),
+      { maxRetries: 3, timeoutMs: 30000 }
+    );
 
     if (result.error) {
       return { success: false, error: result.error.message };
@@ -101,20 +105,23 @@ export async function sendTestEmail(toEmail: string): Promise<SendEmailResult> {
   }
 
   try {
-    const result = await client.emails.send({
-      from: `${settings.fromName} <${settings.fromEmail}>`,
-      to: [toEmail],
-      subject: 'Test Email from AI VP Dashboard',
-      html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #1a365d;">Email Configuration Test</h2>
-          <p>This is a test email from your AI VP Dashboard.</p>
-          <p>If you received this email, your email notifications are configured correctly!</p>
-          <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
-          <p style="color: #718096; font-size: 12px;">This is an automated message from the AI VP Dashboard.</p>
-        </div>
-      `,
-    });
+    const result = await withRetry(
+      () => client.emails.send({
+        from: `${settings.fromName} <${settings.fromEmail}>`,
+        to: [toEmail],
+        subject: 'Test Email from AI VP Dashboard',
+        html: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #1a365d;">Email Configuration Test</h2>
+            <p>This is a test email from your AI VP Dashboard.</p>
+            <p>If you received this email, your email notifications are configured correctly!</p>
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+            <p style="color: #718096; font-size: 12px;">This is an automated message from the AI VP Dashboard.</p>
+          </div>
+        `,
+      }),
+      { maxRetries: 3, timeoutMs: 30000 }
+    );
 
     if (result.error) {
       return { success: false, error: result.error.message };

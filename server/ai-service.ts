@@ -1,10 +1,13 @@
 import OpenAI from "openai";
 import { z } from "zod";
 import { storage } from "./storage";
+import { withRetry } from "./utils/retry";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+  timeout: 60000,
+  maxRetries: 0,
 });
 
 interface CategorySuggestion {
@@ -100,12 +103,15 @@ Respond in JSON format:
 }`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-5.1",
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
-      max_completion_tokens: 2048,
-    });
+    const response = await withRetry(
+      () => openai.chat.completions.create({
+        model: "gpt-5.1",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 2048,
+      }),
+      { maxRetries: 3, timeoutMs: 60000 }
+    );
 
     const content = response.choices[0]?.message?.content;
     if (!content) {
@@ -184,12 +190,15 @@ Respond in JSON format:
 }`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-5.1",
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
-      max_completion_tokens: 2048,
-    });
+    const response = await withRetry(
+      () => openai.chat.completions.create({
+        model: "gpt-5.1",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 2048,
+      }),
+      { maxRetries: 3, timeoutMs: 60000 }
+    );
 
     const content = response.choices[0]?.message?.content;
     if (!content) {
@@ -248,12 +257,15 @@ Respond in JSON format:
 }`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-5.1",
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
-      max_completion_tokens: 2048,
-    });
+    const response = await withRetry(
+      () => openai.chat.completions.create({
+        model: "gpt-5.1",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 2048,
+      }),
+      { maxRetries: 3, timeoutMs: 60000 }
+    );
 
     const content = response.choices[0]?.message?.content;
     if (!content) {
@@ -309,12 +321,15 @@ Respond in JSON format:
 }`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-5.1",
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
-      max_completion_tokens: 2048,
-    });
+    const response = await withRetry(
+      () => openai.chat.completions.create({
+        model: "gpt-5.1",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 2048,
+      }),
+      { maxRetries: 3, timeoutMs: 60000 }
+    );
 
     const content = response.choices[0]?.message?.content;
     if (!content) {
