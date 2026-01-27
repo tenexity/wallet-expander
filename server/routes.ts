@@ -24,6 +24,7 @@ import { db } from "./db";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { analyzeSegment, generatePlaybookTasks } from "./ai-service";
+import { handleRouteError } from "./utils/errorHandler";
 import { 
   getEmailSettings, 
   saveEmailSettings, 
@@ -178,8 +179,7 @@ export async function registerRoutes(
         recentTasks,
       });
     } catch (error) {
-      console.error("Dashboard stats error:", error);
-      res.status(500).json({ message: "Failed to get dashboard stats" });
+      handleRouteError(error, res, "Get dashboard stats");
     }
   });
 
@@ -190,14 +190,15 @@ export async function registerRoutes(
       const allTasks = await tenantStorage.getTasks();
       const allAccounts = await tenantStorage.getAccounts();
       
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      // Use UTC to avoid timezone issues with database dates
+      const now = new Date();
+      const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
       
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayUTC = new Date(todayUTC);
+      yesterdayUTC.setUTCDate(yesterdayUTC.getUTCDate() - 1);
       
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowUTC = new Date(todayUTC);
+      tomorrowUTC.setUTCDate(tomorrowUTC.getUTCDate() + 1);
       
       // Filter for tasks due today or overdue (not completed)
       const focusTasks = allTasks
@@ -206,15 +207,15 @@ export async function registerRoutes(
           if (!task.dueDate) return false;
           
           const dueDate = new Date(task.dueDate);
-          dueDate.setHours(0, 0, 0, 0);
+          const dueDateUTC = new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate()));
           
           // Due today or overdue (before today)
-          return dueDate <= today;
+          return dueDateUTC <= todayUTC;
         })
         .map(task => {
           const account = allAccounts.find(a => a.id === task.accountId);
           const dueDate = new Date(task.dueDate!);
-          dueDate.setHours(0, 0, 0, 0);
+          const dueDateUTC = new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate()));
           
           return {
             id: task.id,
@@ -226,7 +227,7 @@ export async function registerRoutes(
             description: task.description,
             status: task.status,
             dueDate: task.dueDate,
-            isOverdue: dueDate < today,
+            isOverdue: dueDateUTC < todayUTC,
             gapCategories: safeParseGapCategories(task.gapCategories),
           };
         })
@@ -243,8 +244,7 @@ export async function registerRoutes(
         tasks: focusTasks.slice(0, 10), // Top 10 priority items
       });
     } catch (error) {
-      console.error("Error fetching daily focus:", error);
-      res.status(500).json({ message: "Failed to fetch daily focus" });
+      handleRouteError(error, res, "Get daily focus");
     }
   });
 
@@ -295,8 +295,7 @@ export async function registerRoutes(
 
       res.json(accountsWithMetrics);
     } catch (error) {
-      console.error("Accounts error:", error);
-      res.status(500).json({ message: "Failed to get accounts" });
+      handleRouteError(error, res, "Get accounts");
     }
   });
 
@@ -313,7 +312,7 @@ export async function registerRoutes(
       }
       res.json(account);
     } catch (error) {
-      res.status(500).json({ message: "Failed to get account" });
+      handleRouteError(error, res, "Get account");
     }
   });
 
@@ -324,10 +323,7 @@ export async function registerRoutes(
       const account = await tenantStorage.createAccount(data);
       res.status(201).json(account);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
-      }
-      res.status(500).json({ message: "Failed to create account" });
+      handleRouteError(error, res, "Create account");
     }
   });
 
@@ -397,13 +393,14 @@ export async function registerRoutes(
         });
 
         // Generate AI tasks for each gap category
-        for (const gapCategory of topGaps) {
-          // Randomly pick a task type
+        for (let i = 0; i < topGaps.length; i++) {
+          const gapCategory = topGaps[i];
+          // Deterministic task type selection based on gap index (round-robin)
           const taskTypes = ["call", "email", "visit"] as const;
-          const taskType = taskTypes[Math.floor(Math.random() * taskTypes.length)];
+          const taskType = taskTypes[i % taskTypes.length];
           
-          // Calculate due date (7-14 days from now)
-          const daysFromNow = 7 + Math.floor(Math.random() * 7);
+          // Calculate due date deterministically based on priority (higher priority = sooner)
+          const daysFromNow = 7 + i * 2; // First gap: 7 days, second: 9 days, etc.
           const dueDate = new Date();
           dueDate.setDate(dueDate.getDate() + daysFromNow);
 
@@ -493,8 +490,7 @@ KEY TALKING POINTS:
         playbook,
       });
     } catch (error) {
-      console.error("Enrollment error:", error);
-      res.status(500).json({ message: "Failed to enroll account" });
+      handleRouteError(error, res, "Enroll account");
     }
   });
 
@@ -531,8 +527,7 @@ KEY TALKING POINTS:
 
       res.json(profilesWithDetails);
     } catch (error) {
-      console.error("Segment profiles error:", error);
-      res.status(500).json({ message: "Failed to get segment profiles" });
+      handleRouteError(error, res, "Get segment profiles");
     }
   });
 
@@ -550,7 +545,7 @@ KEY TALKING POINTS:
       const categories = await tenantStorage.getProfileCategories(id);
       res.json({ ...profile, categories });
     } catch (error) {
-      res.status(500).json({ message: "Failed to get profile" });
+      handleRouteError(error, res, "Get profile");
     }
   });
 
@@ -561,10 +556,7 @@ KEY TALKING POINTS:
       const profile = await tenantStorage.createSegmentProfile(data);
       res.status(201).json(profile);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
-      }
-      res.status(500).json({ message: "Failed to create profile" });
+      handleRouteError(error, res, "Create profile");
     }
   });
 
@@ -582,10 +574,7 @@ KEY TALKING POINTS:
       }
       res.json(profile);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
-      }
-      res.status(500).json({ message: "Failed to update profile" });
+      handleRouteError(error, res, "Update profile");
     }
   });
 
@@ -603,7 +592,7 @@ KEY TALKING POINTS:
       }
       res.json(profile);
     } catch (error) {
-      res.status(500).json({ message: "Failed to approve profile" });
+      handleRouteError(error, res, "Approve profile");
     }
   });
 
@@ -620,8 +609,7 @@ KEY TALKING POINTS:
       }
       res.json({ message: "Profile deleted successfully" });
     } catch (error) {
-      console.error("Delete profile error:", error);
-      res.status(500).json({ message: "Failed to delete profile" });
+      handleRouteError(error, res, "Delete profile");
     }
   });
 
@@ -643,8 +631,7 @@ KEY TALKING POINTS:
         },
       });
     } catch (error) {
-      console.error("Segment analysis error:", error);
-      res.status(500).json({ message: "Failed to analyze segment" });
+      handleRouteError(error, res, "Analyze segment");
     }
   });
 
@@ -973,8 +960,7 @@ KEY TALKING POINTS:
         },
       });
     } catch (error) {
-      console.error("Data insights error:", error);
-      res.status(500).json({ message: "Failed to get data insights" });
+      handleRouteError(error, res, "Get data insights");
     }
   });
 
@@ -1003,8 +989,7 @@ KEY TALKING POINTS:
 
       res.json(tasksWithDetails);
     } catch (error) {
-      console.error("Tasks error:", error);
-      res.status(500).json({ message: "Failed to get tasks" });
+      handleRouteError(error, res, "Get tasks");
     }
   });
 
@@ -1021,7 +1006,7 @@ KEY TALKING POINTS:
       }
       res.json(task);
     } catch (error) {
-      res.status(500).json({ message: "Failed to get task" });
+      handleRouteError(error, res, "Get task");
     }
   });
 
@@ -1045,10 +1030,7 @@ KEY TALKING POINTS:
       
       res.status(201).json(task);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
-      }
-      res.status(500).json({ message: "Failed to create task" });
+      handleRouteError(error, res, "Create task");
     }
   });
 
@@ -1066,10 +1048,7 @@ KEY TALKING POINTS:
       }
       res.json(task);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
-      }
-      res.status(500).json({ message: "Failed to update task" });
+      handleRouteError(error, res, "Update task");
     }
   });
 
@@ -1091,7 +1070,7 @@ KEY TALKING POINTS:
       }
       res.json(task);
     } catch (error) {
-      res.status(500).json({ message: "Failed to complete task" });
+      handleRouteError(error, res, "Complete task");
     }
   });
 
@@ -1131,8 +1110,7 @@ KEY TALKING POINTS:
 
       res.json(playbooksWithStats);
     } catch (error) {
-      console.error("Playbooks error:", error);
-      res.status(500).json({ message: "Failed to get playbooks" });
+      handleRouteError(error, res, "Get playbooks");
     }
   });
 
@@ -1161,8 +1139,7 @@ KEY TALKING POINTS:
 
       res.json(tasksWithDetails);
     } catch (error) {
-      console.error("Playbook tasks error:", error);
-      res.status(500).json({ message: "Failed to get playbook tasks" });
+      handleRouteError(error, res, "Get playbook tasks");
     }
   });
 
@@ -1173,10 +1150,7 @@ KEY TALKING POINTS:
       const playbook = await tenantStorage.createPlaybook(data);
       res.status(201).json(playbook);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
-      }
-      res.status(500).json({ message: "Failed to create playbook" });
+      handleRouteError(error, res, "Create playbook");
     }
   });
 
@@ -1267,8 +1241,7 @@ KEY TALKING POINTS:
         tasksGenerated: generatedTasks.length,
       });
     } catch (error) {
-      console.error("Playbook generation error:", error);
-      res.status(500).json({ message: "Failed to generate playbook" });
+      handleRouteError(error, res, "Generate playbook");
     }
   });
 
@@ -1305,8 +1278,7 @@ KEY TALKING POINTS:
 
       res.json(accountsWithDetails);
     } catch (error) {
-      console.error("Program accounts error:", error);
-      res.status(500).json({ message: "Failed to get program accounts" });
+      handleRouteError(error, res, "Get program accounts");
     }
   });
 
@@ -1390,11 +1362,7 @@ KEY TALKING POINTS:
       
       res.status(201).json(programAccount);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
-      }
-      console.error("Enroll account error:", error);
-      res.status(500).json({ message: "Failed to enroll account" });
+      handleRouteError(error, res, "Enroll account");
     }
   });
 
@@ -1412,10 +1380,7 @@ KEY TALKING POINTS:
       }
       res.json(programAccount);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
-      }
-      res.status(500).json({ message: "Failed to update program account" });
+      handleRouteError(error, res, "Update program account");
     }
   });
 
@@ -1525,8 +1490,7 @@ KEY TALKING POINTS:
         graduatedAt: programAccount.graduatedAt,
       });
     } catch (error) {
-      console.error("Graduation progress error:", error);
-      res.status(500).json({ message: "Failed to get graduation progress" });
+      handleRouteError(error, res, "Get graduation progress");
     }
   });
 
@@ -1564,8 +1528,7 @@ KEY TALKING POINTS:
         accountName: account?.name || "Unknown",
       });
     } catch (error) {
-      console.error("Graduate account error:", error);
-      res.status(500).json({ message: "Failed to graduate account" });
+      handleRouteError(error, res, "Graduate account");
     }
   });
 
@@ -1637,8 +1600,7 @@ KEY TALKING POINTS:
         accounts: readyAccounts,
       });
     } catch (error) {
-      console.error("Graduation ready error:", error);
-      res.status(500).json({ message: "Failed to get graduation-ready accounts" });
+      handleRouteError(error, res, "Get graduation-ready accounts");
     }
   });
 
@@ -1649,7 +1611,7 @@ KEY TALKING POINTS:
       const uploads = await tenantStorage.getDataUploads();
       res.json(uploads);
     } catch (error) {
-      res.status(500).json({ message: "Failed to get uploads" });
+      handleRouteError(error, res, "Get uploads");
     }
   });
 
@@ -1670,10 +1632,7 @@ KEY TALKING POINTS:
 
       res.status(201).json(upload);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
-      }
-      res.status(500).json({ message: "Failed to create upload" });
+      handleRouteError(error, res, "Create upload");
     }
   });
 
@@ -1684,7 +1643,7 @@ KEY TALKING POINTS:
       const settings = await tenantStorage.getSettings();
       res.json(settings);
     } catch (error) {
-      res.status(500).json({ message: "Failed to get settings" });
+      handleRouteError(error, res, "Get settings");
     }
   });
 
@@ -1695,7 +1654,7 @@ KEY TALKING POINTS:
       const setting = await tenantStorage.getSetting(key);
       res.json(setting || { key, value: null });
     } catch (error) {
-      res.status(500).json({ message: "Failed to get setting" });
+      handleRouteError(error, res, "Get setting");
     }
   });
 
@@ -1707,7 +1666,7 @@ KEY TALKING POINTS:
       const setting = await tenantStorage.upsertSetting({ key, value });
       res.json(setting);
     } catch (error) {
-      res.status(500).json({ message: "Failed to update setting" });
+      handleRouteError(error, res, "Update setting");
     }
   });
 
@@ -1722,7 +1681,7 @@ KEY TALKING POINTS:
       const setting = await tenantStorage.upsertSetting({ key: "companyLogo", value: logo });
       res.json(setting);
     } catch (error) {
-      res.status(500).json({ message: "Failed to upload logo" });
+      handleRouteError(error, res, "Upload logo");
     }
   });
 
@@ -1732,7 +1691,7 @@ KEY TALKING POINTS:
       await tenantStorage.upsertSetting({ key: "companyLogo", value: "" });
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ message: "Failed to remove logo" });
+      handleRouteError(error, res, "Remove logo");
     }
   });
 
@@ -1743,7 +1702,7 @@ KEY TALKING POINTS:
       const categories = await tenantStorage.getProductCategories();
       res.json(categories);
     } catch (error) {
-      res.status(500).json({ message: "Failed to get categories" });
+      handleRouteError(error, res, "Get categories");
     }
   });
 
@@ -1754,7 +1713,7 @@ KEY TALKING POINTS:
       const products = await tenantStorage.getProducts();
       res.json(products);
     } catch (error) {
-      res.status(500).json({ message: "Failed to get products" });
+      handleRouteError(error, res, "Get products");
     }
   });
 
@@ -1783,8 +1742,7 @@ KEY TALKING POINTS:
         });
       }
     } catch (error) {
-      console.error("Get scoring weights error:", error);
-      res.status(500).json({ message: "Failed to get scoring weights" });
+      handleRouteError(error, res, "Get scoring weights");
     }
   });
 
@@ -1818,8 +1776,7 @@ KEY TALKING POINTS:
         categoryCountWeight: parseFloat(weights.categoryCountWeight),
       });
     } catch (error) {
-      console.error("Update scoring weights error:", error);
-      res.status(500).json({ message: "Failed to update scoring weights" });
+      handleRouteError(error, res, "Update scoring weights");
     }
   });
 
@@ -1830,8 +1787,7 @@ KEY TALKING POINTS:
       const managers = await tenantStorage.getTerritoryManagers();
       res.json(managers);
     } catch (error) {
-      console.error("Get territory managers error:", error);
-      res.status(500).json({ message: "Failed to get territory managers" });
+      handleRouteError(error, res, "Get territory managers");
     }
   });
 
@@ -1842,11 +1798,7 @@ KEY TALKING POINTS:
       const manager = await tenantStorage.createTerritoryManager(data);
       res.status(201).json(manager);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
-      }
-      console.error("Create territory manager error:", error);
-      res.status(500).json({ message: "Failed to create territory manager" });
+      handleRouteError(error, res, "Create territory manager");
     }
   });
 
@@ -1864,11 +1816,7 @@ KEY TALKING POINTS:
       }
       res.json(manager);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
-      }
-      console.error("Update territory manager error:", error);
-      res.status(500).json({ message: "Failed to update territory manager" });
+      handleRouteError(error, res, "Update territory manager");
     }
   });
 
@@ -1885,8 +1833,7 @@ KEY TALKING POINTS:
       }
       res.json({ message: "Territory manager deleted successfully" });
     } catch (error) {
-      console.error("Delete territory manager error:", error);
-      res.status(500).json({ message: "Failed to delete territory manager" });
+      handleRouteError(error, res, "Delete territory manager");
     }
   });
 
@@ -1897,8 +1844,7 @@ KEY TALKING POINTS:
       const categories = await tenantStorage.getCustomCategories();
       res.json(categories);
     } catch (error) {
-      console.error("Get custom categories error:", error);
-      res.status(500).json({ message: "Failed to get custom categories" });
+      handleRouteError(error, res, "Get custom categories");
     }
   });
 
@@ -1912,8 +1858,7 @@ KEY TALKING POINTS:
       const category = await tenantStorage.createCustomCategory(parsed.data);
       res.status(201).json(category);
     } catch (error) {
-      console.error("Create custom category error:", error);
-      res.status(500).json({ message: "Failed to create custom category" });
+      handleRouteError(error, res, "Create custom category");
     }
   });
 
@@ -1931,11 +1876,7 @@ KEY TALKING POINTS:
       }
       res.json(category);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
-      }
-      console.error("Update custom category error:", error);
-      res.status(500).json({ message: "Failed to update custom category" });
+      handleRouteError(error, res, "Update custom category");
     }
   });
 
@@ -1952,8 +1893,7 @@ KEY TALKING POINTS:
       }
       res.json({ message: "Category deleted successfully" });
     } catch (error) {
-      console.error("Delete custom category error:", error);
-      res.status(500).json({ message: "Failed to delete custom category" });
+      handleRouteError(error, res, "Delete custom category");
     }
   });
 
@@ -1987,8 +1927,7 @@ KEY TALKING POINTS:
       
       res.status(201).json({ message: "Default categories created", categories: created });
     } catch (error) {
-      console.error("Seed categories error:", error);
-      res.status(500).json({ message: "Failed to seed default categories" });
+      handleRouteError(error, res, "Seed default categories");
     }
   });
 
@@ -1999,8 +1938,7 @@ KEY TALKING POINTS:
       const tiers = await tenantStorage.getRevShareTiers();
       res.json(tiers);
     } catch (error) {
-      console.error("Get rev-share tiers error:", error);
-      res.status(500).json({ message: "Failed to get rev-share tiers" });
+      handleRouteError(error, res, "Get rev-share tiers");
     }
   });
 
@@ -2027,8 +1965,7 @@ KEY TALKING POINTS:
       const tier = await tenantStorage.createRevShareTier(validated);
       res.status(201).json(tier);
     } catch (error) {
-      console.error("Create rev-share tier error:", error);
-      res.status(500).json({ message: "Failed to create rev-share tier" });
+      handleRouteError(error, res, "Create rev-share tier");
     }
   });
 
@@ -2068,11 +2005,7 @@ KEY TALKING POINTS:
       }
       res.json(tier);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid data", errors: error.errors });
-      }
-      console.error("Update rev-share tier error:", error);
-      res.status(500).json({ message: "Failed to update rev-share tier" });
+      handleRouteError(error, res, "Update rev-share tier");
     }
   });
 
@@ -2086,8 +2019,7 @@ KEY TALKING POINTS:
       await tenantStorage.deleteRevShareTier(id);
       res.status(204).send();
     } catch (error) {
-      console.error("Delete rev-share tier error:", error);
-      res.status(500).json({ message: "Failed to delete rev-share tier" });
+      handleRouteError(error, res, "Delete rev-share tier");
     }
   });
 
@@ -2155,8 +2087,7 @@ KEY TALKING POINTS:
         breakdown
       });
     } catch (error) {
-      console.error("Calculate rev-share error:", error);
-      res.status(500).json({ message: "Failed to calculate rev-share" });
+      handleRouteError(error, res, "Calculate rev-share");
     }
   });
 
@@ -2179,8 +2110,7 @@ KEY TALKING POINTS:
 
       res.status(201).json({ message: "Default tier created", tier: defaultTier });
     } catch (error) {
-      console.error("Seed default tier error:", error);
-      res.status(500).json({ message: "Failed to seed default tier" });
+      handleRouteError(error, res, "Seed default tier");
     }
   });
 
@@ -2212,8 +2142,7 @@ KEY TALKING POINTS:
         .orderBy(subscriptionPlans.displayOrder);
       res.json(plans);
     } catch (error) {
-      console.error("Error fetching subscription plans:", error);
-      res.status(500).json({ message: "Failed to fetch subscription plans" });
+      handleRouteError(error, res, "Fetch subscription plans");
     }
   });
 
@@ -2242,8 +2171,7 @@ KEY TALKING POINTS:
         plan: planDetails,
       });
     } catch (error) {
-      console.error("Error fetching subscription:", error);
-      res.status(500).json({ message: "Failed to fetch subscription" });
+      handleRouteError(error, res, "Fetch subscription");
     }
   });
 
@@ -2325,8 +2253,7 @@ KEY TALKING POINTS:
       
       res.json({ url: session.url, sessionId: session.id });
     } catch (error: any) {
-      console.error("Error creating checkout session:", error);
-      res.status(500).json({ message: error.message || "Failed to create checkout session" });
+      handleRouteError(error, res, "Create checkout session");
     }
   });
 
@@ -2357,8 +2284,7 @@ KEY TALKING POINTS:
       
       res.json({ url: session.url });
     } catch (error: any) {
-      console.error("Error creating portal session:", error);
-      res.status(500).json({ message: error.message || "Failed to create portal session" });
+      handleRouteError(error, res, "Create portal session");
     }
   });
 
@@ -2581,7 +2507,7 @@ KEY TALKING POINTS:
         isConfigured: isEmailConfigured(),
       });
     } catch (error) {
-      res.status(500).json({ message: "Failed to get email settings" });
+      handleRouteError(error, res, "Get email settings");
     }
   });
 
@@ -2591,10 +2517,7 @@ KEY TALKING POINTS:
       const settings = await saveEmailSettings(validatedData);
       res.json(settings);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid email settings", errors: error.errors });
-      }
-      res.status(500).json({ message: "Failed to update email settings" });
+      handleRouteError(error, res, "Update email settings");
     }
   });
 
@@ -2612,7 +2535,7 @@ KEY TALKING POINTS:
         res.status(400).json({ message: result.error || "Failed to send test email" });
       }
     } catch (error) {
-      res.status(500).json({ message: "Failed to send test email" });
+      handleRouteError(error, res, "Send test email");
     }
   });
 

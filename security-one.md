@@ -299,70 +299,57 @@ The `accountMetrics` and `accountCategoryGaps` tables now include `tenantId` col
 
 ---
 
-### 3.2 MEDIUM: Inconsistent Error Handling
+### 3.2 MEDIUM: Inconsistent Error Handling ✅ RESOLVED
 
 **Location:** `server/routes.ts` - Various routes
 
-**Issue:** Some routes log errors, others don't. Error messages vary in detail.
+**Original Issue:** Some routes logged errors, others didn't. Error messages varied in detail.
 
-```typescript
-// Line 174 - Logs error
-catch (error) {
-  console.error("Dashboard stats error:", error);
-  res.status(500).json({ message: "Failed to get dashboard stats" });
-}
-
-// Line 297-298 - Doesn't log
-catch (error) {
-  res.status(500).json({ message: "Failed to get account" });
-}
-```
-
-**Recommendation:** Standardize error handling with a middleware.
+**Resolution:**
+1. Created `server/utils/errorHandler.ts` with standardized `handleRouteError()` function
+2. The utility handles both ZodError (400 status with validation errors) and general errors (500 status)
+3. All catch blocks in routes.ts now use `handleRouteError(error, res, "Context description")`
+4. Consistent logging and error response format across all routes
 
 ---
 
-### 3.4 MEDIUM: Potential Null Reference in Enrollment
+### 3.4 MEDIUM: Potential Null Reference in Enrollment ✅ RESOLVED
 
-**Location:** `server/routes.ts` - Lines 378-439
+**Location:** `server/routes.ts` - Account enrollment task generation
 
-**Issue:** Task type randomly selected could create inconsistent behavior.
+**Original Issue:** Task type was randomly selected which created inconsistent, non-reproducible behavior.
 
-```typescript
-const taskTypes = ["call", "email", "visit"] as const;
-const taskType = taskTypes[Math.floor(Math.random() * taskTypes.length)];
-```
-
-**Recommendation:** Use deterministic selection based on gap priority or allow configuration.
+**Resolution:**
+1. Changed from `Math.random()` to index-based round-robin selection: `taskTypes[i % taskTypes.length]`
+2. Due dates now deterministic based on priority: `7 + i * 2` days (higher priority gaps get earlier due dates)
+3. First gap → call (7 days), second gap → email (9 days), third gap → visit (11 days)
 
 ---
 
-### 3.5 LOW: Date Handling Edge Cases
+### 3.5 LOW: Date Handling Edge Cases ✅ RESOLVED
 
-**Location:** `server/routes.ts` - Lines 185-210
+**Location:** `server/routes.ts` - GET /api/daily-focus
 
-**Issue:** Date comparisons in daily-focus may have timezone issues.
+**Original Issue:** Date comparisons used local timezone which could mismatch with database dates.
 
-```typescript
-const today = new Date();
-today.setHours(0, 0, 0, 0); // Uses local timezone, could mismatch with DB
-```
-
-**Recommendation:** Use UTC consistently or store dates in UTC.
+**Resolution:**
+1. Changed to use UTC consistently: `Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())`
+2. All date comparisons now use UTC versions: `todayUTC`, `dueDateUTC`
+3. The `isOverdue` calculation now compares `dueDateUTC < todayUTC`
 
 ---
 
-### 3.6 LOW: Missing Null Checks in Analytics
+### 3.6 LOW: Missing Null Checks in Analytics ✅ RESOLVED
 
 **Location:** `server/routes.ts` - Various data calculation routes
 
-**Issue:** Some calculations don't handle empty arrays gracefully.
+**Status:** Audited and confirmed existing code has proper null checks.
 
-```typescript
-const avgCategoryCount = classACustomers.length > 0 
-  ? Math.round(classACustomers.reduce(...)) 
-  : 0; // Good - but not consistent everywhere
-```
+**Findings:**
+- All `reduce()` operations dividing by `.length` have proper `length > 0` guards
+- `Math.min/Math.max` with spread operators are protected by length checks
+- Default values provided for nullable metrics: `metrics?.last12mRevenue ? parseFloat(...) : 0`
+- Empty array edge cases handled with fallback values (e.g., `: 30`, `: 0`)
 
 ---
 
