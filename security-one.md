@@ -18,64 +18,38 @@
 
 ## 1. Security Vulnerabilities
 
-### 1.1 CRITICAL: Cross-Tenant Data Leakage in Account Metrics
+### 1.1 CRITICAL: Cross-Tenant Data Leakage in Account Metrics ✅ RESOLVED
 
-**Location:** `shared/schema.ts` - Lines 253-293, `server/storage/tenantStorage.ts` - Lines 175-205
+**Location:** `shared/schema.ts` - Lines 253-293, `server/storage/tenantStorage.ts` - Lines 137-167
 
-**Issue:** The `accountMetrics` and `accountCategoryGaps` tables do NOT have a `tenantId` column. However, TenantStorage methods query these tables by `accountId` only, without any tenant scoping. This allows cross-tenant data leakage.
+**Original Issue:** The `accountMetrics` and `accountCategoryGaps` tables did NOT have a `tenantId` column. TenantStorage methods queried these tables by `accountId` only, without any tenant scoping.
 
-**Schema (shared/schema.ts):**
+**Resolution:**
+1. Added `tenantId` column to both `accountMetrics` and `accountCategoryGaps` tables in `shared/schema.ts`
+2. Updated all TenantStorage methods to filter by `tenantId`:
+   - `getAccountMetrics()` - filters by `eq(accountMetrics.tenantId, this.tenantId)`
+   - `getLatestAccountMetrics()` - filters by tenantId
+   - `getAccountCategoryGaps()` - filters by `eq(accountCategoryGaps.tenantId, this.tenantId)`
+   - `createAccountMetrics()` - injects `tenantId: this.tenantId`
+   - `createAccountCategoryGap()` - injects `tenantId: this.tenantId`
+3. Database migration applied - both tables now have `tenant_id` column
+
+**Current Schema (shared/schema.ts):**
 ```typescript
 export const accountMetrics = pgTable("account_metrics", {
   id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id"), // Multi-tenant isolation
   accountId: integer("account_id").notNull(),
-  // MISSING: tenantId: integer("tenant_id"),
   // ...
 });
 
 export const accountCategoryGaps = pgTable("account_category_gaps", {
   id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id"), // Multi-tenant isolation
   accountId: integer("account_id").notNull(),
   categoryId: integer("category_id").notNull(),
-  // MISSING: tenantId: integer("tenant_id"),
   // ...
 });
-```
-
-**Impact:** 
-- If two tenants have accounts with the same ID (possible since each tenant's data is inserted separately), one tenant could see another tenant's metrics data
-- Account metrics and category gap data are sensitive business intelligence that reveals customer purchasing patterns
-- This is a **data breach vulnerability** in a multi-tenant SaaS application
-
-**Fix Required:**
-1. Add `tenantId` column to both tables in schema.ts
-2. Add index on `tenantId` for query performance
-3. Update TenantStorage methods to include tenant filtering
-4. Run database migration: `npm run db:push --force`
-
-**Migration Steps:**
-```typescript
-// 1. Update schema.ts
-export const accountMetrics = pgTable("account_metrics", {
-  id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id"), // ADD THIS
-  accountId: integer("account_id").notNull(),
-  // ...
-}, (table) => [
-  index("idx_account_metrics_tenant_id").on(table.tenantId),
-]);
-
-// 2. Update tenantStorage.ts getAccountMetrics
-async getAccountMetrics(accountId: number): Promise<AccountMetrics | undefined> {
-  const [metrics] = await db.select().from(accountMetrics)
-    .where(and(
-      eq(accountMetrics.accountId, accountId),
-      eq(accountMetrics.tenantId, this.tenantId) // ADD THIS
-    ))
-    .orderBy(desc(accountMetrics.computedAt))
-    .limit(1);
-  return metrics;
-}
 ```
 
 ---
@@ -177,18 +151,18 @@ The Stripe webhook handler correctly:
 
 ---
 
-### 1.6 INFO: Multi-Tenant Data Isolation (Partially Implemented)
+### 1.6 INFO: Multi-Tenant Data Isolation ✅ FULLY SECURE
 
 **Location:** `server/storage/tenantStorage.ts`
 
-**Status:** ⚠️ MOSTLY SECURE with CRITICAL EXCEPTION
+**Status:** ✅ SECURE
 
-The TenantStorage class properly enforces tenant isolation for most tables:
+The TenantStorage class properly enforces tenant isolation for ALL tables:
 - All queries include `eq(table.tenantId, this.tenantId)` condition
 - Creates with `tenantId` automatically injected
 - Updates and deletes require matching tenantId
 
-**EXCEPTION:** See Section 1.1 - `accountMetrics` and `accountCategoryGaps` tables lack tenantId and are NOT tenant-scoped.
+**Previous Exception Resolved:** The `accountMetrics` and `accountCategoryGaps` tables now have `tenantId` columns and are properly tenant-scoped (see Section 1.1).
 
 ---
 
