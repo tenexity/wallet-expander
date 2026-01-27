@@ -109,52 +109,57 @@ const profile = await tenantStorage.updateSegmentProfile(id, updateData);
 
 ---
 
-### 1.3 MEDIUM: Integer ID Parsing Without Validation
+### 1.3 MEDIUM: Integer ID Parsing Without Validation ✅ RESOLVED
 
 **Location:** Multiple routes in `server/routes.ts`
 
 **Issue:** `parseInt(req.params.id)` can return `NaN` for non-numeric inputs, which may cause unexpected behavior.
 
-```typescript
-const id = parseInt(req.params.id); // Could be NaN
-const account = await tenantStorage.getAccount(id);
-```
-
-**Recommendation:** Validate numeric IDs:
-```typescript
-const id = parseInt(req.params.id);
-if (isNaN(id) || id <= 0) {
-  return res.status(400).json({ message: "Invalid ID parameter" });
-}
-```
+**Resolution:** Added `isNaN(id)` validation with 400 response to all routes that parse integer IDs:
+- GET /api/accounts/:id
+- POST /api/accounts/:id/enroll
+- GET /api/segment-profiles/:id
+- PATCH /api/segment-profiles/:id
+- POST /api/segment-profiles/:id/approve
+- DELETE /api/segment-profiles/:id
+- GET /api/tasks/:id
+- PATCH /api/tasks/:id
+- POST /api/tasks/:id/complete
+- GET /api/playbooks/:id/tasks
+- GET /api/program-accounts/:id/graduation-progress
+- PATCH /api/program-accounts/:id
+- POST /api/program-accounts/:id/graduate
+- PUT /api/territory-managers/:id
+- DELETE /api/territory-managers/:id
+- PUT /api/custom-categories/:id
+- DELETE /api/custom-categories/:id
+- PUT /api/rev-share-tiers/:id
+- DELETE /api/rev-share-tiers/:id
 
 ---
 
-### 1.3 MEDIUM: Inconsistent Subscription Enforcement
+### 1.4 MEDIUM: Inconsistent Subscription Enforcement ✅ RESOLVED
 
 **Location:** `server/routes.ts`
 
-**Issue:** Some routes use `requireSubscription` middleware while others only use `requireAuth`, creating potential access inconsistencies.
+**Issue:** Some routes used `requireSubscription` middleware while others only used `requireAuth`, creating potential access inconsistencies.
 
-**Protected with requireSubscription:**
-- `/api/dashboard/stats`
-- `/api/daily-focus`
-- `/api/accounts` (GET, POST)
-- `/api/accounts/:id/enroll`
-- `/api/segment-profiles` (GET)
-- `/api/tasks` (GET)
-- `/api/playbooks` (GET, POST)
-- `/api/program-accounts` (GET)
-
-**Protected with only requireAuth (potential gaps):**
-- `/api/segment-profiles/:id` (PATCH, DELETE)
-- `/api/segment-profiles/analyze`
-- `/api/data-insights/:segment`
+**Resolution:** Standardized subscription enforcement. The following routes now use `requireSubscription`:
+- `/api/segment-profiles/:id` (GET, PATCH, DELETE)
+- `/api/segment-profiles/:id/approve` (POST)
+- `/api/segment-profiles/analyze` (POST)
+- `/api/data-insights/:segment` (GET)
 - `/api/tasks/:id` (GET, PATCH)
+- `/api/tasks/:id/complete` (POST)
 - `/api/tasks` (POST)
-- `/api/email/*` routes
-
-**Recommendation:** Review and standardize subscription enforcement across all business logic routes.
+- `/api/playbooks/:id/tasks` (GET)
+- `/api/program-accounts/:id/graduation-progress` (GET)
+- `/api/program-accounts/:id/graduate` (POST)
+- `/api/territory-managers/:id` (DELETE)
+- `/api/custom-categories/:id` (DELETE)
+- `/api/rev-share-tiers/:id` (DELETE)
+- `/api/email/settings` (GET, PATCH)
+- `/api/email/test` (POST)
 
 ---
 

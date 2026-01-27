@@ -288,6 +288,9 @@ export async function registerRoutes(
     try {
       const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid account ID" });
+      }
       const account = await tenantStorage.getAccount(id);
       if (!account) {
         return res.status(404).json({ message: "Account not found" });
@@ -317,6 +320,9 @@ export async function registerRoutes(
     try {
       const tenantStorage = getStorage(req);
       const accountId = parseInt(req.params.id);
+      if (isNaN(accountId)) {
+        return res.status(400).json({ message: "Invalid account ID" });
+      }
       const account = await tenantStorage.getAccount(accountId);
       
       if (!account) {
@@ -518,6 +524,9 @@ KEY TALKING POINTS:
     try {
       const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid profile ID" });
+      }
       const profile = await tenantStorage.getSegmentProfile(id);
       if (!profile) {
         return res.status(404).json({ message: "Profile not found" });
@@ -543,7 +552,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.patch("/api/segment-profiles/:id", requireAuth, async (req, res) => {
+  app.patch("/api/segment-profiles/:id", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
@@ -564,10 +573,13 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/segment-profiles/:id/approve", requireAuth, async (req, res) => {
+  app.post("/api/segment-profiles/:id/approve", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid profile ID" });
+      }
       const approvedBy = req.body.approvedBy || "Admin";
       const profile = await tenantStorage.approveSegmentProfile(id, approvedBy);
       if (!profile) {
@@ -579,10 +591,13 @@ KEY TALKING POINTS:
     }
   });
 
-  app.delete("/api/segment-profiles/:id", requireAuth, async (req, res) => {
+  app.delete("/api/segment-profiles/:id", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid profile ID" });
+      }
       const success = await tenantStorage.deleteSegmentProfile(id);
       if (!success) {
         return res.status(404).json({ message: "Profile not found" });
@@ -594,7 +609,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/segment-profiles/analyze", requireAuth, async (req, res) => {
+  app.post("/api/segment-profiles/analyze", requireSubscription, async (req, res) => {
     try {
       const { segment } = req.body;
       if (!segment) {
@@ -618,7 +633,7 @@ KEY TALKING POINTS:
   });
 
   // ============ Data Insights (for ICP Builder) ============
-  app.get("/api/data-insights/:segment", requireAuth, async (req, res) => {
+  app.get("/api/data-insights/:segment", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const { segment } = req.params;
@@ -980,10 +995,13 @@ KEY TALKING POINTS:
     }
   });
 
-  app.get("/api/tasks/:id", requireAuth, async (req, res) => {
+  app.get("/api/tasks/:id", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid task ID" });
+      }
       const task = await tenantStorage.getTask(id);
       if (!task) {
         return res.status(404).json({ message: "Task not found" });
@@ -994,7 +1012,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/tasks", requireAuth, async (req, res) => {
+  app.post("/api/tasks", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const data = insertTaskSchema.parse(req.body);
@@ -1021,7 +1039,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.patch("/api/tasks/:id", requireAuth, async (req, res) => {
+  app.patch("/api/tasks/:id", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
@@ -1042,10 +1060,13 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/tasks/:id/complete", requireAuth, async (req, res) => {
+  app.post("/api/tasks/:id/complete", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid task ID" });
+      }
       const { outcome } = req.body;
       const task = await tenantStorage.updateTask(id, {
         status: "completed",
@@ -1102,10 +1123,13 @@ KEY TALKING POINTS:
     }
   });
 
-  app.get("/api/playbooks/:id/tasks", requireAuth, async (req, res) => {
+  app.get("/api/playbooks/:id/tasks", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const playbookId = parseInt(req.params.id);
+      if (isNaN(playbookId)) {
+        return res.status(400).json({ message: "Invalid playbook ID" });
+      }
       const playbookTaskLinks = await tenantStorage.getPlaybookTasks(playbookId);
       const allTasks = await tenantStorage.getTasks();
       const allAccounts = await tenantStorage.getAccounts();
@@ -1383,10 +1407,13 @@ KEY TALKING POINTS:
   });
 
   // Get graduation progress for a program account
-  app.get("/api/program-accounts/:id/graduation-progress", requireAuth, async (req, res) => {
+  app.get("/api/program-accounts/:id/graduation-progress", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid program account ID" });
+      }
       const programAccount = await tenantStorage.getProgramAccount(id);
       if (!programAccount) {
         return res.status(404).json({ message: "Program account not found" });
@@ -1491,10 +1518,13 @@ KEY TALKING POINTS:
   });
 
   // Graduate an account
-  app.post("/api/program-accounts/:id/graduate", requireAuth, async (req, res) => {
+  app.post("/api/program-accounts/:id/graduate", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid program account ID" });
+      }
       const { notes } = req.body;
 
       const programAccount = await tenantStorage.getProgramAccount(id);
@@ -1829,10 +1859,13 @@ KEY TALKING POINTS:
     }
   });
 
-  app.delete("/api/territory-managers/:id", requireAuth, async (req, res) => {
+  app.delete("/api/territory-managers/:id", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid territory manager ID" });
+      }
       const success = await tenantStorage.deleteTerritoryManager(id);
       if (!success) {
         return res.status(404).json({ message: "Territory manager not found" });
@@ -1893,10 +1926,13 @@ KEY TALKING POINTS:
     }
   });
 
-  app.delete("/api/custom-categories/:id", requireAuth, async (req, res) => {
+  app.delete("/api/custom-categories/:id", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid category ID" });
+      }
       const success = await tenantStorage.deleteCustomCategory(id);
       if (!success) {
         return res.status(404).json({ message: "Category not found" });
@@ -2027,10 +2063,13 @@ KEY TALKING POINTS:
     }
   });
 
-  app.delete("/api/rev-share-tiers/:id", requireAuth, async (req, res) => {
+  app.delete("/api/rev-share-tiers/:id", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid tier ID" });
+      }
       await tenantStorage.deleteRevShareTier(id);
       res.status(204).send();
     } catch (error) {
@@ -2521,7 +2560,7 @@ KEY TALKING POINTS:
   });
 
   // ============ Email Settings ============
-  app.get("/api/email/settings", requireAuth, async (req, res) => {
+  app.get("/api/email/settings", requireSubscription, async (req, res) => {
     try {
       const settings = await getEmailSettings();
       res.json({
@@ -2533,7 +2572,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.patch("/api/email/settings", requireAuth, async (req, res) => {
+  app.patch("/api/email/settings", requireSubscription, async (req, res) => {
     try {
       const validatedData = updateEmailSettingsSchema.parse(req.body);
       const settings = await saveEmailSettings(validatedData);
@@ -2546,7 +2585,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/email/test", requireAuth, async (req, res) => {
+  app.post("/api/email/test", requireSubscription, async (req, res) => {
     try {
       const { email } = req.body;
       if (!email) {
