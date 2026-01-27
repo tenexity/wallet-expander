@@ -25,6 +25,17 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { analyzeSegment, generatePlaybookTasks } from "./ai-service";
 import { handleRouteError } from "./utils/errorHandler";
+import { DASHBOARD_LIMITS, DEFAULT_VALUES, SCORING } from "./utils/constants";
+import {
+  calculateClassACustomers,
+  calculateTotalRevenue,
+  calculateAvgCategoryCount,
+  calculateSegmentBreakdown,
+  calculateAlignmentMetrics,
+  buildCategoryDataPointsMap,
+  calculateTerritoryRanking,
+  type AccountWithMetrics,
+} from "./services/dataInsightsService";
 import { 
   getEmailSettings, 
   saveEmailSettings, 
@@ -38,7 +49,7 @@ import { withTenantContext, requireRole, requirePermission, type TenantContext }
 import { getTenantStorage, TenantStorage } from "./storage/tenantStorage";
 import { requireActiveSubscription, requirePlan, checkSubscriptionStatus } from "./middleware/subscription";
 
-function getStorage(req: any): TenantStorage {
+function getStorage(req: Request): TenantStorage {
   if (!req.tenantContext?.tenantId) {
     throw new Error("Tenant context not available");
   }
@@ -74,24 +85,22 @@ export async function registerRoutes(
   // All routes below require authentication and tenant context
   // Middleware chain: isAuthenticated -> withTenantContext
   // This ensures every protected route has access to req.tenantContext
-  const authWithTenant = [isAuthenticated, withTenantContext];
   
-  // Helper for routes that need write permissions
-  const authWithWrite = [...authWithTenant, requirePermission("write")];
+  // Base authentication: requires login + tenant context
+  const requireAuth = [isAuthenticated, withTenantContext];
   
-  // Helper for admin routes that need manage_users or manage_settings
-  const authWithAdmin = [...authWithTenant, requirePermission("manage_settings")];
+  // Write permission: authentication + write permission
+  const requireWrite = [...requireAuth, requirePermission("write")];
   
-  // Legacy alias for backward compatibility during migration
-  const requireAuth = authWithTenant;
+  // Admin permission: authentication + manage_settings permission
+  const requireAdmin = [...requireAuth, requirePermission("manage_settings")];
   
-  // Middleware for routes that require active subscription
-  // Add requireActiveSubscription after requireAuth for subscription-protected routes
-  const requireSubscription = [...authWithTenant, requireActiveSubscription];
+  // Active subscription: authentication + active subscription status
+  const requireSubscription = [...requireAuth, requireActiveSubscription];
   
-  // Middleware for routes requiring specific plan levels
-  const requireProPlan = [...authWithTenant, requireActiveSubscription, requirePlan("professional")];
-  const requireEnterprisePlan = [...authWithTenant, requireActiveSubscription, requirePlan("enterprise")];
+  // Plan-specific: authentication + active subscription + minimum plan level
+  const requireProPlan = [...requireAuth, requireActiveSubscription, requirePlan("professional")];
+  const requireEnterprisePlan = [...requireAuth, requireActiveSubscription, requirePlan("enterprise")];
 
   // ============ Dashboard Stats ============
   app.get("/api/dashboard/stats", requireSubscription, async (req, res) => {
@@ -129,7 +138,7 @@ export async function registerRoutes(
       const categories = await tenantStorage.getProductCategories();
       const categoryMap = new Map(categories.map(c => [c.id, c]));
       
-      const top10Accounts = allAccounts.slice(0, 10);
+      const top10Accounts = allAccounts.slice(0, DASHBOARD_LIMITS.TOP_OPPORTUNITIES);
       const top10AccountIds = top10Accounts.map(a => a.id);
       
       const [metricsMap, gapsMap] = await Promise.all([
@@ -149,7 +158,7 @@ export async function registerRoutes(
           segment: account.segment || "Unknown",
           opportunityScore: metrics ? parseFloat(metrics.opportunityScore || "0") : 0,
           estimatedValue: estimatedValue,
-          gapCategories: gaps.slice(0, 3).map(g => {
+          gapCategories: gaps.slice(0, DASHBOARD_LIMITS.TOP_GAPS).map(g => {
             const cat = categoryMap.get(g.categoryId);
             return cat?.name || "Unknown";
           }),
@@ -157,7 +166,7 @@ export async function registerRoutes(
       });
 
       // Get recent tasks
-      const recentTasks = allTasks.slice(0, 5).map(task => {
+      const recentTasks = allTasks.slice(0, DASHBOARD_LIMITS.RECENT_TASKS).map(task => {
         const account = allAccounts.find(a => a.id === task.accountId);
         return {
           id: task.id,
@@ -241,7 +250,7 @@ export async function registerRoutes(
       res.json({
         todayCount: focusTasks.filter(t => !t.isOverdue).length,
         overdueCount: focusTasks.filter(t => t.isOverdue).length,
-        tasks: focusTasks.slice(0, 10), // Top 10 priority items
+        tasks: focusTasks.slice(0, DASHBOARD_LIMITS.FOCUS_TASKS),
       });
     } catch (error) {
       handleRouteError(error, res, "Get daily focus");
@@ -281,7 +290,7 @@ export async function registerRoutes(
           last12mRevenue: metrics ? parseFloat(metrics.last12mRevenue || "0") : 0,
           categoryPenetration: metrics ? parseFloat(metrics.categoryPenetration || "0") : 0,
           opportunityScore: metrics ? parseFloat(metrics.opportunityScore || "0") : 0,
-          gapCategories: gaps.slice(0, 5).map(g => {
+          gapCategories: gaps.slice(0, DASHBOARD_LIMITS.ACCOUNT_GAPS_DISPLAY).map(g => {
             const cat = categoryMap.get(g.categoryId);
             return {
               name: cat?.name || "Unknown",
@@ -350,7 +359,7 @@ export async function registerRoutes(
 
       // Get account metrics for baseline
       const metrics = await tenantStorage.getAccountMetrics(accountId);
-      const baselineRevenue = metrics ? parseFloat(metrics.last12mRevenue || "0") : 50000;
+      const baselineRevenue = metrics ? parseFloat(metrics.last12mRevenue || "0") : DEFAULT_VALUES.BASELINE_REVENUE;
 
       // Calculate baseline period (last 12 months)
       const now = new Date();
@@ -365,7 +374,7 @@ export async function registerRoutes(
         baselineEnd: baselineEnd,
         baselineRevenue: baselineRevenue.toString(),
         baselineCategories: [],
-        shareRate: "0.10", // 10% default share rate
+        shareRate: DEFAULT_VALUES.SHARE_RATE,
         status: "active",
       });
 
@@ -374,7 +383,7 @@ export async function registerRoutes(
       const categories = await tenantStorage.getProductCategories();
 
       // Get top 3 gap categories for this account
-      const topGaps = gaps.slice(0, 3).map(g => {
+      const topGaps = gaps.slice(0, DASHBOARD_LIMITS.TOP_GAPS).map(g => {
         const cat = categories.find(c => c.id === g.categoryId);
         return cat?.name || "Unknown";
       }).filter(name => name !== "Unknown");
@@ -658,51 +667,20 @@ KEY TALKING POINTS:
         tenantStorage.getAccountCategoryGapsBatch(allAccountIds)
       ]);
       
-      const accountsWithMetrics = segmentAccounts.map(account => {
+      const accountsWithMetrics: AccountWithMetrics[] = segmentAccounts.map(account => {
         const metrics = allMetricsMap.get(account.id);
         return { account, metrics };
       });
 
       const minRevenue = segmentProfile?.minAnnualRevenue 
         ? parseFloat(segmentProfile.minAnnualRevenue) 
-        : 50000;
+        : DEFAULT_VALUES.BASELINE_REVENUE;
 
-      const classACustomers = accountsWithMetrics.filter(({ metrics }) => {
-        const revenue = metrics?.last12mRevenue ? parseFloat(metrics.last12mRevenue) : 0;
-        return revenue >= minRevenue;
-      });
-
-      const totalRevenue = classACustomers.reduce((sum, { metrics }) => {
-        return sum + (metrics?.last12mRevenue ? parseFloat(metrics.last12mRevenue) : 0);
-      }, 0);
-
-      const avgCategoryCount = classACustomers.length > 0 
-        ? Math.round(classACustomers.reduce((sum, { metrics }) => {
-            return sum + (metrics?.categoryCount || 0);
-          }, 0) / classACustomers.length)
-        : 0;
-
-      const allSegments = allAccounts.reduce((acc, a) => {
-        if (a.segment) acc.add(a.segment);
-        return acc;
-      }, new Set<string>());
-
-      // Use cached metrics from batch query instead of N+1
-      const segmentBreakdown = Array.from(allSegments).map(seg => {
-        const accounts = allAccounts.filter(a => a.segment === seg);
-        const revenues = accounts.map(acc => {
-          const m = allMetricsMap.get(acc.id);
-          return m?.last12mRevenue ? parseFloat(m.last12mRevenue) : 0;
-        });
-        const avgRevenue = revenues.length > 0 
-          ? revenues.reduce((sum, r) => sum + r, 0) / revenues.length
-          : 0;
-        return {
-          segment: seg,
-          count: accounts.length,
-          avgRevenue: Math.round(avgRevenue),
-        };
-      });
+      // Use service functions for calculations
+      const classACustomers = calculateClassACustomers(accountsWithMetrics, minRevenue);
+      const totalRevenue = calculateTotalRevenue(classACustomers);
+      const avgCategoryCount = calculateAvgCategoryCount(classACustomers);
+      const segmentBreakdown = calculateSegmentBreakdown(allAccounts, allMetricsMap);
 
       let profileCategories: Array<{
         categoryName: string;
@@ -735,34 +713,8 @@ KEY TALKING POINTS:
                     cat.importance <= 0.75 ? "Low margin, convenience" : "Consistent purchases",
       }));
 
-      const categoryDataPointsMap: Record<string, Array<{
-        accountName: string;
-        accountId: number;
-        categoryPct: number;
-        revenue: number;
-        isClassA: boolean;
-      }>> = {};
-
-      // Use cached gaps from batch query instead of N+1
-      for (const { account, metrics } of classACustomers) {
-        const accountGaps = allGapsMap.get(account.id) || [];
-        const revenue = metrics?.last12mRevenue ? parseFloat(metrics.last12mRevenue) : 0;
-        
-        for (const gap of accountGaps) {
-          const catInfo = productCatMap.get(gap.categoryId);
-          const catName = catInfo?.name || "Unknown";
-          if (!categoryDataPointsMap[catName]) {
-            categoryDataPointsMap[catName] = [];
-          }
-          categoryDataPointsMap[catName].push({
-            accountName: account.name,
-            accountId: account.id,
-            categoryPct: gap.actualPct ? parseFloat(gap.actualPct) : 0,
-            revenue: revenue,
-            isClassA: true,
-          });
-        }
-      }
+      // Use service function for category data points aggregation
+      const categoryDataPointsMap = buildCategoryDataPointsMap(classACustomers, allGapsMap, productCatMap);
 
       const decisionLogic = profileCategories.map(cat => {
         const dataPointsList = categoryDataPointsMap[cat.categoryName] || [];
@@ -805,43 +757,12 @@ KEY TALKING POINTS:
         };
       });
 
-      // Use cached gaps from batch query instead of N+1
-      const flatGaps = segmentAccounts.flatMap(acc => allGapsMap.get(acc.id) || []);
-      
-      const gapsByCategory: Record<string, number[]> = {};
-      flatGaps.forEach(gap => {
-        const cat = productCatMap.get(gap.categoryId);
-        const catName = cat?.name || "Unknown";
-        if (!gapsByCategory[catName]) gapsByCategory[catName] = [];
-        gapsByCategory[catName].push(gap.gapPct ? parseFloat(gap.gapPct) : 0);
-      });
-
-      const topGaps = Object.entries(gapsByCategory)
-        .map(([category, gaps]) => ({
-          category,
-          gapPct: Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length),
-        }))
-        .sort((a, b) => b.gapPct - a.gapPct)
-        .slice(0, 3);
-
-      const avgGap = flatGaps.length > 0
-        ? flatGaps.reduce((sum, g) => sum + (g.gapPct ? parseFloat(g.gapPct) : 0), 0) / flatGaps.length
-        : 30;
-      const alignmentScore = Math.round(100 - avgGap);
-      
-      const NEAR_ICP_THRESHOLD = 20;
-      // Use cached gaps from batch query instead of N+1
-      const accountAlignments = segmentAccounts.map(acc => {
-        const gaps = allGapsMap.get(acc.id) || [];
-        if (gaps.length === 0) return { account: acc, isNearICP: false };
-        const avgAccountGap = gaps.reduce((sum, g) => sum + (g.gapPct ? parseFloat(g.gapPct) : 0), 0) / gaps.length;
-        return { account: acc, isNearICP: avgAccountGap <= NEAR_ICP_THRESHOLD };
-      });
-      const accountsNearICP = accountAlignments.filter(a => a.isNearICP).length;
-      
-      const totalEstimatedOpportunity = flatGaps.reduce((sum, g) => 
-        sum + (g.estimatedOpportunity ? parseFloat(g.estimatedOpportunity) : 0), 0);
-      const revenueAtRisk = Math.round(totalEstimatedOpportunity);
+      // Use service function for alignment metrics calculation
+      const { alignmentScore, accountsNearICP, revenueAtRisk, topGaps } = calculateAlignmentMetrics(
+        segmentAccounts,
+        allGapsMap,
+        productCatMap
+      );
 
       // Use cached gaps from batch query instead of N+1
       const quickWins = segmentAccounts.slice(0, 3).map((account, idx) => {
@@ -865,29 +786,8 @@ KEY TALKING POINTS:
         };
       });
 
-      const tmSet = segmentAccounts.reduce((acc, a) => {
-        if (a.assignedTm) acc.add(a.assignedTm);
-        return acc;
-      }, new Set<string>());
-      
-      const tmList = Array.from(tmSet);
-      // Use cached metrics from batch query instead of N+1
-      const territoryRanking = tmList.slice(0, 4).map(tm => {
-        const tmAccounts = segmentAccounts.filter(a => a.assignedTm === tm);
-        const tmMetricsValues = tmAccounts.map(acc => {
-          const m = allMetricsMap.get(acc.id);
-          return m?.categoryPenetration ? parseFloat(m.categoryPenetration) : 50;
-        });
-        const avgAlignment = tmMetricsValues.length > 0
-          ? Math.round(tmMetricsValues.reduce((a, b) => a + b, 0) / tmMetricsValues.length)
-          : 50;
-        return {
-          tm,
-          avgAlignment,
-          accountCount: tmAccounts.length,
-        };
-      });
-      territoryRanking.sort((a, b) => b.avgAlignment - a.avgAlignment);
+      // Use service function for territory ranking calculation
+      const territoryRanking = calculateTerritoryRanking(segmentAccounts, allMetricsMap);
 
       const requiredCategories = profileCategories.filter(c => c.isRequired).map(c => c.categoryName);
       const growthCategories = profileCategories.filter(c => c.importance >= 1.5).map(c => c.categoryName);
@@ -1605,7 +1505,7 @@ KEY TALKING POINTS:
   });
 
   // ============ Data Uploads ============
-  app.get("/api/data-uploads", authWithAdmin, async (req, res) => {
+  app.get("/api/data-uploads", requireAdmin, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const uploads = await tenantStorage.getDataUploads();
@@ -1615,7 +1515,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/data-uploads", authWithAdmin, async (req, res) => {
+  app.post("/api/data-uploads", requireAdmin, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       // In real implementation, this would handle file upload
@@ -1637,7 +1537,7 @@ KEY TALKING POINTS:
   });
 
   // ============ Settings ============
-  app.get("/api/settings", authWithAdmin, async (req, res) => {
+  app.get("/api/settings", requireAdmin, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const settings = await tenantStorage.getSettings();
@@ -1658,7 +1558,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.put("/api/settings/:key", authWithAdmin, async (req, res) => {
+  app.put("/api/settings/:key", requireAdmin, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const { key } = req.params;
@@ -1671,7 +1571,7 @@ KEY TALKING POINTS:
   });
 
   // Logo upload endpoint - handles base64 encoded images
-  app.post("/api/settings/logo", authWithAdmin, async (req, res) => {
+  app.post("/api/settings/logo", requireAdmin, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const { logo } = req.body;
@@ -1685,7 +1585,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.delete("/api/settings/logo", authWithAdmin, async (req, res) => {
+  app.delete("/api/settings/logo", requireAdmin, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       await tenantStorage.upsertSetting({ key: "companyLogo", value: "" });
@@ -1791,7 +1691,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/territory-managers", authWithAdmin, async (req, res) => {
+  app.post("/api/territory-managers", requireAdmin, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const data = insertTerritoryManagerSchema.parse(req.body);
@@ -1848,7 +1748,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/custom-categories", authWithAdmin, async (req, res) => {
+  app.post("/api/custom-categories", requireAdmin, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const parsed = insertCustomCategorySchema.safeParse(req.body);
@@ -1942,7 +1842,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/rev-share-tiers", authWithAdmin, async (req, res) => {
+  app.post("/api/rev-share-tiers", requireAdmin, async (req, res) => {
     try {
       const validated = insertRevShareTierSchema.parse(req.body);
       
@@ -2092,7 +1992,7 @@ KEY TALKING POINTS:
   });
 
   // Seed default tier if none exist
-  app.post("/api/rev-share-tiers/seed-default", authWithAdmin, async (req, res) => {
+  app.post("/api/rev-share-tiers/seed-default", requireAdmin, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const existing = await tenantStorage.getRevShareTiers();
@@ -2149,7 +2049,7 @@ KEY TALKING POINTS:
   // Get current subscription status
   app.get("/api/subscription", requireAuth, async (req, res) => {
     try {
-      const tenantContext = (req as any).tenantContext as TenantContext;
+      const tenantContext = req.tenantContext;
       const tenant = tenantContext.tenant;
       
       // Get plan details if tenant has a plan
@@ -2189,9 +2089,9 @@ KEY TALKING POINTS:
       }
       
       const { priceId, planSlug, billingCycle } = parseResult.data;
-      const tenantContext = (req as any).tenantContext as TenantContext;
+      const tenantContext = req.tenantContext;
       const tenant = tenantContext.tenant;
-      const user = (req as any).user;
+      const user = req.user;
       
       if (!priceId && !planSlug) {
         return res.status(400).json({ message: "Price ID or plan slug required" });
@@ -2264,7 +2164,7 @@ KEY TALKING POINTS:
         return res.status(503).json({ message: "Stripe is not configured" });
       }
       
-      const tenantContext = (req as any).tenantContext as TenantContext;
+      const tenantContext = req.tenantContext;
       const tenant = tenantContext.tenant;
       
       if (!tenant.stripeCustomerId) {

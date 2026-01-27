@@ -3,19 +3,13 @@ import { db } from "../db";
 import { tenants, userRoles, type Tenant, type UserRole, type RoleType, ROLE_PERMISSIONS } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 
+import "../types/express.d";
+
 export interface TenantContext {
   tenantId: number;
   tenant: Tenant;
   role: RoleType;
   userId: string;
-}
-
-declare global {
-  namespace Express {
-    interface Request {
-      tenantContext?: TenantContext;
-    }
-  }
 }
 
 export async function getTenantForUser(userId: string): Promise<{ tenant: Tenant; role: UserRole } | null> {
@@ -61,7 +55,7 @@ export async function createTenantForUser(userId: string, email: string): Promis
 }
 
 export const withTenantContext: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
-  const user = req.user as any;
+  const user = req.user;
 
   if (!user?.claims?.sub) {
     return res.status(401).json({ message: "Unauthorized - no user context" });

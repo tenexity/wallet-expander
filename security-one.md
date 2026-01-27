@@ -355,98 +355,91 @@ The `accountMetrics` and `accountCategoryGaps` tables now include `tenantId` col
 
 ## 4. Code Style
 
-### 4.1 MEDIUM: Inconsistent Middleware Naming
+### 4.1 MEDIUM: Inconsistent Middleware Naming ✅ RESOLVED
 
-**Location:** `server/routes.ts` - Lines 76-93
+**Location:** `server/routes.ts` - Lines 76-95
 
-**Issue:** Multiple naming conventions for middleware arrays.
+**Original Issue:** Multiple naming conventions for middleware arrays (authWithX vs requireX).
+
+**Resolution:**
+1. Standardized all middleware arrays to use `requireX` pattern consistently
+2. Renamed `authWithTenant` → `requireAuth`, `authWithAdmin` → `requireAdmin`
+3. Removed unused `authWithWrite` (replaced with `requireWrite`)
+4. Clear documentation comments for each middleware chain
 
 ```typescript
-const authWithTenant = [isAuthenticated, withTenantContext];
-const authWithWrite = [...authWithTenant, requirePermission("write")];
-const authWithAdmin = [...authWithTenant, requirePermission("manage_settings")];
-const requireAuth = authWithTenant; // Alias
-const requireSubscription = [...authWithTenant, requireActiveSubscription];
+const requireAuth = [isAuthenticated, withTenantContext];
+const requireWrite = [...requireAuth, requirePermission("write")];
+const requireAdmin = [...requireAuth, requirePermission("manage_settings")];
+const requireSubscription = [...requireAuth, requireActiveSubscription];
 ```
-
-**Recommendation:** Standardize naming (e.g., all use `requireX` pattern).
 
 ---
 
-### 4.2 MEDIUM: TypeScript Any Types
+### 4.2 MEDIUM: TypeScript Any Types ✅ RESOLVED
 
 **Location:** Multiple files
 
-**Issue:** Use of `any` type reduces type safety.
+**Original Issue:** Use of `any` type reduced type safety for Request objects.
 
-```typescript
-// server/routes.ts
-function getStorage(req: any): TenantStorage { ... }
-
-// server/middleware/subscription.ts
-const tenantContext = (req as any).tenantContext as TenantContext | undefined;
-```
-
-**Recommendation:** Use proper Express Request type extensions:
-```typescript
-declare global {
-  namespace Express {
-    interface Request {
-      tenantContext?: TenantContext;
-    }
-  }
-}
-```
+**Resolution:**
+1. Created `server/types/express.d.ts` with proper type declarations
+2. Extended `Express.User` interface with `AuthenticatedUser` type including claims
+3. Extended `Express.Request` interface with `tenantContext` property
+4. Updated all middleware and routes to use typed Request:
+   - `getStorage(req: Request)` instead of `getStorage(req: any)`
+   - `req.tenantContext` instead of `(req as any).tenantContext`
+   - `req.user` instead of `(req as any).user`
 
 ---
 
-### 4.3 LOW: Inconsistent Async/Await Usage
+### 4.3 LOW: Inconsistent Async/Await Usage ✅ RESOLVED
 
-**Location:** Various middleware files
+**Location:** `server/middleware/subscription.ts`
 
-**Issue:** Some middleware use async but don't await anything.
+**Original Issue:** Some middleware marked as `async` without using `await`.
 
-```typescript
-export const requireActiveSubscription: RequestHandler = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  // No await statements - doesn't need async
-```
+**Resolution:**
+1. Removed unnecessary `async` from `requireActiveSubscription`
+2. Removed unnecessary `async` from `checkSubscriptionStatus`
+3. `withTenantContext` correctly retains `async` as it uses database operations
 
 ---
 
-### 4.4 LOW: Magic Numbers
+### 4.4 LOW: Magic Numbers ✅ RESOLVED
 
 **Location:** `server/routes.ts`
 
-**Issue:** Hard-coded values without explanation.
+**Original Issue:** Hard-coded values scattered throughout without explanation.
 
-```typescript
-baselineRevenue: 50000           // Line 335
-shareRate: "0.10"                // Line 352
-allAccounts.slice(0, 10)         // Line 130
-recentTasks.slice(0, 5)          // Line 151
-topGaps.slice(0, 3)              // Line 142
-```
-
-**Recommendation:** Extract to named constants:
-```typescript
-const DEFAULT_BASELINE_REVENUE = 50000;
-const DEFAULT_SHARE_RATE = "0.10";
-const DASHBOARD_TOP_OPPORTUNITIES_LIMIT = 10;
-```
+**Resolution:**
+1. Created `server/utils/constants.ts` with organized constant groups:
+   - `DASHBOARD_LIMITS`: TOP_OPPORTUNITIES, RECENT_TASKS, TOP_GAPS, etc.
+   - `DEFAULT_VALUES`: BASELINE_REVENUE, SHARE_RATE, etc.
+   - `SCORING`: NEAR_ICP_THRESHOLD, DEFAULT_GAP_PERCENTAGE, MAX_SCORE
+2. Updated routes.ts to use named constants from the constants file
+3. Added import and replaced key magic numbers throughout routes.ts
 
 ---
 
-### 4.5 LOW: Long Functions
+### 4.5 LOW: Long Functions ✅ RESOLVED
 
-**Location:** `server/routes.ts`
+**Location:** `server/routes.ts` - data-insights endpoint (previously ~330 lines)
 
-**Issue:** Some route handlers exceed 100 lines (e.g., data-insights endpoint ~330 lines).
+**Original Issue:** Some route handlers exceeded 100 lines, making them hard to maintain.
 
-**Recommendation:** Extract logic into service functions.
+**Resolution:**
+1. Created `server/services/dataInsightsService.ts` with extracted helper functions:
+   - `calculateClassACustomers()` - filters accounts by revenue threshold
+   - `calculateTotalRevenue()` - sums revenue from Class A customers
+   - `calculateAvgCategoryCount()` - averages category counts
+   - `calculateSegmentBreakdown()` - computes per-segment statistics
+   - `calculateAlignmentMetrics()` - computes alignment scores, ICP proximity, revenue at risk
+   - `buildCategoryDataPointsMap()` - aggregates category data points
+   - `calculateTerritoryRanking()` - ranks territories by alignment
+2. Refactored the data-insights route handler to use these service functions
+3. Route handler is now significantly shorter with business logic extracted
+4. All service functions are properly typed with TypeScript interfaces
 
 ---
 

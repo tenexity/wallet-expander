@@ -1,12 +1,13 @@
 import { RequestHandler, Request, Response, NextFunction } from "express";
 import type { TenantContext } from "./tenantContext";
+import "../types/express.d";
 
-export const requireActiveSubscription: RequestHandler = async (
+export const requireActiveSubscription: RequestHandler = (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
-  const tenantContext = (req as any).tenantContext as TenantContext | undefined;
+  const tenantContext = req.tenantContext;
   const tenant = tenantContext?.tenant;
 
   if (!tenant) {
@@ -36,7 +37,7 @@ export const requirePlan = (
   };
 
   return (req: Request, res: Response, next: NextFunction) => {
-    const tenantContext = (req as any).tenantContext as TenantContext | undefined;
+    const tenantContext = req.tenantContext;
     const tenant = tenantContext?.tenant;
 
     if (!tenant) {
@@ -58,12 +59,12 @@ export const requirePlan = (
   };
 };
 
-export const checkSubscriptionStatus: RequestHandler = async (
+export const checkSubscriptionStatus: RequestHandler = (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
-  const tenantContext = (req as any).tenantContext as TenantContext | undefined;
+  const tenantContext = req.tenantContext;
   const tenant = tenantContext?.tenant;
 
   if (tenant) {
