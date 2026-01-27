@@ -9,7 +9,7 @@ import connectPg from "connect-pg-simple";
 import rateLimit from "express-rate-limit";
 import { authStorage } from "./storage";
 
-const authRateLimiter = rateLimit({
+export const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10, // 10 attempts per window
   standardHeaders: true,
@@ -18,7 +18,7 @@ const authRateLimiter = rateLimit({
   skipSuccessfulRequests: false,
 });
 
-const logoutRateLimiter = rateLimit({
+export const logoutRateLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
   max: 5, // 5 logout attempts per minute
   standardHeaders: true,
