@@ -124,28 +124,36 @@ export async function registerRoutes(
         accountCount: allAccounts.filter(a => a.segment === profile.segment).length,
       }));
 
-      // Get top opportunities (accounts with highest opportunity scores)
+      // Get top opportunities (accounts with highest opportunity scores) - using batch queries
       const categories = await tenantStorage.getProductCategories();
-      const accountsWithMetrics = await Promise.all(
-        allAccounts.slice(0, 10).map(async account => {
-          const metrics = await tenantStorage.getAccountMetrics(account.id);
-          const gaps = await tenantStorage.getAccountCategoryGaps(account.id);
-          
-          const estimatedValue = gaps.reduce((sum, g) => sum + parseFloat(g.estimatedOpportunity || "0"), 0);
-          
-          return {
-            id: account.id,
-            name: account.name,
-            segment: account.segment || "Unknown",
-            opportunityScore: metrics ? parseFloat(metrics.opportunityScore || "0") : 0,
-            estimatedValue: estimatedValue,
-            gapCategories: gaps.slice(0, 3).map(g => {
-              const cat = categories.find(c => c.id === g.categoryId);
-              return cat?.name || "Unknown";
-            }),
-          };
-        })
-      );
+      const categoryMap = new Map(categories.map(c => [c.id, c]));
+      
+      const top10Accounts = allAccounts.slice(0, 10);
+      const top10AccountIds = top10Accounts.map(a => a.id);
+      
+      const [metricsMap, gapsMap] = await Promise.all([
+        tenantStorage.getAccountMetricsBatch(top10AccountIds),
+        tenantStorage.getAccountCategoryGapsBatch(top10AccountIds)
+      ]);
+      
+      const accountsWithMetrics = top10Accounts.map(account => {
+        const metrics = metricsMap.get(account.id);
+        const gaps = gapsMap.get(account.id) || [];
+        
+        const estimatedValue = gaps.reduce((sum, g) => sum + parseFloat(g.estimatedOpportunity || "0"), 0);
+        
+        return {
+          id: account.id,
+          name: account.name,
+          segment: account.segment || "Unknown",
+          opportunityScore: metrics ? parseFloat(metrics.opportunityScore || "0") : 0,
+          estimatedValue: estimatedValue,
+          gapCategories: gaps.slice(0, 3).map(g => {
+            const cat = categoryMap.get(g.categoryId);
+            return cat?.name || "Unknown";
+          }),
+        };
+      });
 
       // Get recent tasks
       const recentTasks = allTasks.slice(0, 5).map(task => {
@@ -248,34 +256,42 @@ export async function registerRoutes(
       const programAccounts = await tenantStorage.getProgramAccounts();
       const enrolledAccountIds = new Set(programAccounts.map(p => p.accountId));
 
-      const accountsWithMetrics = await Promise.all(
-        allAccounts.map(async account => {
-          const metrics = await tenantStorage.getAccountMetrics(account.id);
-          const gaps = await tenantStorage.getAccountCategoryGaps(account.id);
-          const categories = await tenantStorage.getProductCategories();
+      // Fetch categories once outside the loop and create a Map for O(1) lookups
+      const categories = await tenantStorage.getProductCategories();
+      const categoryMap = new Map(categories.map(c => [c.id, c]));
+      
+      // Use batch queries to avoid N+1 problem
+      const accountIds = allAccounts.map(a => a.id);
+      const [metricsMap, gapsMap] = await Promise.all([
+        tenantStorage.getAccountMetricsBatch(accountIds),
+        tenantStorage.getAccountCategoryGapsBatch(accountIds)
+      ]);
 
-          return {
-            id: account.id,
-            name: account.name,
-            segment: account.segment || "Unknown",
-            region: account.region || "Unknown",
-            assignedTm: account.assignedTm || "Unassigned",
-            status: account.status,
-            last12mRevenue: metrics ? parseFloat(metrics.last12mRevenue || "0") : 0,
-            categoryPenetration: metrics ? parseFloat(metrics.categoryPenetration || "0") : 0,
-            opportunityScore: metrics ? parseFloat(metrics.opportunityScore || "0") : 0,
-            gapCategories: gaps.slice(0, 5).map(g => {
-              const cat = categories.find(c => c.id === g.categoryId);
-              return {
-                name: cat?.name || "Unknown",
-                gapPct: parseFloat(g.gapPct || "0"),
-                estimatedValue: parseFloat(g.estimatedOpportunity || "0"),
-              };
-            }),
-            enrolled: enrolledAccountIds.has(account.id),
-          };
-        })
-      );
+      const accountsWithMetrics = allAccounts.map(account => {
+        const metrics = metricsMap.get(account.id);
+        const gaps = gapsMap.get(account.id) || [];
+
+        return {
+          id: account.id,
+          name: account.name,
+          segment: account.segment || "Unknown",
+          region: account.region || "Unknown",
+          assignedTm: account.assignedTm || "Unassigned",
+          status: account.status,
+          last12mRevenue: metrics ? parseFloat(metrics.last12mRevenue || "0") : 0,
+          categoryPenetration: metrics ? parseFloat(metrics.categoryPenetration || "0") : 0,
+          opportunityScore: metrics ? parseFloat(metrics.opportunityScore || "0") : 0,
+          gapCategories: gaps.slice(0, 5).map(g => {
+            const cat = categoryMap.get(g.categoryId);
+            return {
+              name: cat?.name || "Unknown",
+              gapPct: parseFloat(g.gapPct || "0"),
+              estimatedValue: parseFloat(g.estimatedOpportunity || "0"),
+            };
+          }),
+          enrolled: enrolledAccountIds.has(account.id),
+        };
+      });
 
       res.json(accountsWithMetrics);
     } catch (error) {
@@ -642,15 +658,23 @@ KEY TALKING POINTS:
       const allProfiles = await tenantStorage.getSegmentProfiles();
       const productCats = await tenantStorage.getProductCategories();
       
+      // Create Maps for O(1) lookups
+      const productCatMap = new Map(productCats.map(c => [c.id, c]));
+      
       const segmentAccounts = allAccounts.filter(a => a.segment === segment);
       const segmentProfile = allProfiles.find(p => p.segment === segment);
       
-      const accountsWithMetrics = await Promise.all(
-        segmentAccounts.map(async (account) => {
-          const metrics = await tenantStorage.getAccountMetrics(account.id);
-          return { account, metrics };
-        })
-      );
+      // Use batch queries for all accounts to avoid N+1
+      const allAccountIds = allAccounts.map(a => a.id);
+      const [allMetricsMap, allGapsMap] = await Promise.all([
+        tenantStorage.getAccountMetricsBatch(allAccountIds),
+        tenantStorage.getAccountCategoryGapsBatch(allAccountIds)
+      ]);
+      
+      const accountsWithMetrics = segmentAccounts.map(account => {
+        const metrics = allMetricsMap.get(account.id);
+        return { account, metrics };
+      });
 
       const minRevenue = segmentProfile?.minAnnualRevenue 
         ? parseFloat(segmentProfile.minAnnualRevenue) 
@@ -676,24 +700,22 @@ KEY TALKING POINTS:
         return acc;
       }, new Set<string>());
 
-      const segmentBreakdown = await Promise.all(
-        Array.from(allSegments).map(async (seg) => {
-          const accounts = allAccounts.filter(a => a.segment === seg);
-          const metricsPromises = accounts.map(async (acc) => {
-            const m = await tenantStorage.getAccountMetrics(acc.id);
-            return m?.last12mRevenue ? parseFloat(m.last12mRevenue) : 0;
-          });
-          const revenues = await Promise.all(metricsPromises);
-          const avgRevenue = revenues.length > 0 
-            ? revenues.reduce((sum, r) => sum + r, 0) / revenues.length
-            : 0;
-          return {
-            segment: seg,
-            count: accounts.length,
-            avgRevenue: Math.round(avgRevenue),
-          };
-        })
-      );
+      // Use cached metrics from batch query instead of N+1
+      const segmentBreakdown = Array.from(allSegments).map(seg => {
+        const accounts = allAccounts.filter(a => a.segment === seg);
+        const revenues = accounts.map(acc => {
+          const m = allMetricsMap.get(acc.id);
+          return m?.last12mRevenue ? parseFloat(m.last12mRevenue) : 0;
+        });
+        const avgRevenue = revenues.length > 0 
+          ? revenues.reduce((sum, r) => sum + r, 0) / revenues.length
+          : 0;
+        return {
+          segment: seg,
+          count: accounts.length,
+          avgRevenue: Math.round(avgRevenue),
+        };
+      });
 
       let profileCategories: Array<{
         categoryName: string;
@@ -734,12 +756,13 @@ KEY TALKING POINTS:
         isClassA: boolean;
       }>> = {};
 
+      // Use cached gaps from batch query instead of N+1
       for (const { account, metrics } of classACustomers) {
-        const accountGaps = await tenantStorage.getAccountCategoryGaps(account.id);
+        const accountGaps = allGapsMap.get(account.id) || [];
         const revenue = metrics?.last12mRevenue ? parseFloat(metrics.last12mRevenue) : 0;
         
         for (const gap of accountGaps) {
-          const catInfo = productCats.find(c => c.id === gap.categoryId);
+          const catInfo = productCatMap.get(gap.categoryId);
           const catName = catInfo?.name || "Unknown";
           if (!categoryDataPointsMap[catName]) {
             categoryDataPointsMap[catName] = [];
@@ -795,17 +818,12 @@ KEY TALKING POINTS:
         };
       });
 
-      const allGaps = await Promise.all(
-        segmentAccounts.map(async (acc) => {
-          const gaps = await tenantStorage.getAccountCategoryGaps(acc.id);
-          return gaps;
-        })
-      );
-      const flatGaps = allGaps.flat();
+      // Use cached gaps from batch query instead of N+1
+      const flatGaps = segmentAccounts.flatMap(acc => allGapsMap.get(acc.id) || []);
       
       const gapsByCategory: Record<string, number[]> = {};
       flatGaps.forEach(gap => {
-        const cat = productCats.find(c => c.id === gap.categoryId);
+        const cat = productCatMap.get(gap.categoryId);
         const catName = cat?.name || "Unknown";
         if (!gapsByCategory[catName]) gapsByCategory[catName] = [];
         gapsByCategory[catName].push(gap.gapPct ? parseFloat(gap.gapPct) : 0);
@@ -825,42 +843,40 @@ KEY TALKING POINTS:
       const alignmentScore = Math.round(100 - avgGap);
       
       const NEAR_ICP_THRESHOLD = 20;
-      const accountAlignments = await Promise.all(
-        segmentAccounts.map(async (acc) => {
-          const gaps = await tenantStorage.getAccountCategoryGaps(acc.id);
-          if (gaps.length === 0) return { account: acc, isNearICP: false };
-          const avgAccountGap = gaps.reduce((sum, g) => sum + (g.gapPct ? parseFloat(g.gapPct) : 0), 0) / gaps.length;
-          return { account: acc, isNearICP: avgAccountGap <= NEAR_ICP_THRESHOLD };
-        })
-      );
+      // Use cached gaps from batch query instead of N+1
+      const accountAlignments = segmentAccounts.map(acc => {
+        const gaps = allGapsMap.get(acc.id) || [];
+        if (gaps.length === 0) return { account: acc, isNearICP: false };
+        const avgAccountGap = gaps.reduce((sum, g) => sum + (g.gapPct ? parseFloat(g.gapPct) : 0), 0) / gaps.length;
+        return { account: acc, isNearICP: avgAccountGap <= NEAR_ICP_THRESHOLD };
+      });
       const accountsNearICP = accountAlignments.filter(a => a.isNearICP).length;
       
       const totalEstimatedOpportunity = flatGaps.reduce((sum, g) => 
         sum + (g.estimatedOpportunity ? parseFloat(g.estimatedOpportunity) : 0), 0);
       const revenueAtRisk = Math.round(totalEstimatedOpportunity);
 
-      const quickWins = await Promise.all(
-        segmentAccounts.slice(0, 3).map(async (account, idx) => {
-          const accountGaps = await tenantStorage.getAccountCategoryGaps(account.id);
-          const topAccountGap = accountGaps
-            .sort((a, b) => {
-              const aOpp = a.estimatedOpportunity ? parseFloat(a.estimatedOpportunity) : 0;
-              const bOpp = b.estimatedOpportunity ? parseFloat(b.estimatedOpportunity) : 0;
-              return bOpp - aOpp;
-            })[0];
-          const gapCategory = topAccountGap 
-            ? productCats.find(c => c.id === topAccountGap.categoryId)?.name || "Unknown"
-            : topGaps[idx % Math.max(1, topGaps.length)]?.category || "Unknown";
-          const potentialRevenue = topAccountGap?.estimatedOpportunity 
-            ? parseFloat(topAccountGap.estimatedOpportunity)
-            : 5000;
-          return {
-            account: account.name,
-            category: gapCategory,
-            potentialRevenue: Math.round(potentialRevenue),
-          };
-        })
-      );
+      // Use cached gaps from batch query instead of N+1
+      const quickWins = segmentAccounts.slice(0, 3).map((account, idx) => {
+        const accountGaps = (allGapsMap.get(account.id) || [])
+          .sort((a, b) => {
+            const aOpp = a.estimatedOpportunity ? parseFloat(a.estimatedOpportunity) : 0;
+            const bOpp = b.estimatedOpportunity ? parseFloat(b.estimatedOpportunity) : 0;
+            return bOpp - aOpp;
+          });
+        const topAccountGap = accountGaps[0];
+        const gapCategory = topAccountGap 
+          ? productCatMap.get(topAccountGap.categoryId)?.name || "Unknown"
+          : topGaps[idx % Math.max(1, topGaps.length)]?.category || "Unknown";
+        const potentialRevenue = topAccountGap?.estimatedOpportunity 
+          ? parseFloat(topAccountGap.estimatedOpportunity)
+          : 5000;
+        return {
+          account: account.name,
+          category: gapCategory,
+          potentialRevenue: Math.round(potentialRevenue),
+        };
+      });
 
       const tmSet = segmentAccounts.reduce((acc, a) => {
         if (a.assignedTm) acc.add(a.assignedTm);
@@ -868,25 +884,22 @@ KEY TALKING POINTS:
       }, new Set<string>());
       
       const tmList = Array.from(tmSet);
-      const territoryRanking = await Promise.all(
-        tmList.slice(0, 4).map(async (tm) => {
-          const tmAccounts = segmentAccounts.filter(a => a.assignedTm === tm);
-          const tmMetrics = await Promise.all(
-            tmAccounts.map(async (acc) => {
-              const m = await tenantStorage.getAccountMetrics(acc.id);
-              return m?.categoryPenetration ? parseFloat(m.categoryPenetration) : 50;
-            })
-          );
-          const avgAlignment = tmMetrics.length > 0
-            ? Math.round(tmMetrics.reduce((a, b) => a + b, 0) / tmMetrics.length)
-            : 50;
-          return {
-            tm,
-            avgAlignment,
-            accountCount: tmAccounts.length,
-          };
-        })
-      );
+      // Use cached metrics from batch query instead of N+1
+      const territoryRanking = tmList.slice(0, 4).map(tm => {
+        const tmAccounts = segmentAccounts.filter(a => a.assignedTm === tm);
+        const tmMetricsValues = tmAccounts.map(acc => {
+          const m = allMetricsMap.get(acc.id);
+          return m?.categoryPenetration ? parseFloat(m.categoryPenetration) : 50;
+        });
+        const avgAlignment = tmMetricsValues.length > 0
+          ? Math.round(tmMetricsValues.reduce((a, b) => a + b, 0) / tmMetricsValues.length)
+          : 50;
+        return {
+          tm,
+          avgAlignment,
+          accountCount: tmAccounts.length,
+        };
+      });
       territoryRanking.sort((a, b) => b.avgAlignment - a.avgAlignment);
 
       const requiredCategories = profileCategories.filter(c => c.isRequired).map(c => c.categoryName);

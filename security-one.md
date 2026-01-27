@@ -168,82 +168,58 @@ The TenantStorage class properly enforces tenant isolation for ALL tables:
 
 ## 2. Performance Issues
 
-### 2.1 HIGH: N+1 Query Pattern in Dashboard Stats
+### 2.1 HIGH: N+1 Query Pattern in Dashboard Stats ✅ RESOLVED
 
-**Location:** `server/routes.ts` - Lines 129-148
+**Location:** `server/routes.ts` - GET /api/dashboard/stats
 
-**Issue:** Fetches account metrics and category gaps in a loop for each account.
+**Original Issue:** Fetched account metrics and category gaps in a loop for each account (20+ queries for 10 accounts).
 
-```typescript
-const accountsWithMetrics = await Promise.all(
-  allAccounts.slice(0, 10).map(async account => {
-    const metrics = await tenantStorage.getAccountMetrics(account.id);  // N queries
-    const gaps = await tenantStorage.getAccountCategoryGaps(account.id); // N queries
-    // ...
-  })
-);
-```
+**Resolution:**
+1. Added `getAccountMetricsBatch(accountIds)` method to TenantStorage using SQL `IN` clause
+2. Added `getAccountCategoryGapsBatch(accountIds)` method to TenantStorage
+3. Refactored route to use batch queries with `Promise.all([metricsMap, gapsMap])`
+4. Created category Map for O(1) lookups instead of `.find()` in loop
 
-**Impact:** For 10 accounts, this executes 20+ database queries instead of 2-3.
-
-**Recommendation:** Use batch queries or JOIN operations:
-```typescript
-const allMetrics = await tenantStorage.getAccountMetricsBatch(accountIds);
-const allGaps = await tenantStorage.getAccountCategoryGapsBatch(accountIds);
-```
+**Result:** 2-3 database queries instead of 20+
 
 ---
 
-### 2.2 HIGH: N+1 Query Pattern in Accounts Listing
+### 2.2 HIGH: N+1 Query Pattern in Accounts Listing ✅ RESOLVED
 
-**Location:** `server/routes.ts` - Lines 251-278
+**Location:** `server/routes.ts` - GET /api/accounts
 
-**Issue:** Similar pattern - fetches metrics, gaps, and categories for every account.
+**Original Issue:** Fetched metrics, gaps, and categories for every account in a loop. Categories were fetched N times despite returning the same data.
 
-```typescript
-const accountsWithMetrics = await Promise.all(
-  allAccounts.map(async account => {
-    const metrics = await tenantStorage.getAccountMetrics(account.id);
-    const gaps = await tenantStorage.getAccountCategoryGaps(account.id);
-    const categories = await tenantStorage.getProductCategories(); // Called N times!
-    // ...
-  })
-);
-```
+**Resolution:**
+1. Moved `getProductCategories()` outside the loop - fetched once
+2. Created categoryMap for O(1) lookups
+3. Used batch queries `getAccountMetricsBatch()` and `getAccountCategoryGapsBatch()`
+4. Changed from `Promise.all(allAccounts.map(async...))` to synchronous `.map()` using cached Maps
 
-**Additional Issue:** `getProductCategories()` is called inside the loop but returns the same data each time.
-
-**Recommendation:** Move invariant queries outside the loop:
-```typescript
-const categories = await tenantStorage.getProductCategories(); // Once
-const accountsWithMetrics = await Promise.all(
-  allAccounts.map(async account => {
-    // ... use categories here
-  })
-);
-```
+**Result:** 4-5 database queries instead of N*3 queries
 
 ---
 
-### 2.3 HIGH: N+1 Query Pattern in Data Insights
+### 2.3 HIGH: N+1 Query Pattern in Data Insights ✅ RESOLVED
 
-**Location:** `server/routes.ts` - Lines 626-868
+**Location:** `server/routes.ts` - GET /api/data-insights/:segment
 
-**Issue:** Multiple nested loops with database queries for segment analysis.
+**Original Issue:** Multiple nested loops with database queries for segment analysis, potentially causing hundreds of queries.
 
-```typescript
-// Line 657-674: N queries for segment breakdown
-const segmentBreakdown = await Promise.all(
-  Array.from(allSegments).map(async (seg) => {
-    const accounts = allAccounts.filter(a => a.segment === seg);
-    const metricsPromises = accounts.map(async (acc) => {
-      const m = await tenantStorage.getAccountMetrics(acc.id); // N*M queries
-    });
-  })
-);
-```
+**Resolution:**
+1. Batch fetch all account metrics and gaps at the start of the route
+2. Created `allMetricsMap` and `allGapsMap` using batch methods
+3. Created `productCatMap` for O(1) category lookups
+4. Refactored all loops to use cached Maps instead of individual queries:
+   - accountsWithMetrics
+   - segmentBreakdown
+   - categoryDataPointsMap
+   - flatGaps
+   - accountAlignments
+   - quickWins
+   - territoryRanking
 
-**Impact:** Can result in hundreds of queries for large datasets.
+**Result:** 2-3 database queries instead of hundreds
 
 ---
 

@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
+import { eq, and, desc, sql, gte, lte, inArray } from "drizzle-orm";
 import {
   accounts, products, productCategories, orders, orderItems,
   segmentProfiles, profileCategories, profileReviewLog, accountMetrics, accountCategoryGaps,
@@ -167,6 +167,45 @@ export class TenantStorage {
       .values({ ...gap, tenantId: this.tenantId })
       .returning();
     return created;
+  }
+
+  async getAccountMetricsBatch(accountIds: number[]): Promise<Map<number, AccountMetrics>> {
+    if (accountIds.length === 0) return new Map();
+    
+    const allMetrics = await db.select().from(accountMetrics)
+      .where(and(
+        inArray(accountMetrics.accountId, accountIds),
+        eq(accountMetrics.tenantId, this.tenantId)
+      ))
+      .orderBy(desc(accountMetrics.computedAt));
+    
+    const metricsMap = new Map<number, AccountMetrics>();
+    for (const m of allMetrics) {
+      if (!metricsMap.has(m.accountId)) {
+        metricsMap.set(m.accountId, m);
+      }
+    }
+    return metricsMap;
+  }
+
+  async getAccountCategoryGapsBatch(accountIds: number[]): Promise<Map<number, AccountCategoryGap[]>> {
+    if (accountIds.length === 0) return new Map();
+    
+    const allGaps = await db.select().from(accountCategoryGaps)
+      .where(and(
+        inArray(accountCategoryGaps.accountId, accountIds),
+        eq(accountCategoryGaps.tenantId, this.tenantId)
+      ))
+      .orderBy(desc(accountCategoryGaps.gapPct));
+    
+    const gapsMap = new Map<number, AccountCategoryGap[]>();
+    for (const g of allGaps) {
+      if (!gapsMap.has(g.accountId)) {
+        gapsMap.set(g.accountId, []);
+      }
+      gapsMap.get(g.accountId)!.push(g);
+    }
+    return gapsMap;
   }
 
   async getSegmentProfiles(): Promise<SegmentProfile[]> {
