@@ -103,6 +103,12 @@ export async function registerRoutes(
   const requireEnterprisePlan = [...requireAuth, requireActiveSubscription, requirePlan("enterprise")];
 
   // ============ Dashboard Stats ============
+  /**
+   * Get dashboard statistics for the current tenant
+   * @route GET /api/dashboard/stats
+   * @security requireSubscription - Requires active subscription
+   * @returns {DashboardStats} Dashboard statistics including account counts, revenue, segments, and top opportunities
+   */
   app.get("/api/dashboard/stats", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
@@ -194,6 +200,12 @@ export async function registerRoutes(
   });
 
   // ============ Daily Focus ============
+  /**
+   * Get daily focus tasks for Territory Managers
+   * @route GET /api/daily-focus
+   * @security requireSubscription - Requires active subscription
+   * @returns {Object} Focus tasks with due date and priority information
+   */
   app.get("/api/daily-focus", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
@@ -261,6 +273,12 @@ export async function registerRoutes(
   });
 
   // ============ Accounts ============
+  /**
+   * Get all accounts for the current tenant with metrics and enrollment status
+   * @route GET /api/accounts
+   * @security requireSubscription - Requires active subscription
+   * @returns {Account[]} List of accounts with metrics, gaps, and enrollment status
+   */
   app.get("/api/accounts", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
@@ -508,6 +526,12 @@ KEY TALKING POINTS:
   });
 
   // ============ Segment Profiles ============
+  /**
+   * Get all Ideal Customer Profiles (ICPs) for the current tenant
+   * @route GET /api/segment-profiles
+   * @security requireSubscription - Requires active subscription
+   * @returns {SegmentProfile[]} List of segment profiles with account counts and category details
+   */
   app.get("/api/segment-profiles", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
@@ -873,6 +897,15 @@ KEY TALKING POINTS:
   });
 
   // ============ Tasks ============
+  /**
+   * Get all tasks for the current tenant with pagination
+   * @route GET /api/tasks
+   * @query {number} [page=1] - Page number for pagination
+   * @query {number} [limit=50] - Number of tasks per page (max 100)
+   * @query {number} [playbookId] - Filter tasks by playbook ID
+   * @security requireSubscription - Requires active subscription
+   * @returns {Object} Tasks array with pagination metadata
+   */
   app.get("/api/tasks", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
@@ -1014,6 +1047,12 @@ KEY TALKING POINTS:
   });
 
   // ============ Playbooks ============
+  /**
+   * Get all playbooks for the current tenant with task counts
+   * @route GET /api/playbooks
+   * @security requireSubscription - Requires active subscription
+   * @returns {Playbook[]} List of playbooks with associated task counts
+   */
   app.get("/api/playbooks", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
@@ -2085,7 +2124,12 @@ KEY TALKING POINTS:
   
   const portalSessionSchema = z.object({}).optional();
 
-  // Get subscription plans
+  /**
+   * Get all available subscription plans
+   * @route GET /api/subscription/plans
+   * @security None - Public endpoint
+   * @returns {SubscriptionPlan[]} List of active subscription plans ordered by display order
+   */
   app.get("/api/subscription/plans", async (req, res) => {
     try {
       const plans = await db.select().from(subscriptionPlans)
@@ -2097,7 +2141,12 @@ KEY TALKING POINTS:
     }
   });
 
-  // Get current subscription status
+  /**
+   * Get current subscription status for the authenticated tenant
+   * @route GET /api/subscription
+   * @security requireAuth - Requires authentication
+   * @returns {Object} Subscription status including plan details, billing period, and Stripe customer ID
+   */
   app.get("/api/subscription", requireAuth, async (req, res) => {
     try {
       const tenantContext = req.tenantContext;
@@ -2126,7 +2175,15 @@ KEY TALKING POINTS:
     }
   });
 
-  // Create checkout session
+  /**
+   * Create a Stripe checkout session for subscription purchase
+   * @route POST /api/stripe/create-checkout-session
+   * @body {string} [priceId] - Stripe price ID
+   * @body {string} [planSlug] - Plan slug (alternative to priceId)
+   * @body {string} [billingCycle=monthly] - Billing cycle (monthly or yearly)
+   * @security requireAuth - Requires authentication
+   * @returns {Object} Checkout session URL and session ID
+   */
   app.post("/api/stripe/create-checkout-session", requireAuth, async (req, res) => {
     try {
       if (!stripe) {
@@ -2208,7 +2265,12 @@ KEY TALKING POINTS:
     }
   });
 
-  // Create billing portal session
+  /**
+   * Create a Stripe billing portal session for subscription management
+   * @route POST /api/stripe/create-portal-session
+   * @security requireAuth - Requires authentication
+   * @returns {Object} Billing portal session URL
+   */
   app.post("/api/stripe/create-portal-session", requireAuth, async (req, res) => {
     try {
       if (!stripe) {
