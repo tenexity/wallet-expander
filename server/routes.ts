@@ -547,12 +547,19 @@ KEY TALKING POINTS:
     try {
       const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
-      const profile = await tenantStorage.updateSegmentProfile(id, req.body);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid profile ID" });
+      }
+      const updateData = insertSegmentProfileSchema.partial().parse(req.body);
+      const profile = await tenantStorage.updateSegmentProfile(id, updateData);
       if (!profile) {
         return res.status(404).json({ message: "Profile not found" });
       }
       res.json(profile);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
       res.status(500).json({ message: "Failed to update profile" });
     }
   });
@@ -1018,12 +1025,19 @@ KEY TALKING POINTS:
     try {
       const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
-      const task = await tenantStorage.updateTask(id, req.body);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid task ID" });
+      }
+      const updateData = insertTaskSchema.partial().parse(req.body);
+      const task = await tenantStorage.updateTask(id, updateData);
       if (!task) {
         return res.status(404).json({ message: "Task not found" });
       }
       res.json(task);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
       res.status(500).json({ message: "Failed to update task" });
     }
   });
@@ -1351,12 +1365,19 @@ KEY TALKING POINTS:
     try {
       const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
-      const programAccount = await tenantStorage.updateProgramAccount(id, req.body);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid program account ID" });
+      }
+      const updateData = insertProgramAccountSchema.partial().parse(req.body);
+      const programAccount = await tenantStorage.updateProgramAccount(id, updateData);
       if (!programAccount) {
         return res.status(404).json({ message: "Program account not found" });
       }
       res.json(programAccount);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
       res.status(500).json({ message: "Failed to update program account" });
     }
   });
@@ -1790,12 +1811,19 @@ KEY TALKING POINTS:
     try {
       const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
-      const manager = await tenantStorage.updateTerritoryManager(id, req.body);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid territory manager ID" });
+      }
+      const updateData = insertTerritoryManagerSchema.partial().parse(req.body);
+      const manager = await tenantStorage.updateTerritoryManager(id, updateData);
       if (!manager) {
         return res.status(404).json({ message: "Territory manager not found" });
       }
       res.json(manager);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
       console.error("Update territory manager error:", error);
       res.status(500).json({ message: "Failed to update territory manager" });
     }
@@ -1847,12 +1875,19 @@ KEY TALKING POINTS:
     try {
       const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
-      const category = await tenantStorage.updateCustomCategory(id, req.body);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid category ID" });
+      }
+      const updateData = insertCustomCategorySchema.partial().parse(req.body);
+      const category = await tenantStorage.updateCustomCategory(id, updateData);
       if (!category) {
         return res.status(404).json({ message: "Category not found" });
       }
       res.json(category);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
       console.error("Update custom category error:", error);
       res.status(500).json({ message: "Failed to update custom category" });
     }
@@ -1951,11 +1986,17 @@ KEY TALKING POINTS:
   app.put("/api/rev-share-tiers/:id", requireAuth, async (req, res) => {
     try {
       const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid tier ID" });
+      }
       
-      // Validate min/max relationship if both are provided
-      if (req.body.minRevenue !== undefined || req.body.maxRevenue !== undefined) {
-        const minRev = req.body.minRevenue ? parseFloat(req.body.minRevenue) : null;
-        const maxRev = req.body.maxRevenue ? parseFloat(req.body.maxRevenue) : null;
+      // First validate against schema
+      const updateData = insertRevShareTierSchema.partial().parse(req.body);
+      
+      // Additional business logic validation for min/max relationship
+      if (updateData.minRevenue !== undefined || updateData.maxRevenue !== undefined) {
+        const minRev = updateData.minRevenue ? parseFloat(updateData.minRevenue) : null;
+        const maxRev = updateData.maxRevenue ? parseFloat(updateData.maxRevenue) : null;
         
         if (minRev !== null && (isNaN(minRev) || minRev < 0)) {
           return res.status(400).json({ message: "Minimum revenue must be a non-negative number" });
@@ -1964,20 +2005,23 @@ KEY TALKING POINTS:
           return res.status(400).json({ message: "Maximum revenue must be greater than minimum revenue" });
         }
       }
-      if (req.body.shareRate !== undefined) {
-        const shareRate = parseFloat(req.body.shareRate);
+      if (updateData.shareRate !== undefined) {
+        const shareRate = parseFloat(updateData.shareRate);
         if (isNaN(shareRate) || shareRate < 0 || shareRate > 100) {
           return res.status(400).json({ message: "Share rate must be between 0 and 100" });
         }
       }
       
       const tenantStorage = getStorage(req);
-      const tier = await tenantStorage.updateRevShareTier(id, req.body);
+      const tier = await tenantStorage.updateRevShareTier(id, updateData);
       if (!tier) {
         return res.status(404).json({ message: "Rev-share tier not found" });
       }
       res.json(tier);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
       console.error("Update rev-share tier error:", error);
       res.status(500).json({ message: "Failed to update rev-share tier" });
     }
