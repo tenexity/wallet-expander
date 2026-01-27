@@ -252,6 +252,7 @@ export type ProfileReviewLog = typeof profileReviewLog.$inferSelect;
 // ============ ACCOUNT METRICS ============
 export const accountMetrics = pgTable("account_metrics", {
   id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id"), // Multi-tenant isolation
   accountId: integer("account_id").notNull(),
   computedAt: timestamp("computed_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   last12mRevenue: numeric("last_12m_revenue"),
@@ -275,6 +276,7 @@ export type AccountMetrics = typeof accountMetrics.$inferSelect;
 // ============ ACCOUNT CATEGORY GAPS ============
 export const accountCategoryGaps = pgTable("account_category_gaps", {
   id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id"), // Multi-tenant isolation
   accountId: integer("account_id").notNull(),
   categoryId: integer("category_id").notNull(),
   expectedPct: numeric("expected_pct"),

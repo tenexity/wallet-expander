@@ -124,6 +124,7 @@ async function seed() {
     const opportunityScore = Math.floor(Math.random() * 40 + 50);
     
     await db.insert(accountMetrics).values({
+      tenantId: 1, // Default tenant for seed data
       accountId: account.id,
       last12mRevenue: String(revenue),
       last3mRevenue: String(Math.floor(revenue / 4)),
@@ -141,6 +142,7 @@ async function seed() {
       const category = categories[Math.floor(Math.random() * categories.length)];
       const gapPct = Math.floor(Math.random() * 30 + 10);
       await db.insert(accountCategoryGaps).values({
+        tenantId: 1, // Default tenant for seed data
         accountId: account.id,
         categoryId: category.id,
         expectedPct: String(gapPct + Math.floor(Math.random() * 20)),

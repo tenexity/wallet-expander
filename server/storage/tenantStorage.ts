@@ -14,6 +14,8 @@ import {
   type SegmentProfile, type InsertSegmentProfile,
   type ProfileCategory, type InsertProfileCategory,
   type ProfileReviewLog, type InsertProfileReviewLog,
+  type AccountMetrics, type InsertAccountMetrics,
+  type AccountCategoryGap, type InsertAccountCategoryGap,
   type Task, type InsertTask,
   type Playbook, type InsertPlaybook,
   type PlaybookTask, type InsertPlaybookTask,
@@ -127,6 +129,42 @@ export class TenantStorage {
   async createProfileReviewLog(log: InsertProfileReviewLog): Promise<ProfileReviewLog> {
     const [created] = await db.insert(profileReviewLog)
       .values({ ...log, tenantId: this.tenantId })
+      .returning();
+    return created;
+  }
+
+  // Account Metrics with tenant scoping
+  async getAccountMetrics(accountId: number): Promise<AccountMetrics | undefined> {
+    const [metrics] = await db.select().from(accountMetrics)
+      .where(and(eq(accountMetrics.accountId, accountId), eq(accountMetrics.tenantId, this.tenantId)))
+      .orderBy(desc(accountMetrics.computedAt))
+      .limit(1);
+    return metrics;
+  }
+
+  async getLatestAccountMetrics(): Promise<AccountMetrics[]> {
+    return db.select().from(accountMetrics)
+      .where(eq(accountMetrics.tenantId, this.tenantId))
+      .orderBy(desc(accountMetrics.opportunityScore));
+  }
+
+  async createAccountMetrics(metrics: InsertAccountMetrics): Promise<AccountMetrics> {
+    const [created] = await db.insert(accountMetrics)
+      .values({ ...metrics, tenantId: this.tenantId })
+      .returning();
+    return created;
+  }
+
+  // Account Category Gaps with tenant scoping
+  async getAccountCategoryGaps(accountId: number): Promise<AccountCategoryGap[]> {
+    return db.select().from(accountCategoryGaps)
+      .where(and(eq(accountCategoryGaps.accountId, accountId), eq(accountCategoryGaps.tenantId, this.tenantId)))
+      .orderBy(desc(accountCategoryGaps.gapPct));
+  }
+
+  async createAccountCategoryGap(gap: InsertAccountCategoryGap): Promise<AccountCategoryGap> {
+    const [created] = await db.insert(accountCategoryGaps)
+      .values({ ...gap, tenantId: this.tenantId })
       .returning();
     return created;
   }
