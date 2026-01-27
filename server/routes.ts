@@ -1,6 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import express from "express";
+import path from "path";
+import fs from "fs";
 import { storage } from "./storage";
 import { 
   insertAccountSchema, 
@@ -1649,8 +1651,6 @@ KEY TALKING POINTS:
       return res.status(400).json({ message: "Invalid template type" });
     }
     
-    const path = require("path");
-    const fs = require("fs");
     const templatePath = path.join(process.cwd(), "public", "templates", `${type}_template.csv`);
     
     if (!fs.existsSync(templatePath)) {
