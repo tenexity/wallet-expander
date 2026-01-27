@@ -11,6 +11,7 @@ import {
   Settings,
   LogOut,
   GitBranch,
+  CreditCard,
 } from "lucide-react";
 import {
   Sidebar,
@@ -77,6 +78,12 @@ const adminNavItems = [
     url: "/data-uploads",
     icon: Upload,
     tooltip: "Import accounts, products, categories, and order history from CSV files",
+  },
+  {
+    title: "Subscription",
+    url: "/subscription",
+    icon: CreditCard,
+    tooltip: "Manage your subscription plan and billing settings",
   },
   {
     title: "Settings",

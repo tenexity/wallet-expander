@@ -14,18 +14,41 @@ export const tenants = pgTable("tenants", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(), // URL-friendly identifier
+  // Subscription fields
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  subscriptionStatus: text("subscription_status").default("none"), // none, trialing, active, past_due, canceled, unpaid
+  planType: text("plan_type").default("free"), // free, starter, professional, enterprise
+  billingPeriodEnd: timestamp("billing_period_end"),
+  trialEndsAt: timestamp("trial_ends_at"),
+  canceledAt: timestamp("canceled_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const insertTenantSchema = createInsertSchema(tenants).omit({
   id: true,
+  stripeCustomerId: true,
+  stripeSubscriptionId: true,
+  subscriptionStatus: true,
+  planType: true,
+  billingPeriodEnd: true,
+  trialEndsAt: true,
+  canceledAt: true,
   createdAt: true,
   updatedAt: true,
 });
 
 export type InsertTenant = z.infer<typeof insertTenantSchema>;
 export type Tenant = typeof tenants.$inferSelect;
+
+// Subscription status types
+export const SUBSCRIPTION_STATUSES = ['none', 'trialing', 'active', 'past_due', 'canceled', 'unpaid'] as const;
+export type SubscriptionStatus = typeof SUBSCRIPTION_STATUSES[number];
+
+// Plan types
+export const PLAN_TYPES = ['free', 'starter', 'professional', 'enterprise'] as const;
+export type PlanType = typeof PLAN_TYPES[number];
 
 // ============ USER ROLES (Permission levels per tenant) ============
 // Roles: super_admin (full access), reviewer (view + approve), viewer (read-only)
@@ -563,3 +586,47 @@ export const updateEmailSettingsSchema = emailSettingsSchema.partial();
 
 export type EmailSettings = z.infer<typeof emailSettingsSchema>;
 export type UpdateEmailSettings = z.infer<typeof updateEmailSettingsSchema>;
+
+// ============ SUBSCRIPTION PLANS ============
+export const subscriptionPlans = pgTable("subscription_plans", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  stripeMonthlyPriceId: text("stripe_monthly_price_id"),
+  stripeYearlyPriceId: text("stripe_yearly_price_id"),
+  monthlyPrice: numeric("monthly_price").notNull(),
+  yearlyPrice: numeric("yearly_price").notNull(),
+  features: jsonb("features").$type<string[]>(),
+  limits: jsonb("limits").$type<{ accounts?: number; users?: number; [key: string]: any }>(),
+  isActive: boolean("is_active").default(true),
+  displayOrder: integer("display_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSubscriptionPlan = z.infer<typeof insertSubscriptionPlanSchema>;
+export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
+
+// ============ SUBSCRIPTION EVENTS (Audit Trail) ============
+export const subscriptionEvents = pgTable("subscription_events", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  eventType: text("event_type").notNull(),
+  stripeEventId: text("stripe_event_id"),
+  data: jsonb("data"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_subscription_events_tenant_id").on(table.tenantId),
+]);
+
+export const insertSubscriptionEventSchema = createInsertSchema(subscriptionEvents).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSubscriptionEvent = z.infer<typeof insertSubscriptionEventSchema>;
+export type SubscriptionEvent = typeof subscriptionEvents.$inferSelect;

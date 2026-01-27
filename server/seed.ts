@@ -11,6 +11,7 @@ import {
   dataUploads,
   accountMetrics,
   accountCategoryGaps,
+  subscriptionPlans,
 } from "@shared/schema";
 import { sql } from "drizzle-orm";
 
@@ -285,6 +286,70 @@ async function seed() {
   ]);
 
   console.log("Created data uploads");
+
+  // Seed subscription plans
+  await db.delete(subscriptionPlans);
+  await db.insert(subscriptionPlans).values([
+    {
+      name: "Starter",
+      slug: "starter",
+      stripeMonthlyPriceId: null, // Will be set after creating products in Stripe Dashboard
+      stripeYearlyPriceId: null,
+      monthlyPrice: "49",
+      yearlyPrice: "490",
+      features: [
+        "Up to 100 accounts",
+        "Up to 3 users",
+        "Basic ICP profiles",
+        "Standard playbooks",
+        "Email support",
+      ],
+      limits: { accounts: 100, users: 3 },
+      isActive: true,
+      displayOrder: 1,
+    },
+    {
+      name: "Professional",
+      slug: "professional",
+      stripeMonthlyPriceId: null,
+      stripeYearlyPriceId: null,
+      monthlyPrice: "149",
+      yearlyPrice: "1490",
+      features: [
+        "Up to 500 accounts",
+        "Up to 10 users",
+        "Advanced ICP with AI insights",
+        "Custom playbooks",
+        "Priority email support",
+        "API access",
+      ],
+      limits: { accounts: 500, users: 10 },
+      isActive: true,
+      displayOrder: 2,
+    },
+    {
+      name: "Enterprise",
+      slug: "enterprise",
+      stripeMonthlyPriceId: null,
+      stripeYearlyPriceId: null,
+      monthlyPrice: "499",
+      yearlyPrice: "4990",
+      features: [
+        "Unlimited accounts",
+        "Unlimited users",
+        "Custom AI training",
+        "White-label options",
+        "Dedicated support",
+        "SSO integration",
+        "Custom integrations",
+      ],
+      limits: { accounts: -1, users: -1 }, // -1 = unlimited
+      isActive: true,
+      displayOrder: 3,
+    },
+  ]);
+
+  console.log("Created subscription plans");
 
   console.log("Seeding complete!");
 }

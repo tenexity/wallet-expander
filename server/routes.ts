@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import express from "express";
 import { storage } from "./storage";
 import { 
   insertAccountSchema, 
@@ -14,7 +15,13 @@ import {
   insertRevShareTierSchema,
   updateEmailSettingsSchema,
   DEFAULT_SCORING_WEIGHTS,
+  tenants,
+  subscriptionPlans,
+  subscriptionEvents,
 } from "@shared/schema";
+import Stripe from "stripe";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { analyzeSegment, generatePlaybookTasks } from "./ai-service";
 import { 
@@ -28,6 +35,7 @@ import {
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { withTenantContext, requireRole, requirePermission, type TenantContext } from "./middleware/tenantContext";
 import { getTenantStorage, TenantStorage } from "./storage/tenantStorage";
+import { requireActiveSubscription, requirePlan, checkSubscriptionStatus } from "./middleware/subscription";
 
 function getStorage(req: any): TenantStorage {
   if (!req.tenantContext?.tenantId) {
@@ -75,9 +83,17 @@ export async function registerRoutes(
   
   // Legacy alias for backward compatibility during migration
   const requireAuth = authWithTenant;
+  
+  // Middleware for routes that require active subscription
+  // Add requireActiveSubscription after requireAuth for subscription-protected routes
+  const requireSubscription = [...authWithTenant, requireActiveSubscription];
+  
+  // Middleware for routes requiring specific plan levels
+  const requireProPlan = [...authWithTenant, requireActiveSubscription, requirePlan("professional")];
+  const requireEnterprisePlan = [...authWithTenant, requireActiveSubscription, requirePlan("enterprise")];
 
   // ============ Dashboard Stats ============
-  app.get("/api/dashboard/stats", requireAuth, async (req, res) => {
+  app.get("/api/dashboard/stats", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const allAccounts = await tenantStorage.getAccounts();
@@ -160,7 +176,7 @@ export async function registerRoutes(
   });
 
   // ============ Daily Focus ============
-  app.get("/api/daily-focus", requireAuth, async (req, res) => {
+  app.get("/api/daily-focus", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const allTasks = await tenantStorage.getTasks();
@@ -225,7 +241,7 @@ export async function registerRoutes(
   });
 
   // ============ Accounts ============
-  app.get("/api/accounts", requireAuth, async (req, res) => {
+  app.get("/api/accounts", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const allAccounts = await tenantStorage.getAccounts();
@@ -268,7 +284,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/accounts/:id", requireAuth, async (req, res) => {
+  app.get("/api/accounts/:id", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
@@ -282,7 +298,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/accounts", requireAuth, async (req, res) => {
+  app.post("/api/accounts", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const data = insertAccountSchema.parse(req.body);
@@ -297,7 +313,7 @@ export async function registerRoutes(
   });
 
   // Enroll account in growth program and auto-generate playbook
-  app.post("/api/accounts/:id/enroll", requireAuth, async (req, res) => {
+  app.post("/api/accounts/:id/enroll", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const accountId = parseInt(req.params.id);
@@ -461,7 +477,7 @@ KEY TALKING POINTS:
   });
 
   // ============ Segment Profiles ============
-  app.get("/api/segment-profiles", requireAuth, async (req, res) => {
+  app.get("/api/segment-profiles", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const profiles = await tenantStorage.getSegmentProfiles();
@@ -498,7 +514,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.get("/api/segment-profiles/:id", requireAuth, async (req, res) => {
+  app.get("/api/segment-profiles/:id", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const id = parseInt(req.params.id);
@@ -513,7 +529,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/segment-profiles", requireAuth, async (req, res) => {
+  app.post("/api/segment-profiles", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const data = insertSegmentProfileSchema.parse(req.body);
@@ -928,7 +944,7 @@ KEY TALKING POINTS:
   });
 
   // ============ Tasks ============
-  app.get("/api/tasks", requireAuth, async (req, res) => {
+  app.get("/api/tasks", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       let allTasks = await tenantStorage.getTasks();
@@ -1032,7 +1048,7 @@ KEY TALKING POINTS:
   });
 
   // ============ Playbooks ============
-  app.get("/api/playbooks", requireAuth, async (req, res) => {
+  app.get("/api/playbooks", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const allPlaybooks = await tenantStorage.getPlaybooks();
@@ -1113,7 +1129,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/playbooks/generate", requireAuth, async (req, res) => {
+  app.post("/api/playbooks/generate", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const { name, segment, topN = 10, priorityCategories = [] } = req.body;
@@ -1206,7 +1222,7 @@ KEY TALKING POINTS:
   });
 
   // ============ Program Accounts ============
-  app.get("/api/program-accounts", requireAuth, async (req, res) => {
+  app.get("/api/program-accounts", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const programAccounts = await tenantStorage.getProgramAccounts();
@@ -1243,7 +1259,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/program-accounts", requireAuth, async (req, res) => {
+  app.post("/api/program-accounts", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const data = insertProgramAccountSchema.parse(req.body);
@@ -2070,6 +2086,394 @@ KEY TALKING POINTS:
       console.error("Seed default tier error:", error);
       res.status(500).json({ message: "Failed to seed default tier" });
     }
+  });
+
+  // ============ Stripe & Subscription ============
+  if (!process.env.STRIPE_SECRET_KEY) {
+    console.warn("Warning: STRIPE_SECRET_KEY not configured - Stripe features will be unavailable");
+  }
+  
+  const stripe = process.env.STRIPE_SECRET_KEY 
+    ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" })
+    : null;
+  
+  // Validation schemas for Stripe endpoints
+  const checkoutSessionSchema = z.object({
+    priceId: z.string().optional(),
+    planSlug: z.string().optional(),
+    billingCycle: z.enum(['monthly', 'yearly']).default('monthly'),
+  }).refine(data => data.priceId || data.planSlug, {
+    message: "Either priceId or planSlug is required"
+  });
+  
+  const portalSessionSchema = z.object({}).optional();
+
+  // Get subscription plans
+  app.get("/api/subscription/plans", async (req, res) => {
+    try {
+      const plans = await db.select().from(subscriptionPlans)
+        .where(eq(subscriptionPlans.isActive, true))
+        .orderBy(subscriptionPlans.displayOrder);
+      res.json(plans);
+    } catch (error) {
+      console.error("Error fetching subscription plans:", error);
+      res.status(500).json({ message: "Failed to fetch subscription plans" });
+    }
+  });
+
+  // Get current subscription status
+  app.get("/api/subscription", requireAuth, async (req, res) => {
+    try {
+      const tenantContext = (req as any).tenantContext as TenantContext;
+      const tenant = tenantContext.tenant;
+      
+      // Get plan details if tenant has a plan
+      let planDetails = null;
+      if (tenant.planType && tenant.planType !== 'free') {
+        const [plan] = await db.select().from(subscriptionPlans)
+          .where(eq(subscriptionPlans.slug, tenant.planType))
+          .limit(1);
+        planDetails = plan || null;
+      }
+      
+      res.json({
+        subscriptionStatus: tenant.subscriptionStatus || 'none',
+        planType: tenant.planType || 'free',
+        billingPeriodEnd: tenant.billingPeriodEnd,
+        trialEndsAt: tenant.trialEndsAt,
+        canceledAt: tenant.canceledAt,
+        hasStripeCustomer: !!tenant.stripeCustomerId,
+        plan: planDetails,
+      });
+    } catch (error) {
+      console.error("Error fetching subscription:", error);
+      res.status(500).json({ message: "Failed to fetch subscription" });
+    }
+  });
+
+  // Create checkout session
+  app.post("/api/stripe/create-checkout-session", requireAuth, async (req, res) => {
+    try {
+      if (!stripe) {
+        return res.status(503).json({ message: "Stripe is not configured" });
+      }
+      
+      // Validate request body
+      const parseResult = checkoutSessionSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ message: "Invalid request", errors: parseResult.error.errors });
+      }
+      
+      const { priceId, planSlug, billingCycle } = parseResult.data;
+      const tenantContext = (req as any).tenantContext as TenantContext;
+      const tenant = tenantContext.tenant;
+      const user = (req as any).user;
+      
+      if (!priceId && !planSlug) {
+        return res.status(400).json({ message: "Price ID or plan slug required" });
+      }
+      
+      // Get the price ID from plan if not provided
+      let stripePriceId = priceId;
+      if (!stripePriceId && planSlug) {
+        const [plan] = await db.select().from(subscriptionPlans)
+          .where(eq(subscriptionPlans.slug, planSlug))
+          .limit(1);
+        
+        if (!plan) {
+          return res.status(404).json({ message: "Plan not found" });
+        }
+        
+        stripePriceId = billingCycle === 'yearly' 
+          ? plan.stripeYearlyPriceId 
+          : plan.stripeMonthlyPriceId;
+          
+        if (!stripePriceId) {
+          return res.status(400).json({ message: "Stripe price not configured for this plan" });
+        }
+      }
+      
+      // Get or create Stripe customer
+      let customerId = tenant.stripeCustomerId;
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: user?.claims?.email || 'unknown@example.com',
+          name: tenant.name,
+          metadata: { tenantId: tenant.id.toString() }
+        });
+        customerId = customer.id;
+        
+        // Save customer ID to database
+        await db.update(tenants)
+          .set({ stripeCustomerId: customerId })
+          .where(eq(tenants.id, tenant.id));
+      }
+      
+      const appUrl = process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : process.env.REPLIT_DOMAINS 
+          ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+          : 'http://localhost:5000';
+      
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        mode: 'subscription',
+        line_items: [{ price: stripePriceId, quantity: 1 }],
+        success_url: `${appUrl}/subscription?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${appUrl}/subscription?canceled=true`,
+        metadata: { tenantId: tenant.id.toString() },
+        subscription_data: {
+          metadata: { tenantId: tenant.id.toString() }
+        }
+      });
+      
+      res.json({ url: session.url, sessionId: session.id });
+    } catch (error: any) {
+      console.error("Error creating checkout session:", error);
+      res.status(500).json({ message: error.message || "Failed to create checkout session" });
+    }
+  });
+
+  // Create billing portal session
+  app.post("/api/stripe/create-portal-session", requireAuth, async (req, res) => {
+    try {
+      if (!stripe) {
+        return res.status(503).json({ message: "Stripe is not configured" });
+      }
+      
+      const tenantContext = (req as any).tenantContext as TenantContext;
+      const tenant = tenantContext.tenant;
+      
+      if (!tenant.stripeCustomerId) {
+        return res.status(400).json({ message: "No billing account found" });
+      }
+      
+      const appUrl = process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : process.env.REPLIT_DOMAINS 
+          ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+          : 'http://localhost:5000';
+      
+      const session = await stripe.billingPortal.sessions.create({
+        customer: tenant.stripeCustomerId,
+        return_url: `${appUrl}/subscription`
+      });
+      
+      res.json({ url: session.url });
+    } catch (error: any) {
+      console.error("Error creating portal session:", error);
+      res.status(500).json({ message: error.message || "Failed to create portal session" });
+    }
+  });
+
+  // Helper function to find plan by Stripe price ID (monthly or yearly)
+  async function findPlanByPriceId(priceId: string): Promise<{ slug: string } | null> {
+    // Try monthly price first
+    let [plan] = await db.select().from(subscriptionPlans)
+      .where(eq(subscriptionPlans.stripeMonthlyPriceId, priceId))
+      .limit(1);
+    
+    if (plan) return { slug: plan.slug };
+    
+    // Try yearly price
+    [plan] = await db.select().from(subscriptionPlans)
+      .where(eq(subscriptionPlans.stripeYearlyPriceId, priceId))
+      .limit(1);
+    
+    if (plan) return { slug: plan.slug };
+    
+    return null;
+  }
+
+  // Stripe webhook handler - uses rawBody stored by global JSON parser
+  app.post("/api/stripe/webhook", async (req, res) => {
+    if (!stripe) {
+      console.error('Webhook error: Stripe not configured');
+      return res.status(503).send('Webhook Error: Stripe not configured');
+    }
+    
+    const sig = req.headers['stripe-signature'] as string;
+    let event: Stripe.Event;
+    
+    // Use rawBody stored by the global JSON parser in index.ts
+    const rawBody = (req as any).rawBody;
+    
+    if (!rawBody) {
+      console.error('Webhook error: No raw body available');
+      return res.status(400).send('Webhook Error: No raw body');
+    }
+    
+    if (!process.env.STRIPE_WEBHOOK_SECRET) {
+      console.error('Webhook error: STRIPE_WEBHOOK_SECRET not configured');
+      return res.status(500).send('Webhook Error: Not configured');
+    }
+    
+    try {
+      event = stripe.webhooks.constructEvent(
+        rawBody, 
+        sig, 
+        process.env.STRIPE_WEBHOOK_SECRET
+      );
+    } catch (err: any) {
+      console.error('Webhook signature verification failed:', err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+    
+    console.log(`Stripe webhook received: ${event.type}`);
+    
+    try {
+      switch (event.type) {
+        case 'checkout.session.completed': {
+          const session = event.data.object as Stripe.Checkout.Session;
+          const tenantId = session.metadata?.tenantId ? parseInt(session.metadata.tenantId) : null;
+          
+          if (tenantId && session.subscription) {
+            // Get subscription details to extract plan info
+            const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
+            const priceId = subscription.items.data[0]?.price.id;
+            
+            // Find matching plan by price ID (monthly or yearly)
+            const matchingPlan = priceId ? await findPlanByPriceId(priceId) : null;
+            
+            if (!matchingPlan) {
+              console.error(`Webhook: No plan found for price ID ${priceId}`);
+              // Don't fail - just log and continue with unknown plan
+            }
+            
+            await db.update(tenants)
+              .set({
+                stripeSubscriptionId: session.subscription as string,
+                subscriptionStatus: 'active',
+                planType: matchingPlan?.slug || null, // Store null if unknown, don't assume 'starter'
+                billingPeriodEnd: new Date(subscription.current_period_end * 1000),
+              })
+              .where(eq(tenants.id, tenantId));
+              
+            console.log(`Tenant ${tenantId} subscription activated: ${matchingPlan?.slug || 'unknown'}`);
+          }
+          break;
+        }
+        
+        case 'customer.subscription.updated': {
+          const subscription = event.data.object as Stripe.Subscription;
+          const customerId = subscription.customer as string;
+          
+          // Find tenant by customer ID
+          const [tenant] = await db.select().from(tenants)
+            .where(eq(tenants.stripeCustomerId, customerId))
+            .limit(1);
+            
+          if (tenant) {
+            const status = subscription.status === 'active' ? 'active' 
+              : subscription.status === 'trialing' ? 'trialing'
+              : subscription.status === 'past_due' ? 'past_due'
+              : subscription.status === 'canceled' ? 'canceled'
+              : 'none';
+              
+            await db.update(tenants)
+              .set({
+                subscriptionStatus: status,
+                billingPeriodEnd: new Date(subscription.current_period_end * 1000),
+                canceledAt: subscription.canceled_at ? new Date(subscription.canceled_at * 1000) : null,
+              })
+              .where(eq(tenants.id, tenant.id));
+              
+            console.log(`Tenant ${tenant.id} subscription updated: ${status}`);
+          }
+          break;
+        }
+        
+        case 'customer.subscription.deleted': {
+          const subscription = event.data.object as Stripe.Subscription;
+          const customerId = subscription.customer as string;
+          
+          const [tenant] = await db.select().from(tenants)
+            .where(eq(tenants.stripeCustomerId, customerId))
+            .limit(1);
+            
+          if (tenant) {
+            await db.update(tenants)
+              .set({
+                subscriptionStatus: 'canceled',
+                canceledAt: new Date(),
+              })
+              .where(eq(tenants.id, tenant.id));
+              
+            console.log(`Tenant ${tenant.id} subscription canceled`);
+          }
+          break;
+        }
+        
+        case 'invoice.paid': {
+          const invoice = event.data.object as Stripe.Invoice;
+          const customerId = invoice.customer as string;
+          
+          const [tenant] = await db.select().from(tenants)
+            .where(eq(tenants.stripeCustomerId, customerId))
+            .limit(1);
+            
+          if (tenant && invoice.subscription) {
+            const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
+            
+            await db.update(tenants)
+              .set({
+                subscriptionStatus: 'active',
+                billingPeriodEnd: new Date(subscription.current_period_end * 1000),
+              })
+              .where(eq(tenants.id, tenant.id));
+              
+            console.log(`Tenant ${tenant.id} invoice paid, subscription renewed`);
+          }
+          break;
+        }
+        
+        case 'invoice.payment_failed': {
+          const invoice = event.data.object as Stripe.Invoice;
+          const customerId = invoice.customer as string;
+          
+          const [tenant] = await db.select().from(tenants)
+            .where(eq(tenants.stripeCustomerId, customerId))
+            .limit(1);
+            
+          if (tenant) {
+            await db.update(tenants)
+              .set({ subscriptionStatus: 'past_due' })
+              .where(eq(tenants.id, tenant.id));
+              
+            console.log(`Tenant ${tenant.id} payment failed, marked as past_due`);
+          }
+          break;
+        }
+      }
+      
+      // Log event for audit trail
+      const eventData = event.data.object as any;
+      let tenantId: number | null = null;
+      
+      if (eventData.metadata?.tenantId) {
+        tenantId = parseInt(eventData.metadata.tenantId);
+      } else if (eventData.customer) {
+        const [tenant] = await db.select().from(tenants)
+          .where(eq(tenants.stripeCustomerId, eventData.customer))
+          .limit(1);
+        tenantId = tenant?.id || null;
+      }
+      
+      if (tenantId) {
+        await db.insert(subscriptionEvents).values({
+          tenantId,
+          eventType: event.type,
+          stripeEventId: event.id,
+          data: eventData,
+        });
+      }
+      
+    } catch (error) {
+      console.error(`Error processing webhook ${event.type}:`, error);
+      // Still return 200 to acknowledge receipt
+    }
+    
+    res.json({ received: true });
   });
 
   // ============ Email Settings ============

@@ -1,22 +1,12 @@
-import { useEffect } from "react";
-import { Link } from "wouter";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import type { SubscriptionPlan } from "@shared/schema";
 import {
   TrendingUp,
   Target,
@@ -36,6 +26,8 @@ import {
   Check,
   UserCheck,
   ClipboardList,
+  Loader2,
+  Crown,
 } from "lucide-react";
 
 import screenshotDashboard from "@/assets/images/screenshot-dashboard.png";
@@ -44,14 +36,6 @@ import screenshotGapAnalysis from "@/assets/images/screenshot-gap-analysis.png";
 import screenshotIcpBuilder from "@/assets/images/screenshot-icp-builder.png";
 import screenshotRevenue from "@/assets/images/screenshot-revenue.png";
 import screenshotPlaybooks from "@/assets/images/screenshot-playbooks.png";
-
-const demoFormSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  email: z.string().email("Please enter a valid email address"),
-  company: z.string().min(2, "Company name must be at least 2 characters"),
-});
-
-type DemoFormValues = z.infer<typeof demoFormSchema>;
 
 const showcaseFeatures = [
   {
@@ -150,15 +134,37 @@ const stats = [
 
 export default function Landing() {
   const { toast } = useToast();
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
 
-  const form = useForm<DemoFormValues>({
-    resolver: zodResolver(demoFormSchema),
-    defaultValues: {
-      name: "",
-      email: "",
-      company: "",
+  const { data: plans, isLoading: plansLoading } = useQuery<SubscriptionPlan[]>({
+    queryKey: ["/api/subscription/plans"],
+  });
+
+  const checkoutMutation = useMutation({
+    mutationFn: async ({ planSlug, cycle }: { planSlug: string; cycle: string }) => {
+      const res = await apiRequest("POST", "/api/stripe/create-checkout-session", {
+        planSlug,
+        billingCycle: cycle,
+      });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Checkout Error",
+        description: error.message || "Failed to start checkout. Please log in first.",
+        variant: "destructive",
+      });
     },
   });
+
+  const handleSelectPlan = (planSlug: string) => {
+    checkoutMutation.mutate({ planSlug, cycle: billingCycle });
+  };
 
   useEffect(() => {
     document.title = "Wallet Share Expander - Recover Lost Revenue from Existing Customers";
@@ -202,17 +208,6 @@ export default function Landing() {
     };
   }, []);
 
-  const onSubmit = async (data: DemoFormValues) => {
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    toast({
-      title: "Demo Request Received",
-      description: `Thanks ${data.name}! We'll contact you at ${data.email} within 24 hours.`,
-    });
-
-    form.reset();
-  };
-
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
@@ -246,13 +241,13 @@ export default function Landing() {
             >
               Pricing
             </button>
-            <button
-              onClick={() => scrollToSection("signup")}
+            <a
+              href="/api/login"
               className="text-sm font-medium text-muted-foreground transition-colors"
-              data-testid="nav-demo"
+              data-testid="nav-signup"
             >
-              Get Demo
-            </button>
+              Sign Up
+            </a>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -262,13 +257,11 @@ export default function Landing() {
                 Login
               </Button>
             </a>
-            <Button
-              size="sm"
-              onClick={() => scrollToSection("signup")}
-              data-testid="button-get-started"
-            >
-              Get Started
-            </Button>
+            <a href="/api/login">
+              <Button size="sm" data-testid="button-get-started">
+                Get Started
+              </Button>
+            </a>
           </div>
         </div>
       </header>
@@ -292,10 +285,10 @@ export default function Landing() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
               <Button
                 size="lg"
-                onClick={() => scrollToSection("signup")}
+                onClick={() => scrollToSection("pricing")}
                 data-testid="button-hero-demo"
               >
-                Request a Demo
+                Start Free Trial
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
               <Button
@@ -431,75 +424,229 @@ export default function Landing() {
 
       <section id="pricing" className="py-20 bg-muted/30">
         <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center">
-            <Badge variant="secondary" className="mb-4" data-testid="badge-pricing">
-              Fee-for-Success Pricing
-            </Badge>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4" data-testid="text-pricing-title">
-              We Only Win When You Win
-            </h2>
-            <p className="text-lg text-muted-foreground mb-12">
-              Our success-based pricing model aligns our objectives with yours.
-              No monthly fees eating into your budget—you only pay when you recover revenue.
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-12">
+              <Badge variant="secondary" className="mb-4" data-testid="badge-pricing">
+                Simple Pricing
+              </Badge>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4" data-testid="text-pricing-title">
+                Choose the Plan That Fits Your Needs
+              </h2>
+              <p className="text-lg text-muted-foreground mb-8">
+                Start with a free trial. Upgrade anytime to unlock more features and scale your revenue recovery.
+              </p>
+
+              <div className="inline-flex items-center gap-2 p-1 rounded-lg bg-muted" data-testid="billing-toggle">
+                <button
+                  onClick={() => setBillingCycle("monthly")}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    billingCycle === "monthly"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground"
+                  }`}
+                  data-testid="button-monthly-billing"
+                >
+                  Monthly
+                </button>
+                <button
+                  onClick={() => setBillingCycle("yearly")}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    billingCycle === "yearly"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground"
+                  }`}
+                  data-testid="button-yearly-billing"
+                >
+                  Yearly
+                  <Badge variant="secondary" className="ml-2 text-xs">
+                    Save 20%
+                  </Badge>
+                </button>
+              </div>
+            </div>
+
+            {plansLoading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : plans && plans.length > 0 ? (
+              <div className="grid md:grid-cols-3 gap-6">
+                {plans.map((plan) => {
+                  const priceRaw = billingCycle === "yearly" ? plan.yearlyPrice : plan.monthlyPrice;
+                  const price = parseFloat(priceRaw || "0");
+                  const isPopular = plan.slug === "professional";
+                  const features = Array.isArray(plan.features) ? plan.features : [];
+                  const planDescriptions: Record<string, string> = {
+                    starter: "For small teams getting started",
+                    professional: "For growing sales teams",
+                    enterprise: "For large organizations",
+                  };
+
+                  return (
+                    <Card
+                      key={plan.id}
+                      className={`relative p-6 flex flex-col ${
+                        isPopular ? "border-primary shadow-lg" : ""
+                      }`}
+                      data-testid={`card-plan-${plan.slug}`}
+                    >
+                      {isPopular && (
+                        <Badge
+                          className="absolute -top-3 left-1/2 -translate-x-1/2"
+                          data-testid="badge-popular"
+                        >
+                          <Crown className="w-3 h-3 mr-1" />
+                          Most Popular
+                        </Badge>
+                      )}
+
+                      <div className="text-center mb-6">
+                        <h3 className="text-xl font-bold mb-2" data-testid={`text-plan-name-${plan.slug}`}>
+                          {plan.name}
+                        </h3>
+                        <p className="text-sm text-muted-foreground mb-4" data-testid={`text-plan-desc-${plan.slug}`}>
+                          {planDescriptions[plan.slug] || "Flexible plan for your needs"}
+                        </p>
+                        <div className="flex items-baseline justify-center gap-1">
+                          <span className="text-4xl font-bold" data-testid={`text-plan-price-${plan.slug}`}>
+                            ${Math.round(price / 100)}
+                          </span>
+                          <span className="text-muted-foreground">
+                            /{billingCycle === "yearly" ? "year" : "month"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <ul className="space-y-3 flex-1 mb-6">
+                        {features.map((feature, idx) => (
+                          <li key={idx} className="flex items-start gap-2 text-sm">
+                            <Check className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                            <span>{String(feature)}</span>
+                          </li>
+                        ))}
+                      </ul>
+
+                      <Button
+                        className="w-full"
+                        variant={isPopular ? "default" : "outline"}
+                        onClick={() => handleSelectPlan(plan.slug)}
+                        disabled={checkoutMutation.isPending}
+                        data-testid={`button-select-plan-${plan.slug}`}
+                      >
+                        {checkoutMutation.isPending ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Loading...
+                          </>
+                        ) : (
+                          <>Get Started</>
+                        )}
+                      </Button>
+                    </Card>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="grid md:grid-cols-3 gap-6">
+                <Card className="p-6" data-testid="card-plan-starter">
+                  <div className="text-center mb-6">
+                    <h3 className="text-xl font-bold mb-2">Starter</h3>
+                    <p className="text-sm text-muted-foreground mb-4">For small teams getting started</p>
+                    <div className="flex items-baseline justify-center gap-1">
+                      <span className="text-4xl font-bold">${billingCycle === "yearly" ? 468 : 49}</span>
+                      <span className="text-muted-foreground">/{billingCycle === "yearly" ? "year" : "month"}</span>
+                    </div>
+                  </div>
+                  <ul className="space-y-3 mb-6">
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>Up to 100 accounts</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>Basic gap analysis</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>Email support</span>
+                    </li>
+                  </ul>
+                  <a href="/api/login">
+                    <Button variant="outline" className="w-full" data-testid="button-select-plan-starter-fallback">
+                      Get Started
+                    </Button>
+                  </a>
+                </Card>
+
+                <Card className="p-6 border-primary shadow-lg relative" data-testid="card-plan-professional">
+                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <Crown className="w-3 h-3 mr-1" />
+                    Most Popular
+                  </Badge>
+                  <div className="text-center mb-6">
+                    <h3 className="text-xl font-bold mb-2">Professional</h3>
+                    <p className="text-sm text-muted-foreground mb-4">For growing sales teams</p>
+                    <div className="flex items-baseline justify-center gap-1">
+                      <span className="text-4xl font-bold">${billingCycle === "yearly" ? 1908 : 199}</span>
+                      <span className="text-muted-foreground">/{billingCycle === "yearly" ? "year" : "month"}</span>
+                    </div>
+                  </div>
+                  <ul className="space-y-3 mb-6">
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>Up to 500 accounts</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>AI-powered playbooks</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>Priority support</span>
+                    </li>
+                  </ul>
+                  <a href="/api/login">
+                    <Button className="w-full" data-testid="button-select-plan-professional-fallback">
+                      Get Started
+                    </Button>
+                  </a>
+                </Card>
+
+                <Card className="p-6" data-testid="card-plan-enterprise">
+                  <div className="text-center mb-6">
+                    <h3 className="text-xl font-bold mb-2">Enterprise</h3>
+                    <p className="text-sm text-muted-foreground mb-4">For large organizations</p>
+                    <div className="flex items-baseline justify-center gap-1">
+                      <span className="text-4xl font-bold">${billingCycle === "yearly" ? 4788 : 499}</span>
+                      <span className="text-muted-foreground">/{billingCycle === "yearly" ? "year" : "month"}</span>
+                    </div>
+                  </div>
+                  <ul className="space-y-3 mb-6">
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>Unlimited accounts</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>Custom integrations</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>Dedicated support</span>
+                    </li>
+                  </ul>
+                  <a href="/api/login">
+                    <Button variant="outline" className="w-full" data-testid="button-select-plan-enterprise-fallback">
+                      Get Started
+                    </Button>
+                  </a>
+                </Card>
+              </div>
+            )}
+
+            <p className="text-center text-sm text-muted-foreground mt-8" data-testid="text-trial-info">
+              All plans include a 14-day free trial. No credit card required to start.
             </p>
-
-            <Card className="p-8 md:p-12 text-center" data-testid="card-pricing-success">
-              <div className="mb-8">
-                <div className="flex items-baseline justify-center gap-2 mb-2">
-                  <span className="text-5xl md:text-6xl font-bold text-primary" data-testid="text-success-fee">15%</span>
-                  <span className="text-xl text-muted-foreground">success fee</span>
-                </div>
-                <p className="text-muted-foreground" data-testid="text-fee-description">
-                  of incremental revenue recovered from enrolled accounts
-                </p>
-              </div>
-
-              <div className="grid md:grid-cols-3 gap-6 mb-8">
-                <div className="p-4 rounded-md bg-muted/50" data-testid="pricing-benefit-risk">
-                  <Shield className="h-6 w-6 text-primary mx-auto mb-2" />
-                  <h4 className="font-medium mb-1">Zero Risk</h4>
-                  <p className="text-sm text-muted-foreground">
-                    No revenue recovered means no fees owed
-                  </p>
-                </div>
-                <div className="p-4 rounded-md bg-muted/50" data-testid="pricing-benefit-aligned">
-                  <Target className="h-6 w-6 text-primary mx-auto mb-2" />
-                  <h4 className="font-medium mb-1">Aligned Incentives</h4>
-                  <p className="text-sm text-muted-foreground">
-                    We're motivated to maximize your results
-                  </p>
-                </div>
-                <div className="p-4 rounded-md bg-muted/50" data-testid="pricing-benefit-volume">
-                  <TrendingUp className="h-6 w-6 text-primary mx-auto mb-2" />
-                  <h4 className="font-medium mb-1">Volume Discounts</h4>
-                  <p className="text-sm text-muted-foreground">
-                    Success fee declines as you grow
-                  </p>
-                </div>
-              </div>
-
-              <Button
-                size="lg"
-                onClick={() => scrollToSection("signup")}
-                className="mb-8"
-                data-testid="button-pricing-demo"
-              >
-                Request a Demo
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-
-              <div className="border-t pt-6 space-y-2 text-xs text-muted-foreground" data-testid="pricing-fine-print">
-                <p data-testid="text-setup-fee">
-                  One-time setup fee of $1,200 covers onboarding, data integration, and initial AI training.
-                </p>
-                <p data-testid="text-volume-discount">
-                  Success fee starts at 15% and declines based on volume thresholds.
-                </p>
-                <p data-testid="text-hybrid-option">
-                  Hybrid pricing available: reduced monthly subscription + lower success fee. Contact us for details.
-                </p>
-              </div>
-            </Card>
           </div>
         </div>
       </section>
@@ -580,92 +727,53 @@ export default function Landing() {
         <div className="container mx-auto px-4">
           <div className="max-w-xl mx-auto">
             <Card className="p-8" data-testid="card-signup">
-              <div className="text-center mb-8">
+              <div className="text-center">
                 <Badge variant="secondary" className="mb-4" data-testid="badge-signup">
-                  Get Started
+                  Get Started Today
                 </Badge>
-                <h2 className="text-2xl font-bold mb-2" data-testid="text-signup-title">Request a Demo</h2>
-                <p className="text-muted-foreground">
-                  See how Wallet Share Expander can help your team recover lost
-                  revenue. Fill out the form and we'll be in touch within 24 hours.
+                <h2 className="text-2xl font-bold mb-2" data-testid="text-signup-title">
+                  Start Your Free Trial
+                </h2>
+                <p className="text-muted-foreground mb-6">
+                  Sign up in seconds and start recovering lost revenue immediately.
+                  No credit card required for your 14-day free trial.
                 </p>
+
+                <div className="space-y-4">
+                  <a href="/api/login">
+                    <Button size="lg" className="w-full" data-testid="button-signup-login">
+                      <ArrowRight className="mr-2 h-4 w-4" />
+                      Create Free Account
+                    </Button>
+                  </a>
+
+                  <p className="text-sm text-muted-foreground">
+                    Already have an account?{" "}
+                    <a 
+                      href="/api/login" 
+                      className="text-primary font-medium"
+                      data-testid="link-login"
+                    >
+                      Log in
+                    </a>
+                  </p>
+
+                  <div className="flex items-center justify-center gap-6 pt-4 border-t text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-primary" />
+                      <span>14-day free trial</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-primary" />
+                      <span>No credit card</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-primary" />
+                      <span>Cancel anytime</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Full Name</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="John Smith"
-                            data-testid="input-name"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Work Email</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="email"
-                            placeholder="john@company.com"
-                            data-testid="input-email"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="company"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Company Name</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Acme Corporation"
-                            data-testid="input-company"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    size="lg"
-                    disabled={form.formState.isSubmitting}
-                    data-testid="button-submit-demo"
-                  >
-                    {form.formState.isSubmitting ? (
-                      "Submitting..."
-                    ) : (
-                      <>
-                        <Mail className="mr-2 h-4 w-4" />
-                        Request Demo
-                      </>
-                    )}
-                  </Button>
-                </form>
-              </Form>
             </Card>
           </div>
         </div>

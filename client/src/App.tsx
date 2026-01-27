@@ -19,6 +19,7 @@ import Revenue from "@/pages/revenue";
 import Settings from "@/pages/settings";
 import WorkflowGuide from "@/pages/workflow-guide";
 import Landing from "@/pages/landing";
+import Subscription from "@/pages/subscription";
 
 function DashboardRouter() {
   return (
@@ -30,6 +31,7 @@ function DashboardRouter() {
       <Route path="/icp-builder" component={ICPBuilder} />
       <Route path="/playbooks" component={Playbooks} />
       <Route path="/revenue" component={Revenue} />
+      <Route path="/subscription" component={Subscription} />
       <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
