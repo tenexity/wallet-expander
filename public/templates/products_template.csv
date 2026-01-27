@@ -1,0 +1,4 @@
+sku,name,category_id,unit_cost,unit_price
+SKU-001,Copper Pipe 1/2 inch,1,12.50,18.99
+SKU-002,HVAC Filter 20x25,2,8.00,14.99
+SKU-003,Ball Valve 3/4 inch,1,15.00,24.99

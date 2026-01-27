@@ -1,0 +1,6 @@
+id,name,parent_id
+1,Plumbing Supplies,
+2,HVAC Equipment,
+3,Copper Fittings,1
+4,PVC Fittings,1
+5,Filters,2

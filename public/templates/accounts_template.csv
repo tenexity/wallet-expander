@@ -1,0 +1,4 @@
+id,name,segment,region,assigned_tm,status
+1001,ABC Heating & Cooling,HVAC,Northeast,John Smith,active
+1002,Premier Plumbing Solutions,Plumbing,Southwest,Sarah Johnson,active
+1003,Midwest Mechanical Inc,Mechanical,Midwest,Mike Williams,prospect

@@ -1640,6 +1640,28 @@ KEY TALKING POINTS:
     }
   });
 
+  // ============ Template Downloads ============
+  app.get("/api/templates/:type", (req, res) => {
+    const { type } = req.params;
+    const validTypes = ["accounts", "products", "categories", "orders"];
+    
+    if (!validTypes.includes(type)) {
+      return res.status(400).json({ message: "Invalid template type" });
+    }
+    
+    const path = require("path");
+    const fs = require("fs");
+    const templatePath = path.join(process.cwd(), "public", "templates", `${type}_template.csv`);
+    
+    if (!fs.existsSync(templatePath)) {
+      return res.status(404).json({ message: "Template not found" });
+    }
+    
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename="${type}_template.csv"`);
+    res.sendFile(templatePath);
+  });
+
   // ============ Settings ============
   app.get("/api/settings", requireAdmin, async (req, res) => {
     try {

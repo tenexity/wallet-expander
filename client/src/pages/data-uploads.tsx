@@ -468,6 +468,14 @@ export default function DataUploads() {
                 variant="outline"
                 className="justify-start"
                 data-testid={`button-download-${type.id}-template`}
+                onClick={() => {
+                  const link = document.createElement("a");
+                  link.href = `/api/templates/${type.id}`;
+                  link.download = `${type.id}_template.csv`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
               >
                 <FileText className="mr-2 h-4 w-4" />
                 {type.label} Template
