@@ -46,7 +46,7 @@ const showcaseFeatures = [
     id: "enrollment",
     badge: "Smart Account Discovery",
     title: "Find Your Highest-Potential Accounts Instantly",
-    description: "Our AI analyzes your entire customer base to surface the accounts with the greatest growth potential. Stop guessing which customers deserve more attention—let data reveal your hidden revenue goldmines so your team can focus where it matters most.",
+    description: "Our AI analyzes your entire customer base to surface the accounts with the greatest growth potential. Stop guessing which customers deserve more attention, let data reveal your hidden revenue goldmines so your team can focus where it matters most.",
     MockupComponent: MockupEnrollment,
     benefits: [
       "AI identifies accounts with the biggest wallet share opportunity",
