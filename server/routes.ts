@@ -2545,7 +2545,7 @@ KEY TALKING POINTS:
   };
 
   const requirePlatformAdmin: RequestHandler = async (req, res, next) => {
-    const userEmail = req.user?.email;
+    const userEmail = req.user?.claims?.email;
     console.log(`[Platform Admin Check] User email: ${userEmail}, Is admin: ${isPlatformAdmin(userEmail)}`);
     if (!isPlatformAdmin(userEmail)) {
       return res.status(403).json({ 
