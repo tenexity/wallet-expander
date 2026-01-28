@@ -220,6 +220,82 @@ When you enroll an account in Wallet Share Expander, it is guaranteed to grow. O
 
 ---
 
+## Account Graduation System
+
+The graduation system provides complete visibility into wallet share capture from enrollment to successful completion. This is a key differentiator that proves ROI and celebrates Territory Manager success.
+
+### Graduation Tracking Metrics
+
+Each enrolled account tracks comprehensive data throughout its lifecycle:
+
+| Metric | Description |
+|--------|-------------|
+| **Baseline Revenue** | Account's revenue at the time of enrollment (annualized or period-specific) |
+| **Baseline Period Days** | The time period used to calculate baseline revenue for pro-rating |
+| **Graduation Revenue** | Cumulative revenue earned during the enrollment period |
+| **Incremental Revenue** | Growth above pro-rated baseline (graduation revenue minus pro-rated baseline) |
+| **Enrollment Duration** | Days from enrollment to graduation |
+| **ICP Categories at Enrollment** | Missing ICP categories (gaps) at enrollment time |
+| **ICP Categories Achieved** | Number of gaps successfully filled during enrollment |
+
+### Revenue Attribution Logic
+
+**Pro-Rated Baseline Comparison:**
+Revenue metrics use a pro-rated baseline for fair comparison. The formula:
+
+```
+Incremental Revenue = Graduation Revenue - (Baseline Revenue × Enrollment Duration / Baseline Period Days)
+```
+
+This ensures that accounts enrolled for different time periods are compared fairly. For example, if an account had $120K baseline over 365 days and was enrolled for 90 days:
+- Pro-rated baseline: $120K × (90/365) = $29,589
+- If graduation revenue is $45K, incremental revenue is $15,411
+
+### Graduation Analytics Dashboard
+
+The system provides executive-level analytics:
+
+| KPI | What It Shows |
+|-----|---------------|
+| **Total Graduated** | Count of accounts that successfully completed the program |
+| **Cumulative Revenue Growth** | Sum of all incremental revenue from graduated accounts |
+| **Avg Days to Graduation** | Average enrollment duration showing time-to-results |
+| **Avg Revenue Growth** | Average incremental revenue per graduated account |
+| **Avg ICP Category Success Rate** | Percentage of identified gaps that were successfully filled |
+
+### The Alumni Section
+
+Graduated accounts move to a permanent Alumni section that serves as:
+
+1. **Success Scoreboard** — Proof that your wallet share expansion strategy works
+2. **Best Practice Library** — See which approaches drove the most growth
+3. **ROI Documentation** — Executive-ready evidence of program impact
+4. **Territory Manager Recognition** — Celebrate individual rep achievements
+
+### Messaging for Graduation Visibility
+
+**Campaign Angles:**
+- "From Enrollment to Graduation: Track Every Dollar of Growth"
+- "Your Alumni Section Is Your Success Scoreboard"
+- "See Exactly How Much Wallet Share You've Captured"
+- "No More Black Box Sales Programs—Complete Visibility from Day One"
+
+**Proof Points for Sales:**
+- Every account has a clear enrollment-to-graduation journey with full revenue attribution
+- Pro-rated baselines ensure fair, accurate measurement regardless of enrollment timing
+- ICP category success rates prove the AI recommendations are working
+- Alumni records provide historical proof of program effectiveness
+
+### Integration with Territory Manager Performance
+
+Graduation metrics tie directly to Territory Manager performance tracking:
+- Revenue growth credited to assigned TM
+- Graduation velocity (days to completion) benchmarked across team
+- Category success rates identify TM strengths and development opportunities
+- Alumni achievements create recognition moments
+
+---
+
 ## Competitive Differentiation
 
 ### vs. Traditional CRM (Salesforce, HubSpot)
