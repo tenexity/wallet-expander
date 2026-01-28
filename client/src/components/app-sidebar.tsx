@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import tenexityLogo from "@assets/Tenexity_Logo_final_1769263645437.png";
+import appLogo from "/favicon2.png";
 
 interface Setting {
   key: string;
@@ -160,8 +161,12 @@ export function AppSidebar() {
               />
             </div>
           ) : (
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-              <TrendingUp className="h-5 w-5" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-md overflow-hidden">
+              <img 
+                src={appLogo} 
+                alt="Wallet Share Expander" 
+                className="h-full w-full object-contain"
+              />
             </div>
           )}
           <div className="flex flex-col">
