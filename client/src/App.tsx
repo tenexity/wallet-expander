@@ -20,6 +20,7 @@ import Settings from "@/pages/settings";
 import WorkflowGuide from "@/pages/workflow-guide";
 import Landing from "@/pages/landing";
 import Subscription from "@/pages/subscription";
+import AppAdmin from "@/pages/app-admin";
 
 function DashboardRouter() {
   return (
@@ -33,6 +34,7 @@ function DashboardRouter() {
       <Route path="/revenue" component={Revenue} />
       <Route path="/subscription" component={Subscription} />
       <Route path="/settings" component={Settings} />
+      <Route path="/app-admin" component={AppAdmin} />
       <Route component={NotFound} />
     </Switch>
   );

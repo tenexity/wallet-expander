@@ -324,13 +324,26 @@ export default function Playbooks() {
       if (data.playbook?.id) {
         setSelectedPlaybookId(data.playbook.id);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Generate playbook error:", error);
-      toast({
-        title: "Generation failed",
-        description: "Failed to generate playbook. Please try again.",
-        variant: "destructive",
-      });
+      
+      const errorMessage = error.message || "";
+      const isLimitExceeded = errorMessage.includes("FEATURE_LIMIT_EXCEEDED") || errorMessage.includes("limit");
+      const isUpgradeRequired = errorMessage.includes("upgrade") || errorMessage.includes("Upgrade");
+      
+      if (isLimitExceeded || isUpgradeRequired) {
+        toast({
+          title: "Upgrade Required",
+          description: "You've reached your playbook limit. Visit the Subscription page to upgrade.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Generation failed",
+          description: "Failed to generate playbook. Please try again.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsGenerating(false);
     }

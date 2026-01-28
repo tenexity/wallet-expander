@@ -163,13 +163,26 @@ export default function Accounts() {
       }
       
       setSelectedAccount(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Enrollment error:", error);
-      toast({
-        title: "Enrollment failed",
-        description: "Please try again",
-        variant: "destructive",
-      });
+      
+      const errorMessage = error.message || "";
+      const isLimitExceeded = errorMessage.includes("FEATURE_LIMIT_EXCEEDED") || errorMessage.includes("limit");
+      const isUpgradeRequired = errorMessage.includes("upgrade") || errorMessage.includes("Upgrade");
+      
+      if (isLimitExceeded || isUpgradeRequired) {
+        toast({
+          title: "Upgrade Required",
+          description: "You've reached your plan limit. Visit the Subscription page to upgrade and enroll more accounts.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Enrollment failed",
+          description: "Please try again",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsEnrolling(false);
     }

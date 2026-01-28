@@ -12,6 +12,7 @@ import {
   LogOut,
   GitBranch,
   CreditCard,
+  ShieldCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -92,6 +93,12 @@ const adminNavItems = [
     icon: Settings,
     tooltip: "Configure scoring weights and manage Territory Managers",
   },
+  {
+    title: "App Admin",
+    url: "/app-admin",
+    icon: ShieldCheck,
+    tooltip: "Platform administration - manage all tenants and subscriptions",
+  },
 ];
 
 function UserProfile() {
@@ -134,6 +141,7 @@ function UserProfile() {
 
 export function AppSidebar() {
   const [location, navigate] = useLocation();
+  const { user } = useAuth();
 
   const { data: settingsData } = useQuery<Setting[]>({
     queryKey: ["/api/settings"],
@@ -147,6 +155,18 @@ export function AppSidebar() {
   const appTitle = getSettingValue("appTitle", "AI VP Dashboard");
   const companyName = getSettingValue("companyName", "Mark Supply");
   const companyLogo = getSettingValue("companyLogo", "");
+
+  // Platform admin emails (tenexity team members)
+  const platformAdminEmails = ["graham@tenexity.ai", "admin@tenexity.ai"];
+  const isPlatformAdmin = user?.email && platformAdminEmails.includes(user.email);
+
+  // Filter admin items - hide App Admin from non-platform admins
+  const visibleAdminItems = adminNavItems.filter(item => {
+    if (item.url === "/app-admin") {
+      return isPlatformAdmin;
+    }
+    return true;
+  });
 
   return (
     <Sidebar>
@@ -200,7 +220,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Admin</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {adminNavItems.map((item) => (
+              {visibleAdminItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     isActive={location === item.url}

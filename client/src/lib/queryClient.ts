@@ -3,7 +3,9 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    // Include full response text in error message so JSON error details are preserved
+    // This allows catching code to check for specific error codes like FEATURE_LIMIT_EXCEEDED
+    throw new Error(text);
   }
 }
 

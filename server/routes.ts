@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, RequestHandler } from "express";
 import { createServer, type Server } from "http";
 import express from "express";
 import path from "path";
@@ -23,7 +23,15 @@ import {
 } from "@shared/schema";
 import Stripe from "stripe";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, sql, count } from "drizzle-orm";
+import { 
+  accounts, 
+  playbooks, 
+  segmentProfiles, 
+  programAccounts,
+  userRoles,
+  users,
+} from "@shared/schema";
 import { z } from "zod";
 import { analyzeSegment, generatePlaybookTasks } from "./ai-service";
 import { handleRouteError } from "./utils/errorHandler";
@@ -50,6 +58,7 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import { withTenantContext, requireRole, requirePermission, type TenantContext } from "./middleware/tenantContext";
 import { getTenantStorage, TenantStorage } from "./storage/tenantStorage";
 import { requireActiveSubscription, requirePlan, checkSubscriptionStatus } from "./middleware/subscription";
+import { requireFeatureLimit, checkFeatureLimit, getUsageWithLimits } from "./middleware/featureLimits";
 
 function getStorage(req: Request): TenantStorage {
   if (!req.tenantContext?.tenantId) {
@@ -230,6 +239,30 @@ export async function registerRoutes(
     }
   });
 
+  // ============ Feature Limits ============
+  /**
+   * Get feature usage and limits for the current tenant
+   * @route GET /api/feature-limits
+   * @security requireAuth - Requires authentication
+   * @returns {Object} Current usage and limits for playbooks, ICPs, enrolled accounts
+   */
+  app.get("/api/feature-limits", requireAuth, async (req, res) => {
+    try {
+      const tenant = req.tenantContext?.tenant;
+      if (!tenant) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const usageWithLimits = await getUsageWithLimits(tenant.id, tenant.planType || "free");
+      res.json({
+        planType: tenant.planType || "free",
+        ...usageWithLimits,
+      });
+    } catch (error) {
+      handleRouteError(error, res, "Get feature limits");
+    }
+  });
+
   // ============ Daily Focus ============
   /**
    * Get daily focus tasks for Territory Managers
@@ -393,6 +426,7 @@ export async function registerRoutes(
   app.post("/api/accounts/:id/enroll", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
+      const tenant = req.tenantContext?.tenant;
       const accountId = parseInt(req.params.id);
       if (isNaN(accountId)) {
         return res.status(400).json({ message: "Invalid account ID" });
@@ -404,10 +438,48 @@ export async function registerRoutes(
       }
 
       // Check if already enrolled
-      const programAccounts = await tenantStorage.getProgramAccounts();
-      const alreadyEnrolled = programAccounts.find(pa => pa.accountId === accountId);
+      const existingProgramAccounts = await tenantStorage.getProgramAccounts();
+      const alreadyEnrolled = existingProgramAccounts.find(pa => pa.accountId === accountId);
       if (alreadyEnrolled) {
         return res.status(400).json({ message: "Account is already enrolled" });
+      }
+
+      // Check enrolled accounts limit
+      if (tenant) {
+        const enrolledLimitCheck = await checkFeatureLimit(
+          tenant.id,
+          tenant.planType || "free",
+          "enrolled_accounts"
+        );
+        if (!enrolledLimitCheck.allowed) {
+          return res.status(403).json({
+            message: `You have reached the limit of ${enrolledLimitCheck.limit} enrolled accounts for your ${enrolledLimitCheck.planType} plan. Please upgrade to enroll more accounts.`,
+            error: "FEATURE_LIMIT_EXCEEDED",
+            feature: "enrolled_accounts",
+            limit: enrolledLimitCheck.limit,
+            current: enrolledLimitCheck.current,
+            planType: enrolledLimitCheck.planType,
+            upgradeRequired: true,
+          });
+        }
+
+        // Check playbooks limit (since enrollment creates a playbook)
+        const playbookLimitCheck = await checkFeatureLimit(
+          tenant.id,
+          tenant.planType || "free",
+          "playbooks"
+        );
+        if (!playbookLimitCheck.allowed) {
+          return res.status(403).json({
+            message: `You have reached the limit of ${playbookLimitCheck.limit} playbook(s) for your ${playbookLimitCheck.planType} plan. Please upgrade to create more playbooks.`,
+            error: "FEATURE_LIMIT_EXCEEDED",
+            feature: "playbooks",
+            limit: playbookLimitCheck.limit,
+            current: playbookLimitCheck.current,
+            planType: playbookLimitCheck.planType,
+            upgradeRequired: true,
+          });
+        }
       }
 
       // Get account metrics for baseline
@@ -624,6 +696,28 @@ KEY TALKING POINTS:
   app.post("/api/segment-profiles", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
+      const tenant = req.tenantContext?.tenant;
+
+      // Check ICP limit
+      if (tenant) {
+        const icpLimitCheck = await checkFeatureLimit(
+          tenant.id,
+          tenant.planType || "free",
+          "icps"
+        );
+        if (!icpLimitCheck.allowed) {
+          return res.status(403).json({
+            message: `You have reached the limit of ${icpLimitCheck.limit} ICP(s) for your ${icpLimitCheck.planType} plan. Please upgrade to create more ICPs.`,
+            error: "FEATURE_LIMIT_EXCEEDED",
+            feature: "icps",
+            limit: icpLimitCheck.limit,
+            current: icpLimitCheck.current,
+            planType: icpLimitCheck.planType,
+            upgradeRequired: true,
+          });
+        }
+      }
+
       const data = insertSegmentProfileSchema.parse(req.body);
       const profile = await tenantStorage.createSegmentProfile(data);
       res.status(201).json(profile);
@@ -1160,6 +1254,28 @@ KEY TALKING POINTS:
   app.post("/api/playbooks", requireAuth, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
+      const tenant = req.tenantContext?.tenant;
+
+      // Check playbooks limit
+      if (tenant) {
+        const playbookLimitCheck = await checkFeatureLimit(
+          tenant.id,
+          tenant.planType || "free",
+          "playbooks"
+        );
+        if (!playbookLimitCheck.allowed) {
+          return res.status(403).json({
+            message: `You have reached the limit of ${playbookLimitCheck.limit} playbook(s) for your ${playbookLimitCheck.planType} plan. Please upgrade to create more playbooks.`,
+            error: "FEATURE_LIMIT_EXCEEDED",
+            feature: "playbooks",
+            limit: playbookLimitCheck.limit,
+            current: playbookLimitCheck.current,
+            planType: playbookLimitCheck.planType,
+            upgradeRequired: true,
+          });
+        }
+      }
+
       const data = insertPlaybookSchema.parse(req.body);
       const playbook = await tenantStorage.createPlaybook(data);
       res.status(201).json(playbook);
@@ -1171,6 +1287,28 @@ KEY TALKING POINTS:
   app.post("/api/playbooks/generate", requireSubscription, async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
+      const tenant = req.tenantContext?.tenant;
+
+      // Check playbooks limit
+      if (tenant) {
+        const playbookLimitCheck = await checkFeatureLimit(
+          tenant.id,
+          tenant.planType || "free",
+          "playbooks"
+        );
+        if (!playbookLimitCheck.allowed) {
+          return res.status(403).json({
+            message: `You have reached the limit of ${playbookLimitCheck.limit} playbook(s) for your ${playbookLimitCheck.planType} plan. Please upgrade to create more playbooks.`,
+            error: "FEATURE_LIMIT_EXCEEDED",
+            feature: "playbooks",
+            limit: playbookLimitCheck.limit,
+            current: playbookLimitCheck.current,
+            planType: playbookLimitCheck.planType,
+            upgradeRequired: true,
+          });
+        }
+      }
+
       const { name, segment, topN = 10, priorityCategories = [] } = req.body;
       
       // Get accounts with gap data
@@ -2379,6 +2517,141 @@ KEY TALKING POINTS:
       res.status(201).json({ message: "Default tier created", tier: defaultTier });
     } catch (error) {
       handleRouteError(error, res, "Seed default tier");
+    }
+  });
+
+  // ============ App Admin (Platform-wide tenant management) ============
+  // Platform admin emails (Tenexity team only)
+  const PLATFORM_ADMIN_EMAILS = ["graham@tenexity.ai", "admin@tenexity.ai"];
+
+  const isPlatformAdmin = (email: string | undefined | null): boolean => {
+    return email !== undefined && email !== null && PLATFORM_ADMIN_EMAILS.includes(email);
+  };
+
+  const requirePlatformAdmin: RequestHandler = async (req, res, next) => {
+    const userEmail = req.user?.email;
+    if (!isPlatformAdmin(userEmail)) {
+      return res.status(403).json({ 
+        message: "Access denied. Platform administrator privileges required.",
+        error: "PLATFORM_ADMIN_REQUIRED"
+      });
+    }
+    next();
+  };
+  
+  /**
+   * Get all tenants with usage metrics for platform administration
+   * @route GET /api/app-admin/tenants
+   * @security requirePlatformAdmin - Requires platform admin email
+   * @returns {Object} List of tenants with their subscription status and usage metrics
+   */
+  app.get("/api/app-admin/tenants", [...requireAuth, requirePlatformAdmin], async (req, res) => {
+    try {
+      // Get all tenants
+      const allTenants = await db.select().from(tenants);
+      
+      // Get usage metrics for each tenant
+      const tenantsWithMetrics = await Promise.all(
+        allTenants.map(async (tenant) => {
+          // Get counts for each metric
+          const [accountCountResult] = await db.select({ count: count() })
+            .from(accounts)
+            .where(eq(accounts.tenantId, tenant.id));
+          
+          const [playbookCountResult] = await db.select({ count: count() })
+            .from(playbooks)
+            .where(eq(playbooks.tenantId, tenant.id));
+          
+          const [icpCountResult] = await db.select({ count: count() })
+            .from(segmentProfiles)
+            .where(eq(segmentProfiles.tenantId, tenant.id));
+          
+          const [enrolledCountResult] = await db.select({ count: count() })
+            .from(programAccounts)
+            .where(eq(programAccounts.tenantId, tenant.id));
+          
+          const [userCountResult] = await db.select({ count: count() })
+            .from(userRoles)
+            .where(eq(userRoles.tenantId, tenant.id));
+          
+          // Get owner email (first user with super_admin role)
+          const [ownerRole] = await db.select()
+            .from(userRoles)
+            .where(eq(userRoles.tenantId, tenant.id))
+            .limit(1);
+          
+          let ownerEmail: string | undefined;
+          if (ownerRole) {
+            const [user] = await db.select()
+              .from(users)
+              .where(eq(users.id, ownerRole.userId))
+              .limit(1);
+            ownerEmail = user?.email || undefined;
+          }
+          
+          return {
+            ...tenant,
+            ownerEmail,
+            accountCount: accountCountResult?.count || 0,
+            playbookCount: playbookCountResult?.count || 0,
+            icpCount: icpCountResult?.count || 0,
+            enrolledCount: enrolledCountResult?.count || 0,
+            userCount: userCountResult?.count || 0,
+          };
+        })
+      );
+      
+      res.json({
+        tenants: tenantsWithMetrics,
+        totalTenants: allTenants.length,
+      });
+    } catch (error) {
+      handleRouteError(error, res, "Get all tenants");
+    }
+  });
+
+  /**
+   * Update a tenant's subscription settings
+   * @route PATCH /api/app-admin/tenants/:id
+   * @security requireAdmin - Requires manage_settings permission
+   * @returns {Object} Updated tenant
+   */
+  app.patch("/api/app-admin/tenants/:id", [...requireAuth, requirePlatformAdmin], async (req, res) => {
+    try {
+      const tenantId = parseInt(req.params.id);
+      if (isNaN(tenantId)) {
+        return res.status(400).json({ message: "Invalid tenant ID" });
+      }
+      
+      const { planType, subscriptionStatus } = req.body;
+      
+      const updateData: { planType?: string; subscriptionStatus?: string; updatedAt: Date } = {
+        updatedAt: new Date(),
+      };
+      
+      if (planType !== undefined) {
+        updateData.planType = planType;
+      }
+      if (subscriptionStatus !== undefined) {
+        updateData.subscriptionStatus = subscriptionStatus;
+      }
+      
+      await db.update(tenants)
+        .set(updateData)
+        .where(eq(tenants.id, tenantId));
+      
+      const [updatedTenant] = await db.select()
+        .from(tenants)
+        .where(eq(tenants.id, tenantId))
+        .limit(1);
+      
+      if (!updatedTenant) {
+        return res.status(404).json({ message: "Tenant not found" });
+      }
+      
+      res.json(updatedTenant);
+    } catch (error) {
+      handleRouteError(error, res, "Update tenant");
     }
   });
 

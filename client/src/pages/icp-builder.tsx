@@ -194,6 +194,25 @@ export default function ICPBuilder() {
         description: "AI has generated a suggested profile",
       });
     },
+    onError: (error: any) => {
+      const errorMessage = error.message || "";
+      const isLimitExceeded = errorMessage.includes("FEATURE_LIMIT_EXCEEDED") || errorMessage.includes("limit");
+      const isUpgradeRequired = errorMessage.includes("upgrade") || errorMessage.includes("Upgrade");
+      
+      if (isLimitExceeded || isUpgradeRequired) {
+        toast({
+          title: "Upgrade Required",
+          description: "You've reached your ICP limit. Visit the Subscription page to upgrade.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Analysis failed",
+          description: "Could not analyze segment. Please try again.",
+          variant: "destructive",
+        });
+      }
+    },
   });
 
   const approveMutation = useMutation({

@@ -854,15 +854,19 @@ export default function Landing() {
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>1 AI-powered playbook</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>1 ICP profile</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
                       <span>Upload unlimited accounts</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
                       <span>Full gap analysis</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm">
-                      <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>AI-powered playbooks</span>
                     </li>
                   </ul>
                   <a href="/api/login">
@@ -888,15 +892,19 @@ export default function Landing() {
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>Unlimited AI playbooks</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>3 ICP profiles</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
                       <span>Upload unlimited accounts</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
                       <span>Full gap analysis</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm">
-                      <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>AI-powered playbooks</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
@@ -927,6 +935,14 @@ export default function Landing() {
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
                       <span>15 enrolled accounts</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>Unlimited AI playbooks</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>Unlimited ICP profiles</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
