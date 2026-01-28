@@ -111,7 +111,7 @@ const showcaseFeatures = [
     id: "playbooks",
     badge: "AI-Powered Action Plans",
     title: "Customized Playbooks That Empower Your Sales Team",
-    description: "AI generates personalized action plans for each enrolled account—complete with talking points, call scripts, and email templates tailored to their specific opportunities. Your team brings the relationship expertise; AI provides the perfect preparation.",
+    description: "AI generates personalized action plans for each enrolled account, complete with talking points, call scripts, and email templates tailored to their specific opportunities. Your team brings the relationship expertise; AI provides the perfect preparation.",
     MockupComponent: MockupPlaybooks,
     benefits: [
       "Personalized scripts address each account's unique gaps",
