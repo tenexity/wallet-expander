@@ -2521,15 +2521,19 @@ KEY TALKING POINTS:
   });
 
   // ============ App Admin (Platform-wide tenant management) ============
-  // Platform admin emails (Tenexity team only)
+  // Platform admin emails (Tenexity team only) - stored in lowercase for comparison
   const PLATFORM_ADMIN_EMAILS = ["graham@tenexity.ai", "admin@tenexity.ai"];
 
   const isPlatformAdmin = (email: string | undefined | null): boolean => {
-    return email !== undefined && email !== null && PLATFORM_ADMIN_EMAILS.includes(email);
+    if (!email) return false;
+    // Case-insensitive comparison for email addresses
+    const normalizedEmail = email.toLowerCase().trim();
+    return PLATFORM_ADMIN_EMAILS.some(adminEmail => adminEmail.toLowerCase() === normalizedEmail);
   };
 
   const requirePlatformAdmin: RequestHandler = async (req, res, next) => {
     const userEmail = req.user?.email;
+    console.log(`[Platform Admin Check] User email: ${userEmail}, Is admin: ${isPlatformAdmin(userEmail)}`);
     if (!isPlatformAdmin(userEmail)) {
       return res.status(403).json({ 
         message: "Access denied. Platform administrator privileges required.",

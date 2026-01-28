@@ -115,7 +115,7 @@ function UserProfile() {
   return (
     <div className="flex items-center gap-3">
       <SidebarMenuButton asChild className="flex-1 h-auto py-1" data-testid="link-profile">
-        <Link href="/settings">
+        <Link href="/profile">
           <Avatar className="h-8 w-8">
             {user?.profileImageUrl && (
               <AvatarImage src={user.profileImageUrl} alt={displayName} />
@@ -126,7 +126,7 @@ function UserProfile() {
           </Avatar>
           <div className="flex flex-col flex-1 min-w-0">
             <span className="text-sm font-medium truncate">{displayName}</span>
-            <span className="text-xs opacity-60">Admin</span>
+            <span className="text-xs opacity-60">My Profile</span>
           </div>
         </Link>
       </SidebarMenuButton>
@@ -156,9 +156,11 @@ export function AppSidebar() {
   const companyName = getSettingValue("companyName", "Mark Supply");
   const companyLogo = getSettingValue("companyLogo", "");
 
-  // Platform admin emails (tenexity team members)
+  // Platform admin emails (tenexity team members) - case-insensitive comparison
   const platformAdminEmails = ["graham@tenexity.ai", "admin@tenexity.ai"];
-  const isPlatformAdmin = user?.email && platformAdminEmails.includes(user.email);
+  const isPlatformAdmin = user?.email && platformAdminEmails.some(
+    adminEmail => adminEmail.toLowerCase() === (user.email || "").toLowerCase().trim()
+  );
 
   // Filter admin items - hide App Admin from non-platform admins
   const visibleAdminItems = adminNavItems.filter(item => {
