@@ -565,10 +565,7 @@ export default function Landing() {
                   </div>
                   <div>
                     <h4 className="text-lg font-semibold mb-2">Profitability from Existing Accounts</h4>
-                    <p className="text-muted-foreground mb-4">
-                      See how much additional revenue you're generating from accounts you already have. 
-                      No customer acquisition cost—pure wallet share expansion.
-                    </p>
+                    <p className="text-muted-foreground mb-4">See how much additional revenue you're generating from accounts you already have. No customer acquisition cost, pure wallet share expansion.</p>
                     <ul className="space-y-2">
                       <li className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Check className="h-4 w-4 text-primary" />
