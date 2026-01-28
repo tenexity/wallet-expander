@@ -786,9 +786,10 @@ export default function Landing() {
                               <span className="text-4xl font-bold" data-testid={`text-plan-price-${plan.slug}`}>
                                 ${billingCycle === "yearly" ? Math.round(price / 12) : Math.round(price)}
                               </span>
-                              <span className="text-muted-foreground">
-                                /{billingCycle === "yearly" ? "mo (billed yearly)" : "month"}
-                              </span>
+                              <span className="text-muted-foreground">/mo</span>
+                              {billingCycle === "yearly" && (
+                                <span className="block text-sm text-muted-foreground mt-1">(billed yearly)</span>
+                              )}
                             </>
                           )}
                         </div>
@@ -880,9 +881,14 @@ export default function Landing() {
                   <div className="text-center mb-6">
                     <h3 className="text-xl font-bold mb-2">Growth</h3>
                     <p className="text-sm text-muted-foreground mb-4">For focused account development</p>
-                    <div className="flex items-baseline justify-center gap-1">
-                      <span className="text-4xl font-bold">${billingCycle === "yearly" ? 240 : 300}</span>
-                      <span className="text-muted-foreground">/{billingCycle === "yearly" ? "mo (billed yearly)" : "month"}</span>
+                    <div className="text-center">
+                      <div className="flex items-baseline justify-center gap-1">
+                        <span className="text-4xl font-bold">${billingCycle === "yearly" ? 240 : 300}</span>
+                        <span className="text-muted-foreground">/mo</span>
+                      </div>
+                      {billingCycle === "yearly" && (
+                        <span className="block text-sm text-muted-foreground mt-1">(billed yearly)</span>
+                      )}
                     </div>
                   </div>
                   <ul className="space-y-3 mb-6">
@@ -926,9 +932,14 @@ export default function Landing() {
                   <div className="text-center mb-6">
                     <h3 className="text-xl font-bold mb-2">Scale</h3>
                     <p className="text-sm text-muted-foreground mb-4">For growing sales teams</p>
-                    <div className="flex items-baseline justify-center gap-1">
-                      <span className="text-4xl font-bold">${billingCycle === "yearly" ? 600 : 750}</span>
-                      <span className="text-muted-foreground">/{billingCycle === "yearly" ? "mo (billed yearly)" : "month"}</span>
+                    <div className="text-center">
+                      <div className="flex items-baseline justify-center gap-1">
+                        <span className="text-4xl font-bold">${billingCycle === "yearly" ? 600 : 750}</span>
+                        <span className="text-muted-foreground">/mo</span>
+                      </div>
+                      {billingCycle === "yearly" && (
+                        <span className="block text-sm text-muted-foreground mt-1">(billed yearly)</span>
+                      )}
                     </div>
                   </div>
                   <ul className="space-y-3 mb-6">
