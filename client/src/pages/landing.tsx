@@ -595,11 +595,7 @@ export default function Landing() {
                 </div>
                 <div className="text-center md:text-left flex-1">
                   <h4 className="text-xl font-semibold mb-2 text-chart-2">Alumni Section: Your Success Scoreboard</h4>
-                  <p className="text-muted-foreground">
-                    Every graduated account moves to your Alumni section—a permanent record of success. 
-                    See which accounts you've grown, how much revenue you captured, and what categories 
-                    you successfully expanded into. It's proof that your wallet share expansion strategy works.
-                  </p>
+                  <p className="text-muted-foreground">Every graduated account moves to your Alumni section, a permanent record of success. See which accounts you've grown, how much revenue you captured, and what categories you successfully expanded into. It's proof that your wallet share expansion strategy works.</p>
                 </div>
                 <div className="text-center md:text-right flex-shrink-0">
                   <div className="text-4xl font-bold text-chart-2">100%</div>
