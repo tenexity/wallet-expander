@@ -14,6 +14,8 @@ import {
   Building2,
   ArrowUpRight,
   Sparkles,
+  GraduationCap,
+  HelpCircle,
 } from "lucide-react";
 
 const mockAccounts = [
@@ -402,6 +404,121 @@ export function MockupPlaybooks() {
               <ArrowUpRight className="h-3 w-3 text-muted-foreground" />
             </div>
           </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const mockGraduatedAccounts = [
+  { 
+    name: "Mountain Air HVAC", 
+    segment: "HVAC", 
+    daysEnrolled: 90, 
+    baseline: 201000, 
+    graduation: 245000, 
+    growth: 44000,
+    icpSuccess: 80 
+  },
+  { 
+    name: "Great Lakes Heating", 
+    segment: "HVAC", 
+    daysEnrolled: 75, 
+    baseline: 169000, 
+    graduation: 199000, 
+    growth: 30000,
+    icpSuccess: 67 
+  },
+];
+
+export function MockupGraduationSuccess() {
+  const totalGraduated = mockGraduatedAccounts.length;
+  const incrementalRevenue = mockGraduatedAccounts.reduce((sum, acc) => sum + acc.growth, 0);
+  const avgDays = Math.round(mockGraduatedAccounts.reduce((sum, acc) => sum + acc.daysEnrolled, 0) / totalGraduated);
+  const avgIcpSuccess = Math.round(mockGraduatedAccounts.reduce((sum, acc) => sum + acc.icpSuccess, 0) / totalGraduated);
+
+  return (
+    <div className="bg-background rounded-lg p-4 space-y-4 text-sm border shadow-sm">
+      <div className="flex items-center justify-between border-b pb-3">
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+            <GraduationCap className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-sm">Graduation Success</h3>
+            <p className="text-[10px] text-muted-foreground">Wallet share captured from graduated accounts</p>
+          </div>
+        </div>
+        <Button variant="outline" size="sm" data-testid="button-view-graduates">
+          View All Graduates
+          <ArrowUpRight className="h-3 w-3 ml-1" />
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-4 gap-3">
+        <div className="text-center p-2.5 rounded-lg bg-muted/50" data-testid="stat-graduated-count">
+          <p className="text-xl font-bold text-chart-3">{totalGraduated}</p>
+          <div className="flex items-center justify-center gap-1">
+            <p className="text-[10px] text-muted-foreground">Accounts Graduated</p>
+            <HelpCircle className="h-3 w-3 text-muted-foreground/60" />
+          </div>
+        </div>
+        <div className="text-center p-2.5 rounded-lg bg-muted/50" data-testid="stat-incremental-revenue">
+          <p className="text-xl font-bold text-chart-1">${Math.round(incrementalRevenue / 1000)}K</p>
+          <div className="flex items-center justify-center gap-1">
+            <p className="text-[10px] text-muted-foreground">Incremental Revenue</p>
+            <HelpCircle className="h-3 w-3 text-muted-foreground/60" />
+          </div>
+        </div>
+        <div className="text-center p-2.5 rounded-lg bg-muted/50" data-testid="stat-avg-days">
+          <p className="text-xl font-bold">{avgDays}</p>
+          <div className="flex items-center justify-center gap-1">
+            <p className="text-[10px] text-muted-foreground">Avg Days to Graduate</p>
+            <HelpCircle className="h-3 w-3 text-muted-foreground/60" />
+          </div>
+        </div>
+        <div className="text-center p-2.5 rounded-lg bg-muted/50" data-testid="stat-icp-success">
+          <p className="text-xl font-bold text-chart-2">{avgIcpSuccess}%</p>
+          <div className="flex items-center justify-center gap-1">
+            <p className="text-[10px] text-muted-foreground">Avg ICP Category Success</p>
+            <HelpCircle className="h-3 w-3 text-muted-foreground/60" />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <h4 className="font-medium text-xs text-muted-foreground">Recent Graduates</h4>
+        {mockGraduatedAccounts.map((account, i) => (
+          <div key={i} className="flex items-center gap-2" data-testid={`graduate-row-${i}`}>
+            <div className="w-1 h-full min-h-[3.5rem] rounded-full bg-chart-2" />
+            <Card className="flex-1 p-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-full bg-chart-2/10 flex items-center justify-center">
+                    <CheckCircle className="h-4 w-4 text-chart-2" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-xs" data-testid={`graduate-name-${i}`}>{account.name}</p>
+                    <p className="text-[10px] text-muted-foreground">{account.segment} • {account.daysEnrolled} days enrolled</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 text-right">
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">Baseline</p>
+                    <p className="font-semibold text-xs" data-testid={`graduate-baseline-${i}`}>${Math.round(account.baseline / 1000)}K</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">At Graduation</p>
+                    <p className="font-semibold text-xs" data-testid={`graduate-graduation-${i}`}>${Math.round(account.graduation / 1000)}K</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">Growth</p>
+                    <p className="font-bold text-xs text-green-600" data-testid={`graduate-growth-${i}`}>+${Math.round(account.growth / 1000)}K</p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
         ))}
       </div>
     </div>

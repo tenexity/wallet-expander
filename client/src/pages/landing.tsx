@@ -39,6 +39,7 @@ import {
   MockupICPBuilder,
   MockupRevenue,
   MockupPlaybooks,
+  MockupGraduationSuccess,
 } from "@/components/feature-mockups";
 
 const showcaseFeatures = [
@@ -597,6 +598,86 @@ export default function Landing() {
                 </div>
               </div>
             </Card>
+          </div>
+        </div>
+      </section>
+      {/* Graduation Success Proof Section */}
+      <section id="graduation-proof" className="py-20 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-12">
+              <Badge variant="secondary" className="mb-4" data-testid="badge-proof">
+                See the Results
+              </Badge>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4" data-testid="text-proof-title">
+                Enroll, Work with AI, <span className="text-primary">Graduate to Huge Returns</span>
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+                This is what success looks like. Every enrolled account has a clear path from enrollment to graduation, 
+                with full visibility into baseline revenue, growth achieved, and ICP category success.
+              </p>
+            </div>
+
+            {/* Workflow Steps */}
+            <div className="grid grid-cols-4 gap-4 mb-12">
+              <div className="text-center" data-testid="workflow-step-enroll">
+                <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3 relative">
+                  <UserCheck className="h-6 w-6 text-primary" />
+                  <div className="absolute -right-2 top-1/2 -translate-y-1/2 hidden md:block">
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </div>
+                <p className="font-semibold text-sm">1. Enroll Account</p>
+                <p className="text-xs text-muted-foreground">Commit to growth</p>
+              </div>
+              <div className="text-center" data-testid="workflow-step-playbooks">
+                <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3 relative">
+                  <Zap className="h-6 w-6 text-primary" />
+                  <div className="absolute -right-2 top-1/2 -translate-y-1/2 hidden md:block">
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </div>
+                <p className="font-semibold text-sm">2. AI Playbooks</p>
+                <p className="text-xs text-muted-foreground">Personalized actions</p>
+              </div>
+              <div className="text-center" data-testid="workflow-step-graduate">
+                <div className="mx-auto w-12 h-12 rounded-full bg-chart-2/10 flex items-center justify-center mb-3 relative">
+                  <GraduationCap className="h-6 w-6 text-chart-2" />
+                  <div className="absolute -right-2 top-1/2 -translate-y-1/2 hidden md:block">
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </div>
+                <p className="font-semibold text-sm">3. Graduate</p>
+                <p className="text-xs text-muted-foreground">Hit revenue targets</p>
+              </div>
+              <div className="text-center" data-testid="workflow-step-returns">
+                <div className="mx-auto w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mb-3">
+                  <DollarSign className="h-6 w-6 text-green-600 dark:text-green-400" />
+                </div>
+                <p className="font-semibold text-sm">4. Capture Returns</p>
+                <p className="text-xs text-muted-foreground">Measurable growth</p>
+              </div>
+            </div>
+
+            {/* Graduation Success Mockup */}
+            <div className="relative group" data-testid="mockup-graduation-success">
+              <div className="absolute -inset-2 bg-gradient-to-r from-chart-2/20 via-primary/10 to-green-500/20 rounded-xl blur-lg opacity-75 group-hover:opacity-100 transition duration-300" />
+              <div className="relative rounded-xl overflow-hidden shadow-2xl border border-border/50">
+                <MockupGraduationSuccess />
+              </div>
+            </div>
+
+            <div className="mt-10 text-center">
+              <p className="text-muted-foreground mb-6">
+                Every graduated account tells a story: where they started, how they grew, and the value you captured. 
+                <br className="hidden md:block" />
+                No guesswork, no assumptions, just measurable wallet share expansion.
+              </p>
+              <Button size="lg" onClick={() => scrollToSection("pricing")} data-testid="button-proof-cta">
+                Start Growing Wallet Share
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </section>
