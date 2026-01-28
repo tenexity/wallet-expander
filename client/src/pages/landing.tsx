@@ -59,7 +59,7 @@ const showcaseFeatures = [
     id: "dashboard",
     badge: "Growth Pipeline",
     title: "Every Enrolled Account Gets a Customized Growth Plan",
-    description: "When you enroll an account, you're making a commitment—and so are we. Each enrolled account receives a personalized action plan designed to grow their wallet share. Track progress, celebrate wins, and watch your accounts graduate to higher revenue tiers.",
+    description: "When you enroll an account, you're making a commitment, and so are we. Each enrolled account receives a personalized action plan designed to grow their wallet share. Track progress, celebrate wins, and watch your accounts graduate to higher revenue tiers.",
     MockupComponent: MockupDashboard,
     benefits: [
       "Personalized growth roadmap for every enrolled account",
