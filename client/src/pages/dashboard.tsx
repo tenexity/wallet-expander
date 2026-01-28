@@ -1783,25 +1783,49 @@ export default function Dashboard() {
                 <p className="text-2xl font-bold text-chart-3" data-testid="stat-graduated-count">
                   {graduationAnalytics.totalGraduated}
                 </p>
-                <p className="text-xs text-muted-foreground">Accounts Graduated</p>
+                <div className="flex items-center justify-center gap-1">
+                  <p className="text-xs text-muted-foreground">Accounts Graduated</p>
+                  <InfoTooltip 
+                    content="Total number of accounts that have successfully completed the program and met their graduation objectives."
+                    testId="tooltip-graduated-count"
+                  />
+                </div>
               </div>
               <div className="text-center p-3 rounded-lg bg-background/50">
                 <p className="text-2xl font-bold text-chart-1" data-testid="stat-revenue-growth">
                   {formatCurrency(graduationAnalytics.cumulativeRevenueGrowth)}
                 </p>
-                <p className="text-xs text-muted-foreground">Incremental Revenue Captured</p>
+                <div className="flex items-center justify-center gap-1">
+                  <p className="text-xs text-muted-foreground">Incremental Revenue</p>
+                  <InfoTooltip 
+                    content="Sum of incremental revenue across all graduated accounts. Calculated as: Graduation Revenue - Pro-rated Baseline. The baseline is adjusted to match enrollment duration for fair comparison."
+                    testId="tooltip-incremental-revenue"
+                  />
+                </div>
               </div>
               <div className="text-center p-3 rounded-lg bg-background/50">
                 <p className="text-2xl font-bold" data-testid="stat-avg-days">
                   {graduationAnalytics.avgDaysToGraduation}
                 </p>
-                <p className="text-xs text-muted-foreground">Avg Days to Graduate</p>
+                <div className="flex items-center justify-center gap-1">
+                  <p className="text-xs text-muted-foreground">Avg Days to Graduate</p>
+                  <InfoTooltip 
+                    content="Average number of days from enrollment to graduation across all graduated accounts. Calculated as: Total enrollment days / Number of graduated accounts."
+                    testId="tooltip-avg-days"
+                  />
+                </div>
               </div>
               <div className="text-center p-3 rounded-lg bg-background/50">
                 <p className="text-2xl font-bold text-chart-2" data-testid="stat-icp-success">
                   {graduationAnalytics.avgIcpCategorySuccessRate}%
                 </p>
-                <p className="text-xs text-muted-foreground">Avg ICP Category Success</p>
+                <div className="flex items-center justify-center gap-1">
+                  <p className="text-xs text-muted-foreground">Avg ICP Category Success</p>
+                  <InfoTooltip 
+                    content="Average percentage of ICP category gaps filled at graduation. Calculated as: (Categories Achieved / Categories Missing at Enrollment) × 100, averaged across all graduated accounts with ICP data."
+                    testId="tooltip-icp-success"
+                  />
+                </div>
               </div>
             </div>
             
