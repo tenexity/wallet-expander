@@ -2693,6 +2693,48 @@ KEY TALKING POINTS:
   });
 
   /**
+   * Update subscription plan Stripe price IDs (platform admin only)
+   * @route PATCH /api/subscription/plans/:id
+   * @security requirePlatformAdmin - Requires platform admin privileges
+   * @returns {Object} Updated subscription plan
+   */
+  app.patch("/api/subscription/plans/:id", [...requireAuth, requirePlatformAdmin], async (req, res) => {
+    try {
+      const planId = parseInt(req.params.id);
+      if (isNaN(planId)) {
+        return res.status(400).json({ message: "Invalid plan ID" });
+      }
+
+      const { stripeMonthlyPriceId, stripeYearlyPriceId } = req.body;
+
+      // Validate Stripe price ID format (price_xxx or empty/null)
+      const stripePriceIdPattern = /^price_[a-zA-Z0-9]+$/;
+      if (stripeMonthlyPriceId && !stripePriceIdPattern.test(stripeMonthlyPriceId)) {
+        return res.status(400).json({ message: "Invalid monthly price ID format. Must be 'price_xxx'" });
+      }
+      if (stripeYearlyPriceId && !stripePriceIdPattern.test(stripeYearlyPriceId)) {
+        return res.status(400).json({ message: "Invalid yearly price ID format. Must be 'price_xxx'" });
+      }
+
+      const [updatedPlan] = await db.update(subscriptionPlans)
+        .set({
+          stripeMonthlyPriceId: stripeMonthlyPriceId || null,
+          stripeYearlyPriceId: stripeYearlyPriceId || null,
+        })
+        .where(eq(subscriptionPlans.id, planId))
+        .returning();
+
+      if (!updatedPlan) {
+        return res.status(404).json({ message: "Plan not found" });
+      }
+
+      res.json(updatedPlan);
+    } catch (error) {
+      handleRouteError(error, res, "Update subscription plan");
+    }
+  });
+
+  /**
    * Get current subscription status for the authenticated tenant
    * @route GET /api/subscription
    * @security requireAuth - Requires authentication

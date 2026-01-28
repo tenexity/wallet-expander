@@ -1207,6 +1207,229 @@ function EmailSettingsManager() {
   );
 }
 
+interface SubscriptionPlanConfig {
+  id: number;
+  name: string;
+  slug: string;
+  stripeMonthlyPriceId: string | null;
+  stripeYearlyPriceId: string | null;
+  monthlyPrice: string;
+  yearlyPrice: string;
+}
+
+function StripeConfigManager() {
+  const { toast } = useToast();
+  const [editingPlan, setEditingPlan] = useState<SubscriptionPlanConfig | null>(null);
+  const [monthlyPriceId, setMonthlyPriceId] = useState("");
+  const [yearlyPriceId, setYearlyPriceId] = useState("");
+
+  const { data: plans = [], isLoading } = useQuery<SubscriptionPlanConfig[]>({
+    queryKey: ["/api/subscription/plans"],
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, stripeMonthlyPriceId, stripeYearlyPriceId }: { id: number; stripeMonthlyPriceId: string; stripeYearlyPriceId: string }) => {
+      const res = await apiRequest("PATCH", `/api/subscription/plans/${id}`, {
+        stripeMonthlyPriceId,
+        stripeYearlyPriceId,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Stripe price IDs updated successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/subscription/plans"] });
+      setEditingPlan(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleEdit = (plan: SubscriptionPlanConfig) => {
+    setEditingPlan(plan);
+    setMonthlyPriceId(plan.stripeMonthlyPriceId || "");
+    setYearlyPriceId(plan.stripeYearlyPriceId || "");
+  };
+
+  const handleSave = () => {
+    if (!editingPlan) return;
+    updateMutation.mutate({
+      id: editingPlan.id,
+      stripeMonthlyPriceId: monthlyPriceId,
+      stripeYearlyPriceId: yearlyPriceId,
+    });
+  };
+
+  const webhookUrl = typeof window !== "undefined" 
+    ? `${window.location.origin}/api/stripe/webhook`
+    : "/api/stripe/webhook";
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Stripe Configuration</CardTitle>
+          <CardDescription>
+            Configure Stripe price IDs for subscription plans. You must create products and prices in your Stripe Dashboard first.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="bg-muted/50 rounded-md p-4 space-y-3">
+            <h4 className="font-medium flex items-center gap-2">
+              <HelpCircle className="h-4 w-4" />
+              Webhook Configuration
+            </h4>
+            <p className="text-sm text-muted-foreground">
+              Add this webhook URL to your Stripe Dashboard under Developers &gt; Webhooks:
+            </p>
+            <div className="flex items-center gap-2">
+              <Input 
+                value={webhookUrl}
+                readOnly
+                className="font-mono text-sm bg-background"
+                data-testid="input-webhook-url"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(webhookUrl);
+                  toast({ title: "Copied", description: "Webhook URL copied to clipboard" });
+                }}
+                data-testid="button-copy-webhook"
+              >
+                Copy
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Events to enable: checkout.session.completed, customer.subscription.created, customer.subscription.updated, customer.subscription.deleted, invoice.paid, invoice.payment_failed
+            </p>
+          </div>
+
+          <Separator />
+
+          <div>
+            <h4 className="font-medium mb-4">Subscription Plans</h4>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Plan</TableHead>
+                    <TableHead>Monthly Price</TableHead>
+                    <TableHead>Monthly Price ID</TableHead>
+                    <TableHead>Yearly Price</TableHead>
+                    <TableHead>Yearly Price ID</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {plans.map((plan) => (
+                    <TableRow key={plan.id} data-testid={`row-plan-${plan.slug}`}>
+                      <TableCell className="font-medium">{plan.name}</TableCell>
+                      <TableCell>${plan.monthlyPrice}/mo</TableCell>
+                      <TableCell>
+                        {plan.stripeMonthlyPriceId ? (
+                          <Badge variant="outline" className="font-mono text-xs">
+                            {plan.stripeMonthlyPriceId}
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary">Not configured</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>${plan.yearlyPrice}/yr</TableCell>
+                      <TableCell>
+                        {plan.stripeYearlyPriceId ? (
+                          <Badge variant="outline" className="font-mono text-xs">
+                            {plan.stripeYearlyPriceId}
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary">Not configured</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEdit(plan)}
+                          data-testid={`button-edit-plan-${plan.slug}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog open={!!editingPlan} onOpenChange={(open) => !open && setEditingPlan(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Stripe Price IDs</DialogTitle>
+            <DialogDescription>
+              Enter the Stripe Price IDs for {editingPlan?.name}. Get these from your Stripe Dashboard under Products.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="monthly-price-id">Monthly Price ID</Label>
+              <Input
+                id="monthly-price-id"
+                value={monthlyPriceId}
+                onChange={(e) => setMonthlyPriceId(e.target.value)}
+                placeholder="price_1234567890..."
+                className="font-mono"
+                data-testid="input-monthly-price-id"
+              />
+              <p className="text-xs text-muted-foreground">
+                Price: ${editingPlan?.monthlyPrice}/month
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="yearly-price-id">Yearly Price ID</Label>
+              <Input
+                id="yearly-price-id"
+                value={yearlyPriceId}
+                onChange={(e) => setYearlyPriceId(e.target.value)}
+                placeholder="price_0987654321..."
+                className="font-mono"
+                data-testid="input-yearly-price-id"
+              />
+              <p className="text-xs text-muted-foreground">
+                Price: ${editingPlan?.yearlyPrice}/year
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditingPlan(null)}
+              data-testid="button-cancel-price"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={updateMutation.isPending}
+              data-testid="button-save-price"
+            >
+              {updateMutation.isPending && <RefreshCw className="mr-2 h-4 w-4 animate-spin" />}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 function CategoriesManager() {
   const { toast } = useToast();
   const [newCategoryName, setNewCategoryName] = useState("");
@@ -1793,6 +2016,10 @@ export default function SettingsPage() {
           <TabsTrigger value="email" data-testid="tab-email">
             <Mail className="mr-2 h-4 w-4" />
             Email
+          </TabsTrigger>
+          <TabsTrigger value="stripe" data-testid="tab-stripe">
+            <DollarSign className="mr-2 h-4 w-4" />
+            Stripe
           </TabsTrigger>
         </TabsList>
 
@@ -2488,6 +2715,10 @@ Output a structured profile with category expectations.`}
 
         <TabsContent value="email" className="space-y-6">
           <EmailSettingsManager />
+        </TabsContent>
+
+        <TabsContent value="stripe" className="space-y-6">
+          <StripeConfigManager />
         </TabsContent>
       </Tabs>
 
