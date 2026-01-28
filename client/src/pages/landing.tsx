@@ -425,10 +425,7 @@ export default function Landing() {
               <h2 className="text-3xl md:text-4xl font-bold mb-4" data-testid="text-guarantee-title">
                 Enrolled Accounts Are <span className="text-primary">Guaranteed to Grow</span>
               </h2>
-              <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-                When you enroll an account, you're not hoping for results—you're activating a proven system 
-                designed to drive additional revenue through AI-powered personalization and human relationships.
-              </p>
+              <p className="text-lg text-muted-foreground max-w-3xl mx-auto">When you enroll an account, you're not hoping for results, you're activating a proven system designed to drive additional revenue through AI-powered personalization and human relationships.</p>
             </div>
 
             <div className="grid md:grid-cols-4 gap-6 mb-12">
