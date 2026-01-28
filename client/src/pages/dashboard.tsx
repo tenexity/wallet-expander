@@ -166,6 +166,30 @@ interface GraduationReadyData {
   }>;
 }
 
+interface GraduationAnalyticsData {
+  totalGraduated: number;
+  cumulativeRevenueGrowth: number; // Sum of incremental revenue across all graduated accounts
+  avgDaysToGraduation: number;
+  avgRevenueGrowth: number; // Average incremental revenue per account
+  avgIcpCategorySuccessRate: number; // % of ICP gaps filled
+  graduatedAccounts: Array<{
+    id: number;
+    accountId: number;
+    accountName: string;
+    segment: string | null;
+    enrolledAt: string;
+    graduatedAt: string | null;
+    baselineRevenue: number;
+    graduationRevenue: number; // Cumulative revenue during enrollment
+    revenueGrowth: number; // Incremental revenue = graduationRevenue - proRatedBaseline
+    enrollmentDurationDays: number | null;
+    icpCategoriesAtEnrollment: number | null; // ICP gaps at enrollment
+    icpCategoriesAchieved: number | null; // ICP gaps filled
+    icpSuccessRate: number; // % of gaps filled
+    graduationPenetration: number | null;
+  }>;
+}
+
 interface DailyFocusData {
   todayCount: number;
   overdueCount: number;
@@ -355,6 +379,10 @@ export default function Dashboard() {
 
   const { data: graduationReady } = useQuery<GraduationReadyData>({
     queryKey: ["/api/program-accounts/graduation-ready"],
+  });
+
+  const { data: graduationAnalytics } = useQuery<GraduationAnalyticsData>({
+    queryKey: ["/api/program-accounts/graduation-analytics"],
   });
 
   // Fetch enrolled accounts for revenue by segment
@@ -1723,6 +1751,91 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </Link>
+      )}
+
+      {/* Graduation Success Block - Shows when there are graduated accounts */}
+      {graduationAnalytics && graduationAnalytics.totalGraduated > 0 && (
+        <Card className="border-chart-3/30 bg-chart-3/5" data-testid="card-graduation-success">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-chart-3/20">
+                  <Trophy className="h-4 w-4 text-chart-3" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Graduation Success</CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    Wallet share captured from graduated accounts
+                  </p>
+                </div>
+              </div>
+              <Link href="/revenue">
+                <Button variant="outline" size="sm" data-testid="button-view-graduates">
+                  View All Graduates
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div className="text-center p-3 rounded-lg bg-background/50">
+                <p className="text-2xl font-bold text-chart-3" data-testid="stat-graduated-count">
+                  {graduationAnalytics.totalGraduated}
+                </p>
+                <p className="text-xs text-muted-foreground">Accounts Graduated</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-background/50">
+                <p className="text-2xl font-bold text-chart-1" data-testid="stat-revenue-growth">
+                  {formatCurrency(graduationAnalytics.cumulativeRevenueGrowth)}
+                </p>
+                <p className="text-xs text-muted-foreground">Incremental Revenue Captured</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-background/50">
+                <p className="text-2xl font-bold" data-testid="stat-avg-days">
+                  {graduationAnalytics.avgDaysToGraduation}
+                </p>
+                <p className="text-xs text-muted-foreground">Avg Days to Graduate</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-background/50">
+                <p className="text-2xl font-bold text-chart-2" data-testid="stat-icp-success">
+                  {graduationAnalytics.avgIcpCategorySuccessRate}%
+                </p>
+                <p className="text-xs text-muted-foreground">Avg ICP Category Success</p>
+              </div>
+            </div>
+            
+            {/* Recent Graduates */}
+            {graduationAnalytics.graduatedAccounts.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">Recent Graduates</p>
+                <div className="flex flex-wrap gap-2">
+                  {graduationAnalytics.graduatedAccounts.slice(0, 5).map((account) => (
+                    <Badge 
+                      key={account.id} 
+                      variant="outline" 
+                      className="bg-background py-1"
+                      data-testid={`badge-graduate-${account.id}`}
+                    >
+                      <Trophy className="h-3 w-3 mr-1 text-chart-3" />
+                      <span className="font-medium">{account.accountName}</span>
+                      {account.revenueGrowth > 0 && (
+                        <span className="ml-1 text-chart-1">
+                          +{formatCurrency(account.revenueGrowth)}
+                        </span>
+                      )}
+                    </Badge>
+                  ))}
+                  {graduationAnalytics.graduatedAccounts.length > 5 && (
+                    <Badge variant="outline" className="bg-background">
+                      +{graduationAnalytics.graduatedAccounts.length - 5} more
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {!isLayoutLocked && (

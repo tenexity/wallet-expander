@@ -396,6 +396,13 @@ export const programAccounts = pgTable("program_accounts", {
   graduationCriteria: text("graduation_criteria").default("any"), // 'any' or 'all' - meet any objective vs all
   graduatedAt: timestamp("graduated_at"), // When account was graduated
   graduationNotes: text("graduation_notes"), // Notes about graduation/success
+  // Graduation analytics (populated at graduation time)
+  graduationRevenue: numeric("graduation_revenue"), // Cumulative revenue during enrollment period
+  graduationPenetration: numeric("graduation_penetration"), // Category penetration % at graduation
+  icpCategoriesAtEnrollment: integer("icp_categories_at_enrollment"), // Number of ICP categories missing at enrollment
+  icpCategoriesAchieved: integer("icp_categories_achieved"), // Number of ICP categories successfully filled
+  enrollmentDurationDays: integer("enrollment_duration_days"), // Days from enrollment to graduation
+  incrementalRevenue: numeric("incremental_revenue"), // Revenue above pro-rated baseline (graduationRevenue - proRatedBaseline)
 }, (table) => [
   index("idx_program_accounts_tenant_id").on(table.tenantId),
   index("idx_program_accounts_account_id").on(table.accountId),

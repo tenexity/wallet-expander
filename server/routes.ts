@@ -1535,13 +1535,119 @@ KEY TALKING POINTS:
         return res.status(400).json({ message: "Account is already graduated" });
       }
 
+      const account = await tenantStorage.getAccount(programAccount.accountId);
+      
+      // Calculate graduation analytics
+      const now = new Date();
+      const enrolledAt = new Date(programAccount.enrolledAt);
+      const enrollmentDurationDays = Math.floor((now.getTime() - enrolledAt.getTime()) / (1000 * 60 * 60 * 24));
+      
+      // Get cumulative revenue from orders during enrollment period
+      // graduationRevenue = total revenue generated during the enrollment period (not baseline)
+      const orders = await tenantStorage.getOrdersByAccount(programAccount.accountId);
+      const ordersAfterEnrollment = orders.filter(o => new Date(o.orderDate) >= enrolledAt);
+      const graduationRevenue = ordersAfterEnrollment.reduce((sum, o) => sum + parseFloat(o.totalAmount?.toString() || "0"), 0);
+      
+      // Get account metrics for penetration
+      const metrics = await tenantStorage.getAccountMetrics(programAccount.accountId);
+      const graduationPenetration = metrics?.categoryPenetration ? parseFloat(metrics.categoryPenetration.toString()) : null;
+      
+      // Get ICP categories from segment profile if account has a segment
+      // icpCategoriesAtEnrollment = categories that were MISSING at enrollment (gaps to fill)
+      // icpCategoriesAchieved = how many of those gaps were filled after enrollment
+      let icpCategoriesAtEnrollment = null;
+      let icpCategoriesAchieved = null;
+      
+      if (account?.segment) {
+        const segmentProfiles = await tenantStorage.getSegmentProfiles();
+        const profile = segmentProfiles.find(p => p.name?.toLowerCase() === account.segment?.toLowerCase());
+        if (profile) {
+          // Get profile categories (ICP categories for this segment)
+          const profileCategories = await tenantStorage.getProfileCategories(profile.id);
+          const icpCategoryIds = new Set(profileCategories.map(pc => pc.categoryId));
+          
+          // Get ALL orders for this account (before and after enrollment)
+          const ordersBeforeEnrollment = orders.filter(o => new Date(o.orderDate) < enrolledAt);
+          
+          // Get products purchased BEFORE enrollment
+          const orderItemsBefore = await Promise.all(
+            ordersBeforeEnrollment.map(async (order) => {
+              const items = await tenantStorage.getOrderItems(order.id);
+              return items;
+            })
+          );
+          const allItemsBefore = orderItemsBefore.flat();
+          const productIdsBefore = Array.from(new Set(allItemsBefore.map(item => item.productId)));
+          
+          // Get products purchased AFTER enrollment  
+          const orderItemsAfter = await Promise.all(
+            ordersAfterEnrollment.map(async (order) => {
+              const items = await tenantStorage.getOrderItems(order.id);
+              return items;
+            })
+          );
+          const allItemsAfter = orderItemsAfter.flat();
+          const productIdsAfter = Array.from(new Set(allItemsAfter.map(item => item.productId)));
+          
+          // Get products to find their category IDs
+          const products = await tenantStorage.getProducts();
+          
+          // Categories already purchased before enrollment
+          const categoriesPurchasedBefore = new Set(
+            products
+              .filter(p => productIdsBefore.includes(p.id))
+              .map(p => p.categoryId)
+              .filter((id): id is number => id !== null)
+          );
+          
+          // Categories purchased after enrollment
+          const categoriesPurchasedAfter = new Set(
+            products
+              .filter(p => productIdsAfter.includes(p.id))
+              .map(p => p.categoryId)
+              .filter((id): id is number => id !== null)
+          );
+          
+          // ICP categories that were MISSING at enrollment (gaps)
+          const missingIcpAtEnrollment = profileCategories.filter(pc => 
+            !categoriesPurchasedBefore.has(pc.categoryId)
+          );
+          
+          // ICP categories that were filled AFTER enrollment (gaps that were closed)
+          const newlyAchievedCategories = missingIcpAtEnrollment.filter(pc =>
+            categoriesPurchasedAfter.has(pc.categoryId)
+          );
+          
+          icpCategoriesAtEnrollment = missingIcpAtEnrollment.length;
+          icpCategoriesAchieved = newlyAchievedCategories.length;
+        }
+      }
+
+      // Calculate incremental revenue using pro-rated baseline for fair comparison
+      const baselineRevenue = parseFloat(programAccount.baselineRevenue?.toString() || "0");
+      const baselineStart = programAccount.baselineStart ? new Date(programAccount.baselineStart) : null;
+      const baselineEnd = programAccount.baselineEnd ? new Date(programAccount.baselineEnd) : null;
+      
+      let incrementalRevenue = graduationRevenue - baselineRevenue; // Default: simple difference
+      if (baselineStart && baselineEnd && enrollmentDurationDays > 0) {
+        const baselinePeriodDays = Math.floor((baselineEnd.getTime() - baselineStart.getTime()) / (1000 * 60 * 60 * 24));
+        if (baselinePeriodDays > 0) {
+          const proRatedBaseline = baselineRevenue * (enrollmentDurationDays / baselinePeriodDays);
+          incrementalRevenue = graduationRevenue - proRatedBaseline;
+        }
+      }
+
       const updatedAccount = await tenantStorage.updateProgramAccount(id, {
         status: "graduated",
-        graduatedAt: new Date(),
+        graduatedAt: now,
         graduationNotes: notes || null,
+        graduationRevenue: graduationRevenue.toString(),
+        graduationPenetration: graduationPenetration?.toString() || null,
+        icpCategoriesAtEnrollment,
+        icpCategoriesAchieved,
+        enrollmentDurationDays,
+        incrementalRevenue: incrementalRevenue.toString(),
       });
-
-      const account = await tenantStorage.getAccount(programAccount.accountId);
       
       res.json({
         success: true,
@@ -1635,6 +1741,114 @@ KEY TALKING POINTS:
       });
     } catch (error) {
       handleRouteError(error, res, "Get graduation-ready accounts");
+    }
+  });
+
+  // Get graduation analytics summary
+  // Revenue metrics explained:
+  // - baselineRevenue: Historical revenue for the baseline period (typically 12 months before enrollment)
+  // - baselinePeriodDays: Duration of baseline period (baselineEnd - baselineStart)
+  // - enrollmentDurationDays: Days from enrollment to graduation
+  // - proRatedBaseline: baselineRevenue * (enrollmentDurationDays / baselinePeriodDays) = expected revenue at baseline run rate
+  // - incrementalRevenue: graduationRevenue - proRatedBaseline = revenue above expected run rate
+  // This represents the true incremental revenue captured during the wallet share expansion program
+  app.get("/api/program-accounts/graduation-analytics", requireAuth, async (req, res) => {
+    try {
+      const tenantStorage = getStorage(req);
+      const allProgramAccounts = await tenantStorage.getProgramAccounts();
+      const graduatedAccounts = allProgramAccounts.filter(pa => pa.status === "graduated");
+      
+      if (graduatedAccounts.length === 0) {
+        return res.json({
+          totalGraduated: 0,
+          cumulativeRevenueGrowth: 0,
+          avgDaysToGraduation: 0,
+          avgRevenueGrowth: 0,
+          avgIcpCategorySuccessRate: 0,
+          graduatedAccounts: [],
+        });
+      }
+      
+      // Calculate aggregate metrics from graduated accounts
+      let totalRevenueGrowth = 0;
+      let totalDays = 0;
+      let totalIcpSuccess = 0;
+      let accountsWithIcpData = 0;
+      let accountsWithDuration = 0;
+      let accountsWithRevenue = 0;
+      
+      const detailedAccounts = await Promise.all(
+        graduatedAccounts.map(async (pa) => {
+          const account = await tenantStorage.getAccount(pa.accountId);
+          
+          const baselineRevenue = parseFloat(pa.baselineRevenue?.toString() || "0");
+          const graduationRevenue = parseFloat(pa.graduationRevenue?.toString() || "0");
+          
+          // Use stored incremental revenue (calculated at graduation using pro-rated baseline)
+          // Falls back to recalculation for accounts graduated before this field was added
+          let revenueGrowth = pa.incrementalRevenue ? parseFloat(pa.incrementalRevenue.toString()) : 0;
+          if (!pa.incrementalRevenue && graduationRevenue > 0) {
+            // Fallback: recalculate for legacy accounts
+            const baselineStart = pa.baselineStart ? new Date(pa.baselineStart) : null;
+            const baselineEnd = pa.baselineEnd ? new Date(pa.baselineEnd) : null;
+            const enrollmentDuration = pa.enrollmentDurationDays || 0;
+            
+            let proRatedBaseline = baselineRevenue;
+            if (baselineStart && baselineEnd && enrollmentDuration > 0) {
+              const baselinePeriodDays = Math.floor((baselineEnd.getTime() - baselineStart.getTime()) / (1000 * 60 * 60 * 24));
+              if (baselinePeriodDays > 0) {
+                proRatedBaseline = baselineRevenue * (enrollmentDuration / baselinePeriodDays);
+              }
+            }
+            revenueGrowth = graduationRevenue - proRatedBaseline;
+          }
+          
+          if (graduationRevenue > 0 || pa.incrementalRevenue) {
+            totalRevenueGrowth += revenueGrowth;
+            accountsWithRevenue++;
+          }
+          
+          if (pa.enrollmentDurationDays) {
+            totalDays += pa.enrollmentDurationDays;
+            accountsWithDuration++;
+          }
+          
+          let icpSuccessRate = 0;
+          if (pa.icpCategoriesAtEnrollment && pa.icpCategoriesAtEnrollment > 0) {
+            icpSuccessRate = ((pa.icpCategoriesAchieved || 0) / pa.icpCategoriesAtEnrollment) * 100;
+            totalIcpSuccess += icpSuccessRate;
+            accountsWithIcpData++;
+          }
+          
+          return {
+            id: pa.id,
+            accountId: pa.accountId,
+            accountName: account?.name || "Unknown",
+            segment: account?.segment || null,
+            enrolledAt: pa.enrolledAt,
+            graduatedAt: pa.graduatedAt,
+            baselineRevenue,
+            graduationRevenue,
+            revenueGrowth,
+            enrollmentDurationDays: pa.enrollmentDurationDays || null,
+            icpCategoriesAtEnrollment: pa.icpCategoriesAtEnrollment || null,
+            icpCategoriesAchieved: pa.icpCategoriesAchieved || null,
+            icpSuccessRate,
+            graduationPenetration: pa.graduationPenetration ? parseFloat(pa.graduationPenetration.toString()) : null,
+          };
+        })
+      );
+      
+      res.json({
+        totalGraduated: graduatedAccounts.length,
+        cumulativeRevenueGrowth: totalRevenueGrowth,
+        avgDaysToGraduation: accountsWithDuration > 0 ? Math.round(totalDays / accountsWithDuration) : 0,
+        avgRevenueGrowth: accountsWithRevenue > 0 ? Math.round(totalRevenueGrowth / accountsWithRevenue) : 0,
+        avgIcpCategorySuccessRate: accountsWithIcpData > 0 ? Math.round(totalIcpSuccess / accountsWithIcpData) : 0,
+        graduatedAccounts: detailedAccounts,
+      });
+    } catch (error) {
+      handleRouteError(error, res, "Get graduation analytics");
     }
   });
 

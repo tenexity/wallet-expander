@@ -29,6 +29,7 @@ import {
   Loader2,
   Crown,
   GraduationCap,
+  Trophy,
 } from "lucide-react";
 
 import {
@@ -511,6 +512,106 @@ export default function Landing() {
                 </p>
               </Card>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Graduation Visibility Section */}
+      <section id="graduation-visibility" className="py-20">
+        <div className="container mx-auto px-4">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-12">
+              <Badge variant="secondary" className="mb-4" data-testid="badge-graduation-visibility">
+                Measure What Matters
+              </Badge>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4" data-testid="text-graduation-visibility-title">
+                Complete Visibility Into <span className="text-primary">Wallet Share Capture</span>
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+                Graduated accounts provide a clear picture of your wallet share expansion success. 
+                Track every account from enrollment to graduation and see exactly how much value you've captured.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-8 mb-12">
+              <Card className="p-6" data-testid="card-visibility-tracking">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <GraduationCap className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-semibold mb-2">Enrollment to Graduation Tracking</h4>
+                    <p className="text-muted-foreground mb-4">
+                      Track the complete journey of every enrolled account. See revenue at enrollment, 
+                      growth milestones hit, and final revenue at graduation.
+                    </p>
+                    <ul className="space-y-2">
+                      <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Check className="h-4 w-4 text-primary" />
+                        Baseline revenue vs. graduation revenue delta
+                      </li>
+                      <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Check className="h-4 w-4 text-primary" />
+                        Days from enrollment to graduation
+                      </li>
+                      <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Check className="h-4 w-4 text-primary" />
+                        ICP category success rate
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="p-6" data-testid="card-visibility-profitability">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-full bg-chart-1/10 flex items-center justify-center flex-shrink-0">
+                    <TrendingUp className="h-6 w-6 text-chart-1" />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-semibold mb-2">Profitability from Existing Accounts</h4>
+                    <p className="text-muted-foreground mb-4">
+                      See how much additional revenue you're generating from accounts you already have. 
+                      No customer acquisition cost—pure wallet share expansion.
+                    </p>
+                    <ul className="space-y-2">
+                      <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Check className="h-4 w-4 text-primary" />
+                        Cumulative revenue growth across all graduates
+                      </li>
+                      <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Check className="h-4 w-4 text-primary" />
+                        Average revenue lift per account
+                      </li>
+                      <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Check className="h-4 w-4 text-primary" />
+                        Category penetration improvements
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            <Card className="p-6 border-chart-2/30 bg-chart-2/5" data-testid="card-visibility-alumni">
+              <div className="flex flex-col md:flex-row items-center gap-6">
+                <div className="w-16 h-16 rounded-full bg-chart-2/20 flex items-center justify-center flex-shrink-0">
+                  <Trophy className="h-8 w-8 text-chart-2" />
+                </div>
+                <div className="text-center md:text-left flex-1">
+                  <h4 className="text-xl font-semibold mb-2 text-chart-2">Alumni Section: Your Success Scoreboard</h4>
+                  <p className="text-muted-foreground">
+                    Every graduated account moves to your Alumni section—a permanent record of success. 
+                    See which accounts you've grown, how much revenue you captured, and what categories 
+                    you successfully expanded into. It's proof that your wallet share expansion strategy works.
+                  </p>
+                </div>
+                <div className="text-center md:text-right flex-shrink-0">
+                  <div className="text-4xl font-bold text-chart-2">100%</div>
+                  <div className="text-sm text-muted-foreground">Visibility</div>
+                </div>
+              </div>
+            </Card>
           </div>
         </div>
       </section>
