@@ -263,7 +263,6 @@ export default function Landing() {
           </div>
         </div>
       </header>
-
       <section className="relative overflow-hidden py-20 md:py-32">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10" />
         <div className="container mx-auto px-4 relative">
@@ -319,7 +318,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
       <section className="py-16 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-3 gap-8">
@@ -353,7 +351,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
       <section id="features" className="py-20">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
@@ -418,7 +415,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
       <section id="growth-guarantee" className="py-20 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="max-w-5xl mx-auto">
@@ -515,7 +511,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
       {/* Graduation Visibility Section */}
       <section id="graduation-visibility" className="py-20">
         <div className="container mx-auto px-4">
@@ -615,7 +610,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
       <section id="pricing" className="py-20">
         <div className="container mx-auto px-4">
           <div className="max-w-5xl mx-auto">
@@ -952,7 +946,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
       <section className="py-20">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
@@ -964,11 +957,7 @@ export default function Landing() {
                 <h2 className="text-3xl font-bold mb-4" data-testid="text-why-title">
                   AI That Enhances, Not Replaces, Human Relationships
                 </h2>
-                <p className="text-muted-foreground mb-6">
-                  Your sales team builds relationships. We give them the insights, 
-                  preparation, and confidence to make every conversation count. 
-                  AI does the analysis—your people close the deals.
-                </p>
+                <p className="text-muted-foreground mb-6">Your sales team builds relationships. We give them the insights, preparation, and confidence to make every conversation count. AI does the analysis, your people close the deals.</p>
 
                 <ul className="space-y-4">
                   <li className="flex items-start gap-3" data-testid="benefit-security">
@@ -1024,7 +1013,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
       <section id="signup" className="py-20 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="max-w-xl mx-auto">
@@ -1080,7 +1068,6 @@ export default function Landing() {
           </div>
         </div>
       </section>
-
       <footer className="py-12 border-t">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
