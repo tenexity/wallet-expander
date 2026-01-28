@@ -562,16 +562,19 @@ export default function Landing() {
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             ) : plans && plans.length > 0 ? (
-              <div className="grid md:grid-cols-3 gap-6">
+              <div className="grid md:grid-cols-4 gap-6">
                 {plans.map((plan) => {
                   const priceRaw = billingCycle === "yearly" ? plan.yearlyPrice : plan.monthlyPrice;
                   const price = parseFloat(priceRaw || "0");
-                  const isPopular = plan.slug === "professional";
+                  const isPopular = plan.slug === "scale";
+                  const isEnterprise = plan.slug === "enterprise";
+                  const isFree = plan.slug === "starter";
                   const features = Array.isArray(plan.features) ? plan.features : [];
                   const planDescriptions: Record<string, string> = {
-                    starter: "For small teams getting started",
-                    professional: "For growing sales teams",
-                    enterprise: "For large organizations",
+                    starter: "Try it free with one account",
+                    growth: "For focused account development",
+                    scale: "For growing sales teams",
+                    enterprise: "Full service solution",
                   };
 
                   return (
@@ -600,12 +603,24 @@ export default function Landing() {
                           {planDescriptions[plan.slug] || "Flexible plan for your needs"}
                         </p>
                         <div className="flex items-baseline justify-center gap-1">
-                          <span className="text-4xl font-bold" data-testid={`text-plan-price-${plan.slug}`}>
-                            ${Math.round(price / 100)}
-                          </span>
-                          <span className="text-muted-foreground">
-                            /{billingCycle === "yearly" ? "year" : "month"}
-                          </span>
+                          {isEnterprise ? (
+                            <span className="text-4xl font-bold" data-testid={`text-plan-price-${plan.slug}`}>
+                              Custom
+                            </span>
+                          ) : isFree ? (
+                            <span className="text-4xl font-bold" data-testid={`text-plan-price-${plan.slug}`}>
+                              Free
+                            </span>
+                          ) : (
+                            <>
+                              <span className="text-4xl font-bold" data-testid={`text-plan-price-${plan.slug}`}>
+                                ${billingCycle === "yearly" ? Math.round(price / 12) : Math.round(price)}
+                              </span>
+                              <span className="text-muted-foreground">
+                                /{billingCycle === "yearly" ? "mo (billed yearly)" : "month"}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
 
@@ -618,45 +633,100 @@ export default function Landing() {
                         ))}
                       </ul>
 
-                      <Button
-                        className="w-full"
-                        variant={isPopular ? "default" : "outline"}
-                        onClick={() => handleSelectPlan(plan.slug)}
-                        disabled={checkoutMutation.isPending}
-                        data-testid={`button-select-plan-${plan.slug}`}
-                      >
-                        {checkoutMutation.isPending ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Loading...
-                          </>
-                        ) : (
-                          <>Get Started</>
-                        )}
-                      </Button>
+                      {isEnterprise ? (
+                        <a href="mailto:sales@tenexity.com?subject=Enterprise%20Plan%20Inquiry">
+                          <Button
+                            className="w-full"
+                            variant="outline"
+                            data-testid={`button-select-plan-${plan.slug}`}
+                          >
+                            Contact Sales
+                          </Button>
+                        </a>
+                      ) : (
+                        <Button
+                          className="w-full"
+                          variant={isPopular ? "default" : "outline"}
+                          onClick={() => handleSelectPlan(plan.slug)}
+                          disabled={checkoutMutation.isPending}
+                          data-testid={`button-select-plan-${plan.slug}`}
+                        >
+                          {checkoutMutation.isPending ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Loading...
+                            </>
+                          ) : isFree ? (
+                            <>Get Started Free</>
+                          ) : (
+                            <>Get Started</>
+                          )}
+                        </Button>
+                      )}
                     </Card>
                   );
                 })}
               </div>
             ) : (
-              <div className="grid md:grid-cols-3 gap-6">
+              <div className="grid md:grid-cols-4 gap-6">
                 <Card className="p-6" data-testid="card-plan-starter">
                   <div className="text-center mb-6">
                     <h3 className="text-xl font-bold mb-2">Starter</h3>
-                    <p className="text-sm text-muted-foreground mb-4">For small teams getting started</p>
+                    <p className="text-sm text-muted-foreground mb-4">Try it free with one account</p>
                     <div className="flex items-baseline justify-center gap-1">
-                      <span className="text-4xl font-bold">${billingCycle === "yearly" ? 468 : 49}</span>
-                      <span className="text-muted-foreground">/{billingCycle === "yearly" ? "year" : "month"}</span>
+                      <span className="text-4xl font-bold">Free</span>
                     </div>
                   </div>
                   <ul className="space-y-3 mb-6">
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>Up to 100 accounts</span>
+                      <span>1 enrolled account</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>Basic gap analysis</span>
+                      <span>Upload unlimited accounts</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>Full gap analysis</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>AI-powered playbooks</span>
+                    </li>
+                  </ul>
+                  <a href="/api/login">
+                    <Button variant="outline" className="w-full" data-testid="button-select-plan-starter-fallback">
+                      Get Started Free
+                    </Button>
+                  </a>
+                </Card>
+
+                <Card className="p-6" data-testid="card-plan-growth">
+                  <div className="text-center mb-6">
+                    <h3 className="text-xl font-bold mb-2">Growth</h3>
+                    <p className="text-sm text-muted-foreground mb-4">For focused account development</p>
+                    <div className="flex items-baseline justify-center gap-1">
+                      <span className="text-4xl font-bold">${billingCycle === "yearly" ? 240 : 300}</span>
+                      <span className="text-muted-foreground">/{billingCycle === "yearly" ? "mo (billed yearly)" : "month"}</span>
+                    </div>
+                  </div>
+                  <ul className="space-y-3 mb-6">
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>5 enrolled accounts</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>Upload unlimited accounts</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>Full gap analysis</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>AI-powered playbooks</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
@@ -664,29 +734,37 @@ export default function Landing() {
                     </li>
                   </ul>
                   <a href="/api/login">
-                    <Button variant="outline" className="w-full" data-testid="button-select-plan-starter-fallback">
+                    <Button variant="outline" className="w-full" data-testid="button-select-plan-growth-fallback">
                       Get Started
                     </Button>
                   </a>
                 </Card>
 
-                <Card className="p-6 border-primary shadow-lg relative" data-testid="card-plan-professional">
+                <Card className="p-6 border-primary shadow-lg relative" data-testid="card-plan-scale">
                   <Badge className="absolute -top-3 left-1/2 -translate-x-1/2">
                     <Crown className="w-3 h-3 mr-1" />
                     Most Popular
                   </Badge>
                   <div className="text-center mb-6">
-                    <h3 className="text-xl font-bold mb-2">Professional</h3>
+                    <h3 className="text-xl font-bold mb-2">Scale</h3>
                     <p className="text-sm text-muted-foreground mb-4">For growing sales teams</p>
                     <div className="flex items-baseline justify-center gap-1">
-                      <span className="text-4xl font-bold">${billingCycle === "yearly" ? 1908 : 199}</span>
-                      <span className="text-muted-foreground">/{billingCycle === "yearly" ? "year" : "month"}</span>
+                      <span className="text-4xl font-bold">${billingCycle === "yearly" ? 600 : 750}</span>
+                      <span className="text-muted-foreground">/{billingCycle === "yearly" ? "mo (billed yearly)" : "month"}</span>
                     </div>
                   </div>
                   <ul className="space-y-3 mb-6">
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>Up to 500 accounts</span>
+                      <span>15 enrolled accounts</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>Upload unlimited accounts</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>Full gap analysis</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
@@ -698,7 +776,7 @@ export default function Landing() {
                     </li>
                   </ul>
                   <a href="/api/login">
-                    <Button className="w-full" data-testid="button-select-plan-professional-fallback">
+                    <Button className="w-full" data-testid="button-select-plan-scale-fallback">
                       Get Started
                     </Button>
                   </a>
@@ -707,29 +785,36 @@ export default function Landing() {
                 <Card className="p-6" data-testid="card-plan-enterprise">
                   <div className="text-center mb-6">
                     <h3 className="text-xl font-bold mb-2">Enterprise</h3>
-                    <p className="text-sm text-muted-foreground mb-4">For large organizations</p>
+                    <p className="text-sm text-muted-foreground mb-4">Full service solution</p>
                     <div className="flex items-baseline justify-center gap-1">
-                      <span className="text-4xl font-bold">${billingCycle === "yearly" ? 4788 : 499}</span>
-                      <span className="text-muted-foreground">/{billingCycle === "yearly" ? "year" : "month"}</span>
+                      <span className="text-4xl font-bold">Custom</span>
                     </div>
                   </div>
                   <ul className="space-y-3 mb-6">
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>Unlimited accounts</span>
+                      <span>Unlimited enrolled accounts</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>Custom integrations</span>
+                      <span>Weekly account review calls</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>Fractional VP of Sales services</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>Custom AI training for your team</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
                       <span>Dedicated support</span>
                     </li>
                   </ul>
-                  <a href="/api/login">
+                  <a href="mailto:sales@tenexity.com?subject=Enterprise%20Plan%20Inquiry">
                     <Button variant="outline" className="w-full" data-testid="button-select-plan-enterprise-fallback">
-                      Get Started
+                      Contact Sales
                     </Button>
                   </a>
                 </Card>
@@ -737,7 +822,7 @@ export default function Landing() {
             )}
 
             <p className="text-center text-sm text-muted-foreground mt-8" data-testid="text-trial-info">
-              All plans include a 14-day free trial. No credit card required to start.
+              Start free with one account. No credit card required. Upgrade anytime as you grow.
             </p>
           </div>
         </div>
