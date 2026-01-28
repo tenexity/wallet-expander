@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { SubscriptionPlan } from "@shared/schema";
+import walletExpanderLogo from "@assets/WalletExpander_logo_1769615587162.png";
 import {
   TrendingUp,
   Target,
@@ -219,9 +220,11 @@ export default function Landing() {
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <div className="flex items-center gap-2" data-testid="logo-brand">
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <TrendingUp className="h-5 w-5" />
-            </div>
+            <img 
+              src={walletExpanderLogo} 
+              alt="Wallet Share Expander" 
+              className="h-10 w-auto"
+            />
             <span className="text-xl font-bold">Wallet Share Expander</span>
           </div>
 
