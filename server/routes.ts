@@ -3196,6 +3196,49 @@ KEY TALKING POINTS:
           break;
         }
         
+        case 'customer.subscription.created': {
+          // Handle subscription created directly (backup for checkout.session.completed)
+          const subscription = event.data.object as Stripe.Subscription;
+          const customerId = subscription.customer as string;
+          const tenantIdFromMeta = subscription.metadata?.tenantId ? parseInt(subscription.metadata.tenantId) : null;
+          
+          // Try to find tenant by metadata first, then by customer ID
+          let tenant = null;
+          if (tenantIdFromMeta) {
+            const [foundTenant] = await db.select().from(tenants)
+              .where(eq(tenants.id, tenantIdFromMeta))
+              .limit(1);
+            tenant = foundTenant;
+          }
+          if (!tenant) {
+            const [foundTenant] = await db.select().from(tenants)
+              .where(eq(tenants.stripeCustomerId, customerId))
+              .limit(1);
+            tenant = foundTenant;
+          }
+          
+          if (tenant) {
+            const priceId = subscription.items.data[0]?.price.id;
+            const matchingPlan = priceId ? await findPlanByPriceId(priceId) : null;
+            
+            const status = subscription.status === 'active' ? 'active' 
+              : subscription.status === 'trialing' ? 'trialing'
+              : 'none';
+            
+            await db.update(tenants)
+              .set({
+                stripeSubscriptionId: subscription.id,
+                subscriptionStatus: status,
+                planType: matchingPlan?.slug || tenant.planType,
+                billingPeriodEnd: new Date(subscription.current_period_end * 1000),
+              })
+              .where(eq(tenants.id, tenant.id));
+              
+            console.log(`Tenant ${tenant.id} subscription created: ${matchingPlan?.slug || 'unknown'} (${status})`);
+          }
+          break;
+        }
+        
         case 'customer.subscription.updated': {
           const subscription = event.data.object as Stripe.Subscription;
           const customerId = subscription.customer as string;
