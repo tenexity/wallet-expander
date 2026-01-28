@@ -85,7 +85,7 @@ const showcaseFeatures = [
     id: "icp-builder",
     badge: "Success Pattern Recognition",
     title: "Learn from Your Best to Grow the Rest",
-    description: "AI studies your top-performing accounts to understand what success looks like in each segment. These patterns become the benchmark for growth—showing exactly how to guide underperforming accounts toward their full potential.",
+    description: "AI studies your top-performing accounts to understand what success looks like in each segment. These patterns become the benchmark for growth, showing exactly how to guide underperforming accounts toward their full potential.",
     MockupComponent: MockupICPBuilder,
     benefits: [
       "AI discovers what your best customers have in common",
