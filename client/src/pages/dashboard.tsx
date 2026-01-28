@@ -88,8 +88,11 @@ interface DashboardStats {
   topOpportunities: AccountWithMetrics[];
   recentTasks: Array<{
     id: number;
+    accountId: number;
+    playbookId: number | null;
     accountName: string;
     taskType: string;
+    title: string;
     status: string;
     dueDate: string;
   }>;
@@ -446,8 +449,17 @@ export default function Dashboard() {
     return Array.from(segmentMap.values());
   }, [enrolledAccounts]);
 
-  const handleTaskClick = (taskId: number) => {
-    navigate(`/playbooks?task=${taskId}`);
+  const handleTaskClick = (taskOrId: number | DashboardStats["recentTasks"][0]) => {
+    if (typeof taskOrId === "number") {
+      navigate(`/playbooks?task=${taskOrId}`);
+    } else {
+      const task = taskOrId;
+      if (task.playbookId) {
+        navigate(`/playbooks?playbook=${task.playbookId}&task=${task.id}`);
+      } else {
+        navigate(`/playbooks?task=${task.id}`);
+      }
+    }
   };
 
   const saveLayout = useCallback((newLayout: LayoutItem[]) => {
@@ -661,10 +673,13 @@ export default function Dashboard() {
 
   const taskColumns = [
     {
-      key: "accountName",
-      header: "Account",
+      key: "title",
+      header: "Task",
       cell: (row: DashboardStats["recentTasks"][0]) => (
-        <span className="font-medium">{row.accountName}</span>
+        <div className="flex flex-col">
+          <span className="font-medium truncate max-w-[200px]">{row.title}</span>
+          <span className="text-xs text-muted-foreground">{row.accountName}</span>
+        </div>
       ),
     },
     {
@@ -791,10 +806,10 @@ export default function Dashboard() {
       },
     ],
     recentTasks: [
-      { id: 1, accountName: "ABC Plumbing", taskType: "Call", status: "pending", dueDate: "Today" },
-      { id: 2, accountName: "Elite HVAC", taskType: "Email", status: "in_progress", dueDate: "Tomorrow" },
-      { id: 3, accountName: "Metro Mechanical", taskType: "Visit", status: "completed", dueDate: "Jan 20" },
-      { id: 4, accountName: "Premier Plumbing", taskType: "Call", status: "pending", dueDate: "Jan 25" },
+      { id: 1, accountId: 1, playbookId: 1, accountName: "ABC Plumbing", taskType: "Call", title: "Follow up on product demo", status: "pending", dueDate: "Today" },
+      { id: 2, accountId: 2, playbookId: 1, accountName: "Elite HVAC", taskType: "Email", title: "Send pricing proposal", status: "in_progress", dueDate: "Tomorrow" },
+      { id: 3, accountId: 3, playbookId: 2, accountName: "Metro Mechanical", taskType: "Visit", title: "Site visit for assessment", status: "completed", dueDate: "Jan 20" },
+      { id: 4, accountId: 4, playbookId: null, accountName: "Premier Plumbing", taskType: "Call", title: "Quarterly review call", status: "pending", dueDate: "Jan 25" },
     ],
     segmentBreakdown: [
       { segment: "HVAC", count: 156, revenue: 3200000 },
@@ -1340,11 +1355,27 @@ export default function Dashboard() {
             )}
             {!isCollapsed && (
               <CardContent className="flex-1 overflow-y-auto overflow-x-auto">
-                <DataTable
-                  columns={taskColumns}
-                  data={displayStats.recentTasks}
-                  testId="table-tasks"
-                />
+                {displayStats.recentTasks.length > 0 ? (
+                  <DataTable
+                    columns={taskColumns}
+                    data={displayStats.recentTasks}
+                    testId="table-tasks"
+                    onRowClick={handleTaskClick}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-3">
+                      <Sparkles className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <p className="font-medium">No tasks yet</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Generate a playbook to create tasks
+                    </p>
+                    <Button variant="outline" size="sm" className="mt-3" asChild>
+                      <Link href="/playbooks">Generate Playbook</Link>
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             )}
           </Card>

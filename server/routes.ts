@@ -194,13 +194,22 @@ export async function registerRoutes(
         .slice(0, 10);
 
       // Get recent tasks - use Map for O(1) account lookups
+      // Sort by created date descending to get most recent first
       const accountMap = new Map(allAccounts.map(a => [a.id, a]));
-      const recentTasks = allTasks.slice(0, DASHBOARD_LIMITS.RECENT_TASKS).map(task => {
+      const sortedTasks = [...allTasks].sort((a, b) => {
+        const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return bDate - aDate;
+      });
+      const recentTasks = sortedTasks.slice(0, DASHBOARD_LIMITS.RECENT_TASKS).map(task => {
         const account = accountMap.get(task.accountId);
         return {
           id: task.id,
+          accountId: task.accountId,
+          playbookId: task.playbookId,
           accountName: account?.name || "Unknown",
           taskType: task.taskType,
+          title: task.title,
           status: task.status,
           dueDate: task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "TBD",
         };
