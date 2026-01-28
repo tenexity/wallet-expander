@@ -62,6 +62,15 @@ The application follows a client-server architecture.
     - **Scoring Settings:** Customizable weighting factors for opportunity scoring (Gap Size, Revenue Potential, Category Count).
     - **Territory Manager Administration:** CRUD operations for Territory Managers, including territory assignments and task linkage.
     - **Email Notifications:** Integrated with Resend for sending task notification emails to Territory Managers when tasks are assigned. Configurable sender settings and notification preferences in Settings > Email tab. Requires RESEND_API_KEY secret.
+    - **Stripe Subscription Billing:** Complete subscription management with:
+        - Price ID whitelist validation (STRIPE_PRICE_IDS env var)
+        - App-specific metadata filtering (APP_SLUG env var) for multi-app Stripe accounts
+        - Atomic idempotency checking to prevent duplicate webhook processing
+        - Fail-closed security: events with unknown price IDs or missing app metadata are skipped
+        - Structured JSON logging for webhook events
+        - Debug endpoint for platform admins (no secrets exposed)
+        - Tier-based feature limits (Starter: 1 playbook/1 ICP/1 enrolled; Growth: unlimited playbooks/3 ICPs/5 enrolled; Scale: unlimited all)
+        - See STRIPE-SETUP.md for configuration details
 
 **Project Structure:**
 - `client/`: Frontend application.
