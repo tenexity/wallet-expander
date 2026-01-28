@@ -46,22 +46,14 @@ async function seed() {
   await db.delete(revShareTiers);
   await db.delete(settings);
 
-  // Create or update demo tenant to ensure active subscription
-  const existingTenants = await db.select().from(tenants).limit(1);
-  let tenantId = 1;
-  if (existingTenants.length === 0) {
-    const [newTenant] = await db.insert(tenants).values({
-      name: "Mark Supply Demo",
-      slug: "mark-supply-demo",
-      subscriptionStatus: "active",
-      planType: "professional",
-    }).returning();
-    tenantId = newTenant.id;
-  } else {
-    tenantId = existingTenants[0].id;
-    // Ensure tenant has active subscription for demo access
-    await db.execute(sql`UPDATE tenants SET subscription_status = 'active', plan_type = 'professional' WHERE id = ${tenantId}`);
-  }
+  // Use tenant ID 8 (graham's tenant) for demo data
+  // This ensures the logged-in user sees the mock data
+  const TARGET_TENANT_ID = 8;
+  
+  // Ensure the target tenant has active subscription
+  await db.execute(sql`UPDATE tenants SET subscription_status = 'active', plan_type = 'professional' WHERE id = ${TARGET_TENANT_ID}`);
+  
+  const tenantId = TARGET_TENANT_ID;
   console.log(`Using tenant ID: ${tenantId} with active subscription`);
 
   // Seed territory managers
