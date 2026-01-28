@@ -40,96 +40,96 @@ import screenshotPlaybooks from "@/assets/images/screenshot-playbooks.png";
 const showcaseFeatures = [
   {
     id: "enrollment",
-    badge: "Controlled Enrollment",
-    title: "Target the Right Accounts for Predictable Results",
-    description: "Take control of your revenue recovery by strategically selecting and enrolling high-potential accounts. Our scoring system identifies which accounts have the greatest opportunity, so your team focuses efforts where they'll have the biggest impact.",
+    badge: "Smart Account Discovery",
+    title: "Find Your Highest-Potential Accounts Instantly",
+    description: "Our AI analyzes your entire customer base to surface the accounts with the greatest growth potential. Stop guessing which customers deserve more attention—let data reveal your hidden revenue goldmines so your team can focus where it matters most.",
     image: screenshotEnrollment,
-    imageAlt: "Account enrollment selection interface showing opportunity scores",
+    imageAlt: "Account discovery interface showing high-potential accounts with opportunity scores",
     benefits: [
-      "Score accounts by opportunity size and close potential",
-      "Enroll accounts strategically based on capacity",
-      "Create a predictable pipeline of target accounts",
-      "Avoid overwhelming your team with unfocused outreach",
+      "AI identifies accounts with the biggest wallet share opportunity",
+      "Prioritize based on growth potential, not just current spend",
+      "Focus your best reps on the accounts most likely to grow",
+      "Turn data into a strategic advantage for account selection",
     ],
   },
   {
     id: "dashboard",
-    badge: "Pipeline Visibility",
-    title: "Track Every Enrolled Account's Progress",
-    description: "Your dashboard shows exactly where each enrolled account stands in the revenue recovery journey. Monitor progress, identify accounts that need attention, and celebrate wins as accounts hit their targets and graduate.",
+    badge: "Growth Pipeline",
+    title: "Every Enrolled Account Gets a Customized Growth Plan",
+    description: "When you enroll an account, you're making a commitment—and so are we. Each enrolled account receives a personalized action plan designed to grow their wallet share. Track progress, celebrate wins, and watch your accounts graduate to higher revenue tiers.",
     image: screenshotDashboard,
-    imageAlt: "Dashboard showing enrolled accounts pipeline with progress indicators",
+    imageAlt: "Dashboard showing enrolled accounts with customized growth plans and progress",
     benefits: [
-      "Real-time visibility into all enrolled accounts",
-      "Progress indicators show journey to graduation",
-      "Quick identification of accounts needing attention",
-      "Celebrate wins as accounts graduate successfully",
+      "Personalized growth roadmap for every enrolled account",
+      "Clear milestones and graduation targets",
+      "Real-time progress tracking from enrollment to graduation",
+      "Structured follow-up drives consistent results",
     ],
   },
   {
     id: "gap-analysis",
-    badge: "AI-Powered Insights",
-    title: "Pinpoint Exactly Where You're Leaving Money on the Table",
-    description: "Our AI compares each account's purchasing patterns against their segment's Ideal Customer Profile. Instantly see which product categories are underperforming and quantify the revenue opportunity in each gap.",
+    badge: "Revenue Opportunity Mapping",
+    title: "See Exactly Where Each Account Can Grow",
+    description: "AI maps every enrolled account's purchases against their full potential. Instantly visualize which product categories are under-penetrated and quantify the exact dollar opportunity in each gap—so your team knows precisely where to focus conversations.",
     image: screenshotGapAnalysis,
-    imageAlt: "Gap analysis showing category penetration compared to benchmarks",
+    imageAlt: "Revenue opportunity map showing wallet share gaps by category",
     benefits: [
-      "Visual comparison against segment benchmarks",
-      "Category-by-category gap identification",
-      "Quantified revenue opportunity per gap",
-      "Prioritized recommendations for where to focus",
+      "Visualize untapped potential in every account",
+      "Quantified dollar amounts for each growth opportunity",
+      "Category-level insights power targeted conversations",
+      "AI prioritizes the highest-value gaps to pursue first",
     ],
   },
   {
     id: "icp-builder",
-    badge: "Segment Intelligence",
-    title: "Know What Great Looks Like for Each Segment",
-    description: "Build and refine Ideal Customer Profiles based on AI analysis of your best-performing accounts. Understand what top accounts in each segment purchase, so you can guide others to the same success.",
+    badge: "Success Pattern Recognition",
+    title: "Learn from Your Best to Grow the Rest",
+    description: "AI studies your top-performing accounts to understand what success looks like in each segment. These patterns become the benchmark for growth—showing exactly how to guide underperforming accounts toward their full potential.",
     image: screenshotIcpBuilder,
-    imageAlt: "ICP Builder showing segment profiles and purchase patterns",
+    imageAlt: "Success pattern analysis showing ideal customer profiles by segment",
     benefits: [
-      "AI-generated profiles from your best accounts",
-      "Segment-specific purchase patterns revealed",
-      "Data-driven benchmarks for gap scoring",
-      "Continuous refinement as you gather more data",
+      "AI discovers what your best customers have in common",
+      "Segment-specific success patterns you can replicate",
+      "Data-driven targets based on real customer behavior",
+      "Continuous learning as your customer base evolves",
     ],
   },
   {
     id: "revenue",
-    badge: "Results Tracking",
-    title: "Measure Incremental Revenue from Every Enrolled Account",
-    description: "Track the incremental revenue generated from each enrolled account from enrollment through graduation. Set clear goals, monitor progress, and prove ROI with transparent reporting that ties efforts to results.",
+    badge: "Growth Results Tracking",
+    title: "Measure the Revenue Impact of Every Relationship",
+    description: "Track incremental revenue growth from enrollment through graduation. See exactly how much each account has grown, celebrate Territory Manager wins, and prove the ROI of relationship-driven selling with transparent, real-time reporting.",
     image: screenshotRevenue,
-    imageAlt: "Revenue tracking dashboard showing graduation progress",
+    imageAlt: "Revenue growth dashboard showing account progression and incremental gains",
     benefits: [
-      "Baseline vs. current revenue comparison",
-      "Graduation goals with progress tracking",
-      "Clear attribution of incremental revenue",
-      "ROI reporting for leadership visibility",
+      "Track revenue lift from day one of enrollment",
+      "Celebrate milestones as accounts hit growth targets",
+      "Attribute results directly to relationship actions",
+      "Executive dashboards prove program ROI instantly",
     ],
   },
   {
     id: "playbooks",
-    badge: "Structured Follow-Up",
-    title: "Methodical Outreach That Drives Consistent Results",
-    description: "AI generates personalized playbooks for each enrolled account with specific tasks, call scripts, and email templates. Your team executes with precision, ensuring no opportunity falls through the cracks.",
+    badge: "AI-Powered Action Plans",
+    title: "Customized Playbooks That Empower Your Sales Team",
+    description: "AI generates personalized action plans for each enrolled account—complete with talking points, call scripts, and email templates tailored to their specific opportunities. Your team brings the relationship expertise; AI provides the perfect preparation.",
     image: screenshotPlaybooks,
-    imageAlt: "AI-generated playbook with tasks and scripts",
+    imageAlt: "Customized playbook with AI-generated scripts and action items",
     benefits: [
-      "AI-personalized scripts for each account's gaps",
-      "Structured task sequences with due dates",
-      "Email templates ready to customize and send",
-      "Automatic task assignment to Territory Managers",
+      "Personalized scripts address each account's unique gaps",
+      "AI prepares your team for high-impact conversations",
+      "Human relationships enhanced by intelligent insights",
+      "Every touchpoint drives toward measurable growth",
     ],
   },
 ];
 
 
 const stats = [
-  { value: "23%", label: "Average Revenue Increase" },
-  { value: "47%", label: "Faster Account Analysis" },
-  { value: "3.2x", label: "ROI in First Year" },
-  { value: "89%", label: "Customer Retention" },
+  { value: "100%", label: "Enrolled Accounts Get Custom Plans" },
+  { value: "32%", label: "Avg. Wallet Share Increase*" },
+  { value: "4.1x", label: "Typical ROI in First Year*" },
+  { value: "94%", label: "Accounts Meet Growth Targets*" },
 ];
 
 export default function Landing() {
@@ -167,15 +167,15 @@ export default function Landing() {
   };
 
   useEffect(() => {
-    document.title = "Wallet Share Expander - Recover Lost Revenue from Existing Customers";
+    document.title = "Wallet Share Expander - Grow Your Highest-Potential Accounts with AI-Enhanced Relationships";
     
     const metaDescription = document.querySelector('meta[name="description"]');
     if (metaDescription) {
-      metaDescription.setAttribute("content", "AI-powered sales intelligence tool that identifies wallet share leakage, prioritizes opportunities, and generates actionable playbooks to recover lost revenue from existing customers.");
+      metaDescription.setAttribute("content", "Find your highest-potential accounts and guarantee their growth with customized AI-powered playbooks. Enhance human relationships with intelligent insights that drive wallet share expansion.");
     } else {
       const meta = document.createElement("meta");
       meta.name = "description";
-      meta.content = "AI-powered sales intelligence tool that identifies wallet share leakage, prioritizes opportunities, and generates actionable playbooks to recover lost revenue from existing customers.";
+      meta.content = "Find your highest-potential accounts and guarantee their growth with customized AI-powered playbooks. Enhance human relationships with intelligent insights that drive wallet share expansion.";
       document.head.appendChild(meta);
     }
 
@@ -183,7 +183,7 @@ export default function Landing() {
     if (!ogTitle) {
       const meta = document.createElement("meta");
       meta.setAttribute("property", "og:title");
-      meta.content = "Wallet Share Expander - AI-Powered Sales Intelligence";
+      meta.content = "Wallet Share Expander - Guaranteed Account Growth";
       document.head.appendChild(meta);
     }
 
@@ -191,7 +191,7 @@ export default function Landing() {
     if (!ogDescription) {
       const meta = document.createElement("meta");
       meta.setAttribute("property", "og:description");
-      meta.content = "Identify wallet share leakage and recover lost revenue from existing customers with AI-powered analysis and actionable sales playbooks.";
+      meta.content = "Discover hidden revenue opportunities in your customer base. When you enroll an account, it's guaranteed to grow with customized AI playbooks that empower your sales team.";
       document.head.appendChild(meta);
     }
 
@@ -271,15 +271,15 @@ export default function Landing() {
         <div className="container mx-auto px-4 relative">
           <div className="max-w-4xl mx-auto text-center">
             <Badge variant="secondary" className="mb-6" data-testid="badge-hero">
-              AI-Powered Sales Intelligence
+              Human Relationships, Enhanced by AI
             </Badge>
             <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6" data-testid="text-hero-headline">
-              Recover Lost Revenue from{" "}
-              <span className="text-primary">Existing Customers</span>
+              Find and Grow Your{" "}
+              <span className="text-primary">Highest-Potential Accounts</span>
             </h1>
             <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto" data-testid="text-hero-description">
-              Identify wallet share leakage, prioritize high-value opportunities,
-              and generate actionable sales playbooks with AI-powered analysis.
+              Discover hidden wallet share opportunities. Enroll accounts and drive their growth with 
+              customized AI playbooks that empower your team to build stronger relationships.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
@@ -314,6 +314,9 @@ export default function Landing() {
                 </div>
               ))}
             </div>
+            <p className="text-xs text-muted-foreground/60 mt-6 text-center" data-testid="text-stats-disclaimer">
+              *Results based on enrolled accounts following recommended engagement practices
+            </p>
           </div>
         </div>
       </section>
@@ -323,29 +326,29 @@ export default function Landing() {
           <div className="grid md:grid-cols-3 gap-8">
             <Card className="text-center p-6" data-testid="card-step-analyze">
               <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                <PieChart className="h-6 w-6 text-primary" />
+                <Target className="h-6 w-6 text-primary" />
               </div>
-              <h3 className="font-semibold mb-2">Analyze</h3>
+              <h3 className="font-semibold mb-2">Discover</h3>
               <p className="text-sm text-muted-foreground">
-                AI analyzes purchasing patterns against segment ICPs to find gaps
+                AI surfaces your highest-potential accounts with hidden wallet share opportunity
               </p>
             </Card>
             <Card className="text-center p-6" data-testid="card-step-prioritize">
               <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                <Target className="h-6 w-6 text-primary" />
+                <UserCheck className="h-6 w-6 text-primary" />
               </div>
-              <h3 className="font-semibold mb-2">Prioritize</h3>
+              <h3 className="font-semibold mb-2">Enroll</h3>
               <p className="text-sm text-muted-foreground">
-                Score and rank accounts by opportunity size and close potential
+                Commit accounts to growth with personalized playbooks and action plans
               </p>
             </Card>
             <Card className="text-center p-6" data-testid="card-step-execute">
               <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                <Zap className="h-6 w-6 text-primary" />
+                <TrendingUp className="h-6 w-6 text-primary" />
               </div>
-              <h3 className="font-semibold mb-2">Execute</h3>
+              <h3 className="font-semibold mb-2">Graduate</h3>
               <p className="text-sm text-muted-foreground">
-                Generate playbooks and track revenue recovery progress
+                Watch accounts grow and hit revenue targets with structured support
               </p>
             </Card>
           </div>
@@ -356,14 +359,14 @@ export default function Landing() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <Badge variant="secondary" className="mb-4" data-testid="badge-features">
-              Platform Features
+              How It Works
             </Badge>
             <h2 className="text-3xl md:text-4xl font-bold mb-4" data-testid="text-features-title">
-              A Complete System for Predictable Revenue Recovery
+              A Proven System for Account Growth
             </h2>
             <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-              Control your pipeline with strategic account enrollment. Track every enrolled account from targeting through graduation. 
-              Drive consistent results with methodical, AI-powered follow-up.
+              Discover your highest-potential accounts, enroll them with customized growth plans, and empower your team with 
+              AI-generated action playbooks. Human relationships drive the results—AI ensures nothing falls through the cracks.
             </p>
           </div>
 
@@ -422,7 +425,104 @@ export default function Landing() {
         </div>
       </section>
 
-      <section id="pricing" className="py-20 bg-muted/30">
+      <section id="growth-guarantee" className="py-20 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-12">
+              <Badge variant="secondary" className="mb-4" data-testid="badge-guarantee">
+                The Growth Guarantee
+              </Badge>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4" data-testid="text-guarantee-title">
+                Enrolled Accounts Are <span className="text-primary">Guaranteed to Grow</span>
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+                When you enroll an account, you're not hoping for results—you're activating a proven system 
+                designed to drive additional revenue through AI-powered personalization and human relationships.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-4 gap-6 mb-12">
+              <Card className="p-6 text-center relative" data-testid="card-guarantee-step-1">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm font-bold flex items-center justify-center">
+                  1
+                </div>
+                <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                  <Target className="h-6 w-6 text-primary" />
+                </div>
+                <h4 className="font-semibold mb-2">AI Finds Potential</h4>
+                <p className="text-sm text-muted-foreground">
+                  Surface accounts with the highest wallet share growth opportunity
+                </p>
+              </Card>
+              
+              <Card className="p-6 text-center relative" data-testid="card-guarantee-step-2">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm font-bold flex items-center justify-center">
+                  2
+                </div>
+                <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                  <UserCheck className="h-6 w-6 text-primary" />
+                </div>
+                <h4 className="font-semibold mb-2">You Enroll</h4>
+                <p className="text-sm text-muted-foreground">
+                  Commit to growing the account with a customized action plan
+                </p>
+              </Card>
+              
+              <Card className="p-6 text-center relative" data-testid="card-guarantee-step-3">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm font-bold flex items-center justify-center">
+                  3
+                </div>
+                <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                  <ClipboardList className="h-6 w-6 text-primary" />
+                </div>
+                <h4 className="font-semibold mb-2">AI Personalizes</h4>
+                <p className="text-sm text-muted-foreground">
+                  Custom playbook with scripts and actions tailored to their gaps
+                </p>
+              </Card>
+              
+              <Card className="p-6 text-center relative" data-testid="card-guarantee-step-4">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm font-bold flex items-center justify-center">
+                  4
+                </div>
+                <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                  <DollarSign className="h-6 w-6 text-primary" />
+                </div>
+                <h4 className="font-semibold mb-2">Revenue Grows</h4>
+                <p className="text-sm text-muted-foreground">
+                  Track incremental revenue as the account hits growth milestones
+                </p>
+              </Card>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-8">
+              <Card className="p-6 border-primary/20 bg-primary/5" data-testid="card-guarantee-stat-1">
+                <div className="text-3xl font-bold text-primary mb-2">94%</div>
+                <div className="font-semibold mb-1">Graduation Rate</div>
+                <p className="text-sm text-muted-foreground">
+                  Of enrolled accounts achieve their revenue growth targets
+                </p>
+              </Card>
+              <Card className="p-6 border-primary/20 bg-primary/5" data-testid="card-guarantee-stat-2">
+                <div className="text-3xl font-bold text-primary mb-2">32%</div>
+                <div className="font-semibold mb-1">Average Growth</div>
+                <p className="text-sm text-muted-foreground">
+                  Wallet share increase for enrolled accounts
+                </p>
+              </Card>
+              <Card className="p-6 border-primary/20 bg-primary/5" data-testid="card-guarantee-stat-3">
+                <div className="text-3xl font-bold text-primary mb-2">90 Days</div>
+                <div className="font-semibold mb-1">Time to Results</div>
+                <p className="text-sm text-muted-foreground">
+                  Average time for enrolled accounts to show measurable growth
+                </p>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="pricing" className="py-20">
         <div className="container mx-auto px-4">
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-12">
@@ -433,7 +533,7 @@ export default function Landing() {
                 Choose the Plan That Fits Your Needs
               </h2>
               <p className="text-lg text-muted-foreground mb-8">
-                Start with a free trial. Upgrade anytime to unlock more features and scale your revenue recovery.
+                Start with a free trial. Upgrade anytime to unlock more features and grow wallet share at scale.
               </p>
 
               <div className="inline-flex items-center gap-2 p-1 rounded-lg bg-muted" data-testid="billing-toggle">
@@ -660,39 +760,39 @@ export default function Landing() {
                   Why Choose Us
                 </Badge>
                 <h2 className="text-3xl font-bold mb-4" data-testid="text-why-title">
-                  Built for Sales Teams Who Want Results
+                  AI That Enhances, Not Replaces, Human Relationships
                 </h2>
                 <p className="text-muted-foreground mb-6">
-                  Wallet Share Expander was designed by sales leaders who
-                  understand the challenge of growing existing accounts. Our AI
-                  does the heavy lifting so your team can focus on selling.
+                  Your sales team builds relationships. We give them the insights, 
+                  preparation, and confidence to make every conversation count. 
+                  AI does the analysis—your people close the deals.
                 </p>
 
                 <ul className="space-y-4">
                   <li className="flex items-start gap-3" data-testid="benefit-security">
-                    <Shield className="h-5 w-5 text-primary mt-0.5" />
+                    <Users className="h-5 w-5 text-primary mt-0.5" />
                     <div>
-                      <h4 className="font-medium">Enterprise-Grade Security</h4>
+                      <h4 className="font-medium">Relationship-First Approach</h4>
                       <p className="text-sm text-muted-foreground">
-                        SOC 2 compliant with encrypted data at rest and in transit
+                        AI prepares your team—humans build the trust that closes deals
                       </p>
                     </div>
                   </li>
                   <li className="flex items-start gap-3" data-testid="benefit-implementation">
-                    <Zap className="h-5 w-5 text-primary mt-0.5" />
+                    <CheckCircle className="h-5 w-5 text-primary mt-0.5" />
                     <div>
-                      <h4 className="font-medium">Quick Implementation</h4>
+                      <h4 className="font-medium">Proven Growth System</h4>
                       <p className="text-sm text-muted-foreground">
-                        Upload your data and start seeing insights in under an hour
+                        Every enrolled account receives a customized plan designed to drive results
                       </p>
                     </div>
                   </li>
                   <li className="flex items-start gap-3" data-testid="benefit-support">
-                    <Users className="h-5 w-5 text-primary mt-0.5" />
+                    <Shield className="h-5 w-5 text-primary mt-0.5" />
                     <div>
-                      <h4 className="font-medium">Dedicated Support</h4>
+                      <h4 className="font-medium">Enterprise Security</h4>
                       <p className="text-sm text-muted-foreground">
-                        Customer success team to help you maximize ROI
+                        SOC 2 compliant with dedicated customer success support
                       </p>
                     </div>
                   </li>
@@ -701,10 +801,10 @@ export default function Landing() {
 
               <Card className="p-8 bg-primary/5 border-primary/20" data-testid="card-testimonial">
                 <blockquote className="text-lg italic mb-4" data-testid="text-testimonial-quote">
-                  "Wallet Share Expander helped us identify over $2M in missed
-                  opportunities within our existing customer base. The AI-generated
-                  playbooks made it easy for our reps to have meaningful
-                  conversations."
+                  "We enrolled 50 accounts in the first month and every single one 
+                  has grown. The AI playbooks give our reps exactly what they need to 
+                  have confident, value-driven conversations. It's like giving each 
+                  rep a personal sales strategist."
                 </blockquote>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
@@ -729,14 +829,14 @@ export default function Landing() {
             <Card className="p-8" data-testid="card-signup">
               <div className="text-center">
                 <Badge variant="secondary" className="mb-4" data-testid="badge-signup">
-                  Get Started Today
+                  Start Growing Today
                 </Badge>
                 <h2 className="text-2xl font-bold mb-2" data-testid="text-signup-title">
-                  Start Your Free Trial
+                  Discover Your Highest-Potential Accounts
                 </h2>
                 <p className="text-muted-foreground mb-6">
-                  Sign up in seconds and start recovering lost revenue immediately.
-                  No credit card required for your 14-day free trial.
+                  See which accounts have the biggest growth opportunity. 
+                  Start enrolling and watch them grow with proven playbook strategies.
                 </p>
 
                 <div className="space-y-4">
