@@ -28,6 +28,7 @@ import {
   ClipboardList,
   Loader2,
   Crown,
+  GraduationCap,
 } from "lucide-react";
 
 import {
@@ -824,6 +825,29 @@ export default function Landing() {
             <p className="text-center text-sm text-muted-foreground mt-8" data-testid="text-trial-info">
               Start free with one account. No credit card required. Upgrade anytime as you grow.
             </p>
+
+            <div className="mt-12 max-w-3xl mx-auto">
+              <Card className="p-6">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0 mt-1">
+                    <GraduationCap className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg mb-2" data-testid="text-graduation-title">
+                      Graduate Accounts, Control Your Costs
+                    </h3>
+                    <p className="text-muted-foreground text-sm leading-relaxed" data-testid="text-graduation-description">
+                      You're always in control of your subscription. When an enrolled account reaches your target revenue 
+                      level or hits its ICP potential, simply graduate it from the program. This frees up a slot for a 
+                      new account to enroll, letting you continuously work on your highest-potential opportunities without 
+                      increasing costs. We track every graduated account so you can see your total success: how many 
+                      accounts have grown, the revenue increase from enrollment to graduation, and the cumulative value 
+                      you've captured. It's a built-in scoreboard for your wallet share expansion efforts.
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            </div>
           </div>
         </div>
       </section>
