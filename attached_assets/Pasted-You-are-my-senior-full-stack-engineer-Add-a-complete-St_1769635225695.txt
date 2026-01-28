@@ -1,0 +1,75 @@
+You are my senior full-stack engineer. Add a complete Stripe subscription integration to this Replit web app that is correct for both Test mode today and Live mode later.
+
+CONTEXT
+- This app’s public URL (test): https://ai-revenue-engineer.replit.app
+- There is a second separate SaaS app with its own Stripe webhook endpoint, so this app must only process Stripe events for its own subscription prices.
+- Stripe account: one Stripe account, multiple products/prices; this app must whitelist only its own Stripe Price IDs.
+- I will configure Stripe webhooks in Stripe Dashboard (Test and Live) to point to this app’s webhook URL.
+
+REQUIREMENTS
+1) Environment variables
+Create a clear env var list and load them safely:
+- STRIPE_SECRET_KEY (test now, live later)
+- STRIPE_WEBHOOK_SECRET (test now, live later)
+- STRIPE_PRICE_IDS (comma-separated whitelist for THIS app only)
+- APP_SLUG (e.g., "ai-revenue-engineer")
+- BASE_URL (e.g., https://ai-revenue-engineer.replit.app)
+- Optional: STRIPE_CUSTOMER_PORTAL_RETURN_URL
+
+2) Routes / endpoints (web app + webhook)
+Implement these endpoints (or their equivalents depending on stack):
+- GET /health (returns OK)
+- POST /api/stripe/checkout-session
+   - Accepts: userId (or email), priceId, optional quantity
+   - Validates priceId is in STRIPE_PRICE_IDS whitelist
+   - Creates Stripe Checkout Session for a subscription
+   - Sets client_reference_id = internal user id (or email)
+   - Sets metadata.app = APP_SLUG on the Checkout Session (and/or subscription)
+   - Returns session.url
+- POST /api/stripe/webhook
+   - Verifies Stripe signature using STRIPE_WEBHOOK_SECRET
+   - IMPORTANT: must use the RAW request body (do not JSON-parse before verification)
+   - Handles idempotency so events aren’t double-processed
+   - Ignores events that are not for this app’s whitelisted price IDs (double safety)
+
+3) Subscription state handling
+Create a minimal persistence layer (use whatever this app already has: SQLite/Replit DB/file/db):
+- Users table (or mapping) with:
+   - internal_user_id/email
+   - stripe_customer_id
+   - stripe_subscription_id
+   - subscription_status (active/past_due/canceled/trialing/incomplete)
+   - current_price_id
+   - current_period_end
+- Update this record based on webhook events.
+
+Handle these event types (at minimum):
+- checkout.session.completed
+- customer.subscription.created
+- customer.subscription.updated
+- customer.subscription.deleted
+- invoice.payment_succeeded
+- invoice.payment_failed
+If your stack supports it, log unhandled events but do not crash.
+
+4) Gating access in the app
+Add a simple helper/middleware that checks subscription_status is active/trialing to access paid features.
+Provide one example of protecting a route or feature flag.
+
+5) Developer tooling
+- Add a “Stripe Debug” page or route that prints current env mode (test vs live based on key prefix) and shows which price IDs are whitelisted (but DO NOT expose secrets).
+- Add structured logs for webhook processing:
+   - event.id, event.type, app slug, subscription id, customer id, and result
+- Add a README section: “How to test in Stripe Test mode” and “How to go Live”.
+
+6) Go-live readiness
+Make the code environment-agnostic:
+- It should work in Test and Live just by switching env vars.
+- Ensure BASE_URL is used to build success/cancel URLs for Checkout.
+- Ensure CORS settings (if applicable) allow my front-end domain(s).
+
+OUTPUT
+- Implement the code changes across the project.
+- Tell me exactly what env vars to set in Replit Secrets for Test mode and what to set later for Live.
+- Tell me the exact webhook endpoint URL I should paste into Stripe (it should be https://ai-revenue-engineer.replit.app/api/stripe/webhook unless stack requires something else).
+- Include a brief “verification steps” checklist I can run end-to-end.
