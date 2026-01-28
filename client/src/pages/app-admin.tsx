@@ -567,6 +567,23 @@ function TenantEditForm({
   );
 }
 
+interface StripeDebugInfo {
+  mode: string;
+  isConfigured: boolean;
+  appSlug: string;
+  baseUrl: string;
+  whitelistedPriceIds: string[];
+  webhookConfigured: boolean;
+  configuredPlans: { slug: string; stripeMonthlyPriceId: string | null; stripeYearlyPriceId: string | null }[];
+  environment: {
+    hasSecretKey: boolean;
+    hasWebhookSecret: boolean;
+    hasPriceIds: boolean;
+    hasAppSlug: boolean;
+    hasBaseUrl: boolean;
+  };
+}
+
 function StripeConfigManager() {
   const { toast } = useToast();
   const [editingPlan, setEditingPlan] = useState<SubscriptionPlanConfig | null>(null);
@@ -575,6 +592,10 @@ function StripeConfigManager() {
 
   const { data: plans = [], isLoading } = useQuery<SubscriptionPlanConfig[]>({
     queryKey: ["/api/subscription/plans"],
+  });
+
+  const { data: debugInfo, isLoading: isDebugLoading, refetch: refetchDebug } = useQuery<StripeDebugInfo>({
+    queryKey: ["/api/stripe/debug"],
   });
 
   const updateMutation = useMutation({
@@ -716,6 +737,108 @@ function StripeConfigManager() {
               </Table>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div>
+            <CardTitle className="text-base">Stripe Debug Info</CardTitle>
+            <CardDescription>
+              Environment status and configuration details (no secrets exposed)
+            </CardDescription>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetchDebug()}
+            disabled={isDebugLoading}
+            data-testid="button-refresh-debug"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isDebugLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {isDebugLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : debugInfo ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-3 bg-muted/50 rounded-md">
+                  <div className="text-sm text-muted-foreground">Mode</div>
+                  <div className="font-medium flex items-center gap-2">
+                    <Badge variant={debugInfo.mode === "test" ? "secondary" : "default"}>
+                      {debugInfo.mode.toUpperCase()}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="p-3 bg-muted/50 rounded-md">
+                  <div className="text-sm text-muted-foreground">Status</div>
+                  <div className="font-medium">
+                    <Badge variant={debugInfo.isConfigured ? "default" : "destructive"}>
+                      {debugInfo.isConfigured ? "Configured" : "Not Configured"}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="p-3 bg-muted/50 rounded-md">
+                  <div className="text-sm text-muted-foreground">Webhook</div>
+                  <div className="font-medium">
+                    <Badge variant={debugInfo.webhookConfigured ? "default" : "destructive"}>
+                      {debugInfo.webhookConfigured ? "Configured" : "Not Configured"}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="p-3 bg-muted/50 rounded-md">
+                  <div className="text-sm text-muted-foreground">App Slug</div>
+                  <div className="font-mono text-sm truncate">{debugInfo.appSlug || "—"}</div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div>
+                <h4 className="font-medium mb-2">Environment Variables</h4>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                  {Object.entries(debugInfo.environment).map(([key, value]) => (
+                    <div key={key} className="flex items-center gap-2 text-sm">
+                      <div className={`h-2 w-2 rounded-full ${value ? "bg-green-500" : "bg-red-500"}`} />
+                      <span className="text-muted-foreground">
+                        {key.replace(/^has/, "").replace(/([A-Z])/g, " $1").trim()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <Separator />
+
+              <div>
+                <h4 className="font-medium mb-2">Base URL</h4>
+                <Input value={debugInfo.baseUrl} readOnly className="font-mono text-sm bg-muted/50" />
+              </div>
+
+              {debugInfo.whitelistedPriceIds.length > 0 && (
+                <>
+                  <Separator />
+                  <div>
+                    <h4 className="font-medium mb-2">Whitelisted Price IDs</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {debugInfo.whitelistedPriceIds.map((priceId) => (
+                        <Badge key={priceId} variant="outline" className="font-mono text-xs">
+                          {priceId}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <p className="text-muted-foreground">Unable to load debug information</p>
+          )}
         </CardContent>
       </Card>
 

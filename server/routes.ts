@@ -20,8 +20,9 @@ import {
   tenants,
   subscriptionPlans,
   subscriptionEvents,
+  stripeWebhookEvents,
 } from "@shared/schema";
-import Stripe from "stripe";
+import type Stripe from "stripe";
 import { db } from "./db";
 import { eq, sql, count } from "drizzle-orm";
 import { 
@@ -54,6 +55,13 @@ import {
   isEmailConfigured,
   DEFAULT_EMAIL_SETTINGS,
 } from "./email-service";
+import {
+  initializeStripeConfig,
+  getStripeConfig,
+  isPriceIdWhitelisted,
+  getStripeDebugInfo,
+  logWebhookEvent,
+} from "./utils/stripeConfig";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { withTenantContext, requireRole, requirePermission, type TenantContext } from "./middleware/tenantContext";
 import { getTenantStorage, TenantStorage } from "./storage/tenantStorage";
@@ -91,6 +99,11 @@ export async function registerRoutes(
   // ============ Setup Authentication ============
   await setupAuth(app);
   registerAuthRoutes(app);
+
+  // ============ Health Check (Public) ============
+  app.get("/health", (req, res) => {
+    res.json({ status: "OK", timestamp: new Date().toISOString() });
+  });
 
   // ============ Protected API Routes ============
   // All routes below require authentication and tenant context
@@ -2660,13 +2673,8 @@ KEY TALKING POINTS:
   });
 
   // ============ Stripe & Subscription ============
-  if (!process.env.STRIPE_SECRET_KEY) {
-    console.warn("Warning: STRIPE_SECRET_KEY not configured - Stripe features will be unavailable");
-  }
-  
-  const stripe = process.env.STRIPE_SECRET_KEY 
-    ? new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: "2025-01-27.acacia" })
-    : null;
+  const stripeConfig = initializeStripeConfig();
+  const stripe = stripeConfig.stripe;
   
   // Validation schemas for Stripe endpoints
   const checkoutSessionSchema = z.object({
@@ -2693,6 +2701,40 @@ KEY TALKING POINTS:
       res.json(plans);
     } catch (error) {
       handleRouteError(error, res, "Fetch subscription plans");
+    }
+  });
+
+  /**
+   * Get Stripe debug information (platform admin only)
+   * @route GET /api/stripe/debug
+   * @security requirePlatformAdmin - Requires platform admin privileges
+   * @returns {Object} Stripe configuration info (no secrets exposed)
+   */
+  app.get("/api/stripe/debug", [...requireAuth, requirePlatformAdmin], async (req, res) => {
+    try {
+      const debugInfo = getStripeDebugInfo();
+      
+      // Get subscription plan price IDs from database
+      const plans = await db.select({
+        slug: subscriptionPlans.slug,
+        stripeMonthlyPriceId: subscriptionPlans.stripeMonthlyPriceId,
+        stripeYearlyPriceId: subscriptionPlans.stripeYearlyPriceId,
+      }).from(subscriptionPlans)
+        .where(eq(subscriptionPlans.isActive, true));
+      
+      res.json({
+        ...debugInfo,
+        configuredPlans: plans,
+        environment: {
+          hasSecretKey: !!process.env.STRIPE_SECRET_KEY,
+          hasWebhookSecret: !!process.env.STRIPE_WEBHOOK_SECRET,
+          hasPriceIds: !!process.env.STRIPE_PRICE_IDS,
+          hasAppSlug: !!process.env.APP_SLUG,
+          hasBaseUrl: !!process.env.BASE_URL,
+        },
+      });
+    } catch (error) {
+      handleRouteError(error, res, "Get Stripe debug info");
     }
   });
 
@@ -2822,13 +2864,24 @@ KEY TALKING POINTS:
         }
       }
       
-      // Get or create Stripe customer
+      // Validate price ID against whitelist (if configured)
+      if (stripePriceId && !isPriceIdWhitelisted(stripePriceId)) {
+        console.warn(`Checkout attempt with non-whitelisted price ID: ${stripePriceId}`);
+        return res.status(400).json({ message: "Invalid price ID for this application" });
+      }
+      
+      const config = getStripeConfig();
+      
+      // Get or create Stripe customer (with app metadata for webhook validation)
       let customerId = tenant.stripeCustomerId;
       if (!customerId) {
         const customer = await stripe.customers.create({
           email: user?.claims?.email || 'unknown@example.com',
           name: tenant.name,
-          metadata: { tenantId: tenant.id.toString() }
+          metadata: { 
+            tenantId: tenant.id.toString(),
+            app: config.appSlug,
+          }
         });
         customerId = customer.id;
         
@@ -2838,21 +2891,24 @@ KEY TALKING POINTS:
           .where(eq(tenants.id, tenant.id));
       }
       
-      const appUrl = process.env.REPLIT_DEV_DOMAIN 
-        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-        : process.env.REPLIT_DOMAINS 
-          ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
-          : 'http://localhost:5000';
-      
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
         mode: 'subscription',
+        client_reference_id: tenant.id.toString(),
         line_items: [{ price: stripePriceId, quantity: 1 }],
-        success_url: `${appUrl}/subscription?success=true&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${appUrl}/subscription?canceled=true`,
-        metadata: { tenantId: tenant.id.toString() },
+        success_url: `${config.baseUrl}/subscription?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${config.baseUrl}/subscription?canceled=true`,
+        metadata: { 
+          tenantId: tenant.id.toString(),
+          app: config.appSlug,
+          priceId: stripePriceId || '',
+        },
         subscription_data: {
-          metadata: { tenantId: tenant.id.toString() }
+          metadata: { 
+            tenantId: tenant.id.toString(),
+            app: config.appSlug,
+            priceId: stripePriceId || '',
+          }
         }
       });
       
@@ -2881,15 +2937,12 @@ KEY TALKING POINTS:
         return res.status(400).json({ message: "No billing account found" });
       }
       
-      const appUrl = process.env.REPLIT_DEV_DOMAIN 
-        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-        : process.env.REPLIT_DOMAINS 
-          ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
-          : 'http://localhost:5000';
+      const config = getStripeConfig();
+      const returnUrl = process.env.STRIPE_CUSTOMER_PORTAL_RETURN_URL || `${config.baseUrl}/subscription`;
       
       const session = await stripe.billingPortal.sessions.create({
         customer: tenant.stripeCustomerId,
-        return_url: `${appUrl}/subscription`
+        return_url: returnUrl
       });
       
       res.json({ url: session.url });
@@ -2949,6 +3002,163 @@ KEY TALKING POINTS:
     } catch (err: any) {
       console.error('Webhook signature verification failed:', err.message);
       return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+    
+    const config = getStripeConfig();
+    
+    // ATOMIC IDEMPOTENCY: Try to insert first, check if it was a conflict
+    // Using a try-catch to detect unique constraint violation
+    try {
+      await db.insert(stripeWebhookEvents).values({
+        stripeEventId: event.id,
+        eventType: event.type,
+        appSlug: config.appSlug,
+        result: "processing",
+      });
+    } catch (insertError: any) {
+      // Check if this is a unique constraint violation (event already exists)
+      if (insertError?.code === '23505' || insertError?.message?.includes('duplicate key')) {
+        logWebhookEvent({
+          eventId: event.id,
+          eventType: event.type,
+          result: "skipped",
+          reason: "Event already processed (idempotency check)",
+        });
+        return res.json({ received: true, status: "already_processed" });
+      }
+      // Re-throw other errors
+      throw insertError;
+    }
+    
+    // Helper to get app slug from subscription or customer metadata (fallback)
+    const getAppSlugFromRelatedObject = async (eventData: any): Promise<string | undefined> => {
+      // First try direct metadata
+      if (eventData.metadata?.app) {
+        return eventData.metadata.app;
+      }
+      
+      // For invoice events, check subscription metadata
+      if (eventData.subscription && typeof eventData.subscription === 'string') {
+        try {
+          const subscription = await stripe.subscriptions.retrieve(eventData.subscription);
+          if (subscription.metadata?.app) {
+            return subscription.metadata.app;
+          }
+        } catch (e) {
+          console.warn(`Failed to retrieve subscription ${eventData.subscription} for app validation`);
+        }
+      }
+      
+      // For customer events or as last resort, check customer metadata
+      const customerId = eventData.customer as string | undefined;
+      if (customerId) {
+        try {
+          const customer = await stripe.customers.retrieve(customerId);
+          if (!customer.deleted && (customer as Stripe.Customer).metadata?.app) {
+            return (customer as Stripe.Customer).metadata.app;
+          }
+        } catch (e) {
+          console.warn(`Failed to retrieve customer ${customerId} for app validation`);
+        }
+      }
+      
+      return undefined;
+    };
+    
+    // Helper to get price ID from metadata or related objects (fallback)
+    const getPriceIdFromRelatedObject = async (eventData: any): Promise<string | undefined> => {
+      // First try direct metadata
+      if (eventData.metadata?.priceId) {
+        return eventData.metadata.priceId;
+      }
+      
+      // From subscription items
+      if (eventData.items?.data?.[0]?.price?.id) {
+        return eventData.items.data[0].price.id;
+      }
+      
+      // From invoice lines
+      if (eventData.lines?.data?.[0]?.price?.id) {
+        return eventData.lines.data[0].price.id;
+      }
+      
+      // For checkout session, check subscription
+      if (eventData.subscription && typeof eventData.subscription === 'string') {
+        try {
+          const subscription = await stripe.subscriptions.retrieve(eventData.subscription);
+          // Check subscription metadata first
+          if (subscription.metadata?.priceId) {
+            return subscription.metadata.priceId;
+          }
+          // Then check subscription items
+          if (subscription.items.data[0]?.price.id) {
+            return subscription.items.data[0].price.id;
+          }
+        } catch (e) {
+          console.warn(`Failed to retrieve subscription for price validation`);
+        }
+      }
+      
+      return undefined;
+    };
+    
+    const eventData = event.data.object as any;
+    
+    // Get app slug with fallback to subscription/customer metadata
+    const eventAppSlug = await getAppSlugFromRelatedObject(eventData);
+    
+    // Strict app slug validation: require metadata.app to match
+    if (eventAppSlug !== config.appSlug) {
+      const reason = eventAppSlug 
+        ? `Event for different app: ${eventAppSlug}`
+        : "Event missing app metadata - skipping for security";
+      
+      await db.update(stripeWebhookEvents)
+        .set({ result: "skipped_app_mismatch" })
+        .where(eq(stripeWebhookEvents.stripeEventId, event.id));
+      
+      logWebhookEvent({
+        eventId: event.id,
+        eventType: event.type,
+        result: "skipped",
+        reason,
+      });
+      return res.json({ received: true, status: "skipped_app_mismatch" });
+    }
+    
+    // Validate price ID against whitelist (if whitelist is configured)
+    // FAIL CLOSED: If whitelist is set and we can't determine the priceId, skip the event
+    if (config.whitelistedPriceIds.length > 0) {
+      const priceId = await getPriceIdFromRelatedObject(eventData);
+      
+      // Fail closed: if we have a whitelist but can't determine priceId, skip
+      if (!priceId) {
+        await db.update(stripeWebhookEvents)
+          .set({ result: "skipped_unknown_price" })
+          .where(eq(stripeWebhookEvents.stripeEventId, event.id));
+        
+        logWebhookEvent({
+          eventId: event.id,
+          eventType: event.type,
+          result: "skipped",
+          reason: "Price whitelist configured but could not determine price ID - fail closed",
+        });
+        return res.json({ received: true, status: "skipped_unknown_price" });
+      }
+      
+      if (!isPriceIdWhitelisted(priceId)) {
+        await db.update(stripeWebhookEvents)
+          .set({ result: "skipped_invalid_price" })
+          .where(eq(stripeWebhookEvents.stripeEventId, event.id));
+        
+        logWebhookEvent({
+          eventId: event.id,
+          eventType: event.type,
+          result: "skipped",
+          reason: `Invalid price ID: ${priceId}`,
+        });
+        return res.json({ received: true, status: "skipped_invalid_price" });
+      }
     }
     
     console.log(`Stripe webhook received: ${event.type}`);
@@ -3079,28 +3289,59 @@ KEY TALKING POINTS:
       }
       
       // Log event for audit trail
-      const eventData = event.data.object as any;
+      const webhookEventData = event.data.object as any;
       let tenantId: number | null = null;
       
-      if (eventData.metadata?.tenantId) {
-        tenantId = parseInt(eventData.metadata.tenantId);
-      } else if (eventData.customer) {
-        const [tenant] = await db.select().from(tenants)
-          .where(eq(tenants.stripeCustomerId, eventData.customer))
+      if (webhookEventData.metadata?.tenantId) {
+        tenantId = parseInt(webhookEventData.metadata.tenantId);
+      } else if (webhookEventData.customer) {
+        const [foundTenant] = await db.select().from(tenants)
+          .where(eq(tenants.stripeCustomerId, webhookEventData.customer))
           .limit(1);
-        tenantId = tenant?.id || null;
+        tenantId = foundTenant?.id || null;
       }
+      
+      // Get subscription and customer IDs for logging
+      const subscriptionId = webhookEventData.subscription || webhookEventData.id;
+      const customerId = webhookEventData.customer;
+      const priceId = webhookEventData.items?.data?.[0]?.price?.id;
       
       if (tenantId) {
         await db.insert(subscriptionEvents).values({
           tenantId,
           eventType: event.type,
           stripeEventId: event.id,
-          data: eventData,
+          data: webhookEventData,
         });
       }
       
+      // Update idempotency record with success result
+      await db.update(stripeWebhookEvents)
+        .set({ result: "processed" })
+        .where(eq(stripeWebhookEvents.stripeEventId, event.id));
+      
+      logWebhookEvent({
+        eventId: event.id,
+        eventType: event.type,
+        subscriptionId,
+        customerId,
+        tenantId,
+        priceId,
+        result: "processed",
+      });
+      
     } catch (error) {
+      // Update idempotency record with error result
+      await db.update(stripeWebhookEvents)
+        .set({ result: "error" })
+        .where(eq(stripeWebhookEvents.stripeEventId, event.id));
+      
+      logWebhookEvent({
+        eventId: event.id,
+        eventType: event.type,
+        result: "error",
+        reason: error instanceof Error ? error.message : "Unknown error",
+      });
       console.error(`Error processing webhook ${event.type}:`, error);
       // Still return 200 to acknowledge receipt
     }

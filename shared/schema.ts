@@ -650,3 +650,16 @@ export const insertSubscriptionEventSchema = createInsertSchema(subscriptionEven
 
 export type InsertSubscriptionEvent = z.infer<typeof insertSubscriptionEventSchema>;
 export type SubscriptionEvent = typeof subscriptionEvents.$inferSelect;
+
+export const stripeWebhookEvents = pgTable("stripe_webhook_events", {
+  id: serial("id").primaryKey(),
+  stripeEventId: text("stripe_event_id").notNull().unique(),
+  eventType: text("event_type").notNull(),
+  processedAt: timestamp("processed_at").defaultNow(),
+  appSlug: text("app_slug"),
+  result: text("result"),
+}, (table) => [
+  index("idx_stripe_webhook_events_event_id").on(table.stripeEventId),
+]);
+
+export type StripeWebhookEvent = typeof stripeWebhookEvents.$inferSelect;
