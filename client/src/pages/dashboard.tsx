@@ -54,6 +54,7 @@ import {
   Columns,
   Eye,
   EyeOff,
+  CreditCard,
 } from "lucide-react";
 import {
   Popover,
@@ -362,9 +363,12 @@ export default function Dashboard() {
   });
 
   // Fetch all accounts for Top Opportunities (same data as Accounts page)
-  const { data: allAccounts, isLoading: isAccountsLoading } = useQuery<AccountWithMetrics[]>({
+  const { data: allAccounts, isLoading: isAccountsLoading, isError: isAccountsError, error: accountsError } = useQuery<AccountWithMetrics[]>({
     queryKey: ["/api/accounts"],
   });
+
+  // Check if accounts error is due to subscription requirement (402 status)
+  const isSubscriptionRequired = isAccountsError && accountsError?.message?.includes("402");
 
   // Toggle column visibility
   const toggleColumnVisibility = useCallback((columnKey: string) => {
@@ -1275,6 +1279,19 @@ export default function Dashboard() {
                     testId="table-opportunities"
                     onRowClick={(row: AccountWithMetrics) => navigate(`/accounts?account=${row.id}`)}
                   />
+                ) : isSubscriptionRequired ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center" data-testid="subscription-required-message">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 mb-3">
+                      <CreditCard className="h-6 w-6 text-primary" />
+                    </div>
+                    <p className="font-medium">Subscription Required</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Upgrade your plan to unlock Top Opportunities
+                    </p>
+                    <Button size="sm" className="mt-3" asChild>
+                      <Link href="/subscription">View Plans</Link>
+                    </Button>
+                  </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-8 text-center">
                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-3">
