@@ -362,7 +362,7 @@ export default function Landing() {
             </h2>
             <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
               Discover your highest-potential accounts, enroll them with customized growth plans, and empower your team with 
-              AI-generated action playbooks. Human relationships drive the results—AI ensures nothing falls through the cracks.
+              AI-generated action playbooks. Human relationships drive the results, AI ensures nothing falls through the cracks.
             </p>
           </div>
 
