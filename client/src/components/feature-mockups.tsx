@@ -1,12 +1,10 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
   TrendingUp,
-  TrendingDown,
   Users,
-  DollarSign,
   Target,
   Mail,
   Phone,
@@ -16,7 +14,6 @@ import {
   Building2,
   ArrowUpRight,
   Sparkles,
-  GraduationCap,
 } from "lucide-react";
 
 const mockAccounts = [
