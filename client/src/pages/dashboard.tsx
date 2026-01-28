@@ -1805,31 +1805,56 @@ export default function Dashboard() {
               </div>
             </div>
             
-            {/* Recent Graduates */}
+            {/* Recent Graduates with Revenue Details */}
             {graduationAnalytics.graduatedAccounts.length > 0 && (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <p className="text-sm font-medium text-muted-foreground">Recent Graduates</p>
-                <div className="flex flex-wrap gap-2">
+                <div className="space-y-2">
                   {graduationAnalytics.graduatedAccounts.slice(0, 5).map((account) => (
-                    <Badge 
-                      key={account.id} 
-                      variant="outline" 
-                      className="bg-background py-1"
-                      data-testid={`badge-graduate-${account.id}`}
+                    <Card 
+                      key={account.id}
+                      className="p-3"
+                      data-testid={`card-graduate-${account.id}`}
                     >
-                      <Trophy className="h-3 w-3 mr-1 text-chart-3" />
-                      <span className="font-medium">{account.accountName}</span>
-                      {account.revenueGrowth > 0 && (
-                        <span className="ml-1 text-chart-1">
-                          +{formatCurrency(account.revenueGrowth)}
-                        </span>
-                      )}
-                    </Badge>
+                      <div className="flex items-center justify-between gap-4 flex-wrap">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-chart-3/20" data-testid={`icon-graduate-${account.id}`}>
+                            <Trophy className="h-4 w-4 text-chart-3" />
+                          </div>
+                          <div>
+                            <p className="font-medium" data-testid={`text-graduate-name-${account.id}`}>{account.accountName}</p>
+                            <p className="text-xs text-muted-foreground" data-testid={`text-graduate-info-${account.id}`}>
+                              {account.segment || "No segment"} 
+                              {account.enrollmentDurationDays && ` · ${account.enrollmentDurationDays} days enrolled`}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4 text-right flex-wrap">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Baseline</p>
+                            <p className="text-sm font-medium" data-testid={`text-baseline-${account.id}`}>{formatCurrency(account.baselineRevenue)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">At Graduation</p>
+                            <p className="text-sm font-medium" data-testid={`text-graduation-revenue-${account.id}`}>{formatCurrency(account.graduationRevenue)}</p>
+                          </div>
+                          <div className="min-w-[80px]">
+                            <p className="text-xs text-muted-foreground">Growth</p>
+                            <p className={`text-sm font-bold ${account.revenueGrowth > 0 ? 'text-chart-1' : 'text-muted-foreground'}`} data-testid={`text-growth-${account.id}`}>
+                              {account.revenueGrowth > 0 ? '+' : ''}{formatCurrency(account.revenueGrowth)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
                   ))}
                   {graduationAnalytics.graduatedAccounts.length > 5 && (
-                    <Badge variant="outline" className="bg-background">
-                      +{graduationAnalytics.graduatedAccounts.length - 5} more
-                    </Badge>
+                    <Link href="/revenue">
+                      <Button variant="ghost" size="sm" className="w-full" data-testid="button-more-graduates">
+                        View {graduationAnalytics.graduatedAccounts.length - 5} more graduates
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    </Link>
                   )}
                 </div>
               </div>
