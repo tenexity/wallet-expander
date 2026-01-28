@@ -72,7 +72,7 @@ const showcaseFeatures = [
     id: "gap-analysis",
     badge: "Revenue Opportunity Mapping",
     title: "See Exactly Where Each Account Can Grow",
-    description: "AI maps every enrolled account's purchases against their full potential. Instantly visualize which product categories are under-penetrated and quantify the exact dollar opportunity in each gap—so your team knows precisely where to focus conversations.",
+    description: "AI maps every enrolled account's purchases against their full potential. Instantly visualize which product categories are under-penetrated and quantify the exact dollar opportunity in each gap, so your team knows precisely where to focus conversations.",
     MockupComponent: MockupGapAnalysis,
     benefits: [
       "Visualize untapped potential in every account",
