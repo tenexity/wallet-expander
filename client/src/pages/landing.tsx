@@ -30,12 +30,14 @@ import {
   Crown,
 } from "lucide-react";
 
-import screenshotDashboard from "@/assets/images/screenshot-dashboard.png";
-import screenshotEnrollment from "@/assets/images/screenshot-enrollment.png";
-import screenshotGapAnalysis from "@/assets/images/screenshot-gap-analysis.png";
-import screenshotIcpBuilder from "@/assets/images/screenshot-icp-builder.png";
-import screenshotRevenue from "@/assets/images/screenshot-revenue.png";
-import screenshotPlaybooks from "@/assets/images/screenshot-playbooks.png";
+import {
+  MockupDashboard,
+  MockupEnrollment,
+  MockupGapAnalysis,
+  MockupICPBuilder,
+  MockupRevenue,
+  MockupPlaybooks,
+} from "@/components/feature-mockups";
 
 const showcaseFeatures = [
   {
@@ -43,8 +45,7 @@ const showcaseFeatures = [
     badge: "Smart Account Discovery",
     title: "Find Your Highest-Potential Accounts Instantly",
     description: "Our AI analyzes your entire customer base to surface the accounts with the greatest growth potential. Stop guessing which customers deserve more attention—let data reveal your hidden revenue goldmines so your team can focus where it matters most.",
-    image: screenshotEnrollment,
-    imageAlt: "Account discovery interface showing high-potential accounts with opportunity scores",
+    MockupComponent: MockupEnrollment,
     benefits: [
       "AI identifies accounts with the biggest wallet share opportunity",
       "Prioritize based on growth potential, not just current spend",
@@ -57,8 +58,7 @@ const showcaseFeatures = [
     badge: "Growth Pipeline",
     title: "Every Enrolled Account Gets a Customized Growth Plan",
     description: "When you enroll an account, you're making a commitment—and so are we. Each enrolled account receives a personalized action plan designed to grow their wallet share. Track progress, celebrate wins, and watch your accounts graduate to higher revenue tiers.",
-    image: screenshotDashboard,
-    imageAlt: "Dashboard showing enrolled accounts with customized growth plans and progress",
+    MockupComponent: MockupDashboard,
     benefits: [
       "Personalized growth roadmap for every enrolled account",
       "Clear milestones and graduation targets",
@@ -71,8 +71,7 @@ const showcaseFeatures = [
     badge: "Revenue Opportunity Mapping",
     title: "See Exactly Where Each Account Can Grow",
     description: "AI maps every enrolled account's purchases against their full potential. Instantly visualize which product categories are under-penetrated and quantify the exact dollar opportunity in each gap—so your team knows precisely where to focus conversations.",
-    image: screenshotGapAnalysis,
-    imageAlt: "Revenue opportunity map showing wallet share gaps by category",
+    MockupComponent: MockupGapAnalysis,
     benefits: [
       "Visualize untapped potential in every account",
       "Quantified dollar amounts for each growth opportunity",
@@ -85,8 +84,7 @@ const showcaseFeatures = [
     badge: "Success Pattern Recognition",
     title: "Learn from Your Best to Grow the Rest",
     description: "AI studies your top-performing accounts to understand what success looks like in each segment. These patterns become the benchmark for growth—showing exactly how to guide underperforming accounts toward their full potential.",
-    image: screenshotIcpBuilder,
-    imageAlt: "Success pattern analysis showing ideal customer profiles by segment",
+    MockupComponent: MockupICPBuilder,
     benefits: [
       "AI discovers what your best customers have in common",
       "Segment-specific success patterns you can replicate",
@@ -99,8 +97,7 @@ const showcaseFeatures = [
     badge: "Growth Results Tracking",
     title: "Measure the Revenue Impact of Every Relationship",
     description: "Track incremental revenue growth from enrollment through graduation. See exactly how much each account has grown, celebrate Territory Manager wins, and prove the ROI of relationship-driven selling with transparent, real-time reporting.",
-    image: screenshotRevenue,
-    imageAlt: "Revenue growth dashboard showing account progression and incremental gains",
+    MockupComponent: MockupRevenue,
     benefits: [
       "Track revenue lift from day one of enrollment",
       "Celebrate milestones as accounts hit growth targets",
@@ -113,8 +110,7 @@ const showcaseFeatures = [
     badge: "AI-Powered Action Plans",
     title: "Customized Playbooks That Empower Your Sales Team",
     description: "AI generates personalized action plans for each enrolled account—complete with talking points, call scripts, and email templates tailored to their specific opportunities. Your team brings the relationship expertise; AI provides the perfect preparation.",
-    image: screenshotPlaybooks,
-    imageAlt: "Customized playbook with AI-generated scripts and action items",
+    MockupComponent: MockupPlaybooks,
     benefits: [
       "Personalized scripts address each account's unique gaps",
       "AI prepares your team for high-impact conversations",
@@ -380,15 +376,10 @@ export default function Landing() {
                   data-testid={`feature-showcase-${feature.id}`}
                 >
                   <div className="w-full lg:w-1/2">
-                    <div className="relative group">
+                    <div className="relative group" data-testid={`mockup-${feature.id}`}>
                       <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-primary/5 rounded-lg blur-sm opacity-75 group-hover:opacity-100 transition duration-300" />
-                      <div className="relative rounded-lg overflow-hidden shadow-xl border border-border/50 bg-card">
-                        <img
-                          src={feature.image}
-                          alt={feature.imageAlt}
-                          className="w-full h-auto"
-                          data-testid={`image-${feature.id}`}
-                        />
+                      <div className="relative rounded-lg overflow-hidden shadow-xl border border-border/50">
+                        <feature.MockupComponent />
                       </div>
                     </div>
                   </div>
