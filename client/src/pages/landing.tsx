@@ -270,12 +270,13 @@ export default function Landing() {
               Human Relationships, Enhanced by AI
             </Badge>
             <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6" data-testid="text-hero-headline">
-              Find and Grow Your{" "}
-              <span className="text-primary">Highest-Potential Accounts</span>
+              Recover Lost Revenue from{" "}
+              <span className="text-primary">Existing Customers</span>
             </h1>
             <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto" data-testid="text-hero-description">
-              Discover hidden wallet share opportunities. Enroll accounts and drive their growth with 
-              customized AI playbooks that empower your team to build stronger relationships.
+              Identify wallet share leakage and prioritize your highest-potential accounts. 
+              Enroll them in a proven growth program and drive results with AI-customized playbooks 
+              that strengthen, not replace, your team's relationships.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
