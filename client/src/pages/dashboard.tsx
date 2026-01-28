@@ -361,6 +361,11 @@ export default function Dashboard() {
     queryKey: ["/api/program-accounts"],
   });
 
+  // Fetch all accounts for Top Opportunities (same data as Accounts page)
+  const { data: allAccounts, isLoading: isAccountsLoading } = useQuery<AccountWithMetrics[]>({
+    queryKey: ["/api/accounts"],
+  });
+
   // Toggle column visibility
   const toggleColumnVisibility = useCallback((columnKey: string) => {
     setVisibleColumns(prev => {
@@ -388,12 +393,13 @@ export default function Dashboard() {
     }
   }, [opportunitySortKey]);
 
-  // Sorted accounts for Top Opportunities (top 10 from dashboard stats)
+  // Sorted accounts for Top Opportunities (top 10 from /api/accounts - same as Accounts page)
   const sortedTopOpportunities = useMemo(() => {
-    const opportunities = stats?.topOpportunities || [];
-    if (opportunities.length === 0) return [];
+    const accounts = allAccounts || [];
+    if (accounts.length === 0) return [];
     
-    const sorted = [...opportunities].sort((a, b) => {
+    // First sort all accounts by the selected column
+    const sorted = [...accounts].sort((a, b) => {
       let comparison = 0;
       switch (opportunitySortKey) {
         case "opportunityScore":
@@ -423,8 +429,9 @@ export default function Dashboard() {
       return opportunitySortDir === "asc" ? comparison : -comparison;
     });
     
-    return sorted;
-  }, [stats?.topOpportunities, opportunitySortKey, opportunitySortDir]);
+    // Return top 10 accounts
+    return sorted.slice(0, 10);
+  }, [allAccounts, opportunitySortKey, opportunitySortDir]);
 
   // Revenue by segment from enrolled accounts
   const revenueBySegment = useMemo(() => {
@@ -1255,7 +1262,13 @@ export default function Dashboard() {
             )}
             {!isCollapsed && (
               <CardContent className="flex-1 overflow-y-auto overflow-x-auto">
-                {sortedTopOpportunities.length > 0 ? (
+                {isAccountsLoading ? (
+                  <div className="space-y-3">
+                    {[...Array(5)].map((_, i) => (
+                      <Skeleton key={i} className="h-10 w-full" />
+                    ))}
+                  </div>
+                ) : sortedTopOpportunities.length > 0 ? (
                   <DataTable
                     columns={opportunityColumns}
                     data={sortedTopOpportunities}
