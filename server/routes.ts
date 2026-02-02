@@ -7,6 +7,7 @@ import { storage } from "./storage";
 import { 
   insertAccountSchema, 
   insertSegmentProfileSchema,
+  insertProfileCategorySchema,
   insertTaskSchema,
   insertPlaybookSchema,
   insertProgramAccountSchema,
@@ -789,6 +790,24 @@ KEY TALKING POINTS:
       res.json({ message: "Profile deleted successfully" });
     } catch (error) {
       handleRouteError(error, res, "Delete profile");
+    }
+  });
+
+  app.patch("/api/profile-categories/:id", requireSubscription, async (req, res) => {
+    try {
+      const tenantStorage = getStorage(req);
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid category ID" });
+      }
+      const updateData = insertProfileCategorySchema.partial().parse(req.body);
+      const category = await tenantStorage.updateProfileCategory(id, updateData);
+      if (!category) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+      res.json(category);
+    } catch (error) {
+      handleRouteError(error, res, "Update profile category");
     }
   });
 

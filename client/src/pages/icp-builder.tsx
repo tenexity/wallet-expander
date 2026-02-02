@@ -166,12 +166,24 @@ interface DataInsights {
 
 const CHART_COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
 
+interface EditedCategory {
+  id: number;
+  categoryName: string;
+  expectedPct: number;
+  importance: number;
+  isRequired: boolean;
+  notes: string;
+}
+
 export default function ICPBuilder() {
   const [selectedProfile, setSelectedProfile] = useState<SegmentProfile | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [activeTab, setActiveTab] = useState("profiles");
   const [selectedInsightSegment, setSelectedInsightSegment] = useState<string>("HVAC");
+  const [editedMinRevenue, setEditedMinRevenue] = useState<number>(0);
+  const [editedCategories, setEditedCategories] = useState<EditedCategory[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
   const { data: dataInsights, isLoading: isInsightsLoading } = useQuery<DataInsights>({
@@ -249,6 +261,95 @@ export default function ICPBuilder() {
       });
     },
   });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: { minAnnualRevenue: string } }) => {
+      return apiRequest("PATCH", `/api/segment-profiles/${id}`, data);
+    },
+  });
+
+  const updateCategoryMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: { expectedPct?: string; importance?: string; isRequired?: boolean } }) => {
+      return apiRequest("PATCH", `/api/profile-categories/${id}`, data);
+    },
+  });
+
+  const handleEnterEditMode = () => {
+    if (selectedProfile) {
+      setEditedMinRevenue(selectedProfile.minAnnualRevenue);
+      setEditedCategories(selectedProfile.categories.map(cat => ({
+        id: cat.id,
+        categoryName: cat.categoryName,
+        expectedPct: cat.expectedPct,
+        importance: cat.importance,
+        isRequired: cat.isRequired,
+        notes: cat.notes,
+      })));
+      setEditMode(true);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditMode(false);
+    setEditedMinRevenue(0);
+    setEditedCategories([]);
+  };
+
+  const handleSaveChanges = async () => {
+    if (!selectedProfile) return;
+    
+    setIsSaving(true);
+    try {
+      await updateProfileMutation.mutateAsync({
+        id: selectedProfile.id,
+        data: { minAnnualRevenue: editedMinRevenue.toString() },
+      });
+
+      for (const category of editedCategories) {
+        const originalCategory = selectedProfile.categories.find(c => c.id === category.id);
+        if (originalCategory) {
+          const hasChanges = 
+            originalCategory.expectedPct !== category.expectedPct ||
+            originalCategory.importance !== category.importance ||
+            originalCategory.isRequired !== category.isRequired;
+          
+          if (hasChanges) {
+            await updateCategoryMutation.mutateAsync({
+              id: category.id,
+              data: {
+                expectedPct: category.expectedPct.toString(),
+                importance: category.importance.toString(),
+                isRequired: category.isRequired,
+              },
+            });
+          }
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["/api/segment-profiles"] });
+      setEditMode(false);
+      toast({
+        title: "Profile updated",
+        description: "The segment weighting changes have been saved successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Save failed",
+        description: "Could not save the changes. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const updateEditedCategory = (categoryId: number, field: keyof EditedCategory, value: number | boolean) => {
+    setEditedCategories(prev => 
+      prev.map(cat => 
+        cat.id === categoryId ? { ...cat, [field]: value } : cat
+      )
+    );
+  };
 
   const displayProfiles = profiles || [];
 
@@ -530,13 +631,23 @@ export default function ICPBuilder() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setEditMode(false)}
+                          onClick={handleCancelEdit}
+                          disabled={isSaving}
                         >
                           Cancel
                         </Button>
-                        <Button size="sm" data-testid="button-save-profile">
-                          <Save className="mr-2 h-4 w-4" />
-                          Save Changes
+                        <Button 
+                          size="sm" 
+                          data-testid="button-save-profile"
+                          onClick={handleSaveChanges}
+                          disabled={isSaving}
+                        >
+                          {isSaving ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Save className="mr-2 h-4 w-4" />
+                          )}
+                          {isSaving ? "Saving..." : "Save Changes"}
                         </Button>
                       </>
                     ) : (
@@ -575,7 +686,7 @@ export default function ICPBuilder() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setEditMode(true)}
+                          onClick={handleEnterEditMode}
                           data-testid="button-edit-profile"
                         >
                           <Edit2 className="mr-2 h-4 w-4" />
@@ -612,8 +723,10 @@ export default function ICPBuilder() {
                     {editMode ? (
                       <Input
                         type="number"
-                        defaultValue={selectedProfile.minAnnualRevenue}
+                        value={editedMinRevenue}
+                        onChange={(e) => setEditedMinRevenue(Number(e.target.value))}
                         className="mt-1"
+                        data-testid="input-min-revenue"
                       />
                     ) : (
                       <p className="font-medium">
@@ -645,16 +758,22 @@ export default function ICPBuilder() {
                     Category Expectations
                   </Label>
                   <div className="space-y-4">
-                    {selectedProfile.categories.map((category) => (
+                    {(editMode ? editedCategories : selectedProfile.categories).map((category) => {
+                      const editedCat = editedCategories.find(c => c.id === category.id);
+                      const displayPct = editMode && editedCat ? editedCat.expectedPct : category.expectedPct;
+                      const displayRequired = editMode && editedCat ? editedCat.isRequired : category.isRequired;
+                      
+                      return (
                       <div
                         key={category.id}
                         className="p-4 rounded-md border bg-card"
+                        data-testid={`category-card-${category.id}`}
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
                               <span className="font-medium">{category.categoryName}</span>
-                              {category.isRequired && (
+                              {displayRequired && (
                                 <Badge variant="destructive" className="text-xs">
                                   Required
                                 </Badge>
@@ -673,14 +792,16 @@ export default function ICPBuilder() {
                                     Expected %
                                   </span>
                                   <span className="font-medium">
-                                    {category.expectedPct}%
+                                    {displayPct}%
                                   </span>
                                 </div>
                                 {editMode ? (
                                   <Slider
-                                    defaultValue={[category.expectedPct]}
+                                    value={[displayPct]}
+                                    onValueChange={(value) => updateEditedCategory(category.id, 'expectedPct', value[0])}
                                     max={100}
                                     step={1}
+                                    data-testid={`slider-category-${category.id}`}
                                   />
                                 ) : (
                                   <div className="h-2 bg-muted rounded-full overflow-hidden">
@@ -694,7 +815,11 @@ export default function ICPBuilder() {
                               {editMode && (
                                 <div className="flex items-center gap-2">
                                   <Label className="text-xs">Required</Label>
-                                  <Switch defaultChecked={category.isRequired} />
+                                  <Switch 
+                                    checked={displayRequired}
+                                    onCheckedChange={(checked) => updateEditedCategory(category.id, 'isRequired', checked)}
+                                    data-testid={`switch-required-${category.id}`}
+                                  />
                                 </div>
                               )}
                             </div>
@@ -706,7 +831,8 @@ export default function ICPBuilder() {
                           </div>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
