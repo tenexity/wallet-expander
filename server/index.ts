@@ -2,7 +2,10 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
-import { startScheduler, stopScheduler } from "./scheduler";
+// NOTE: Scheduler disabled until Phase 1 schema migration is complete.
+// The scheduler imports agent services that reference tables not yet in shared/schema.ts.
+// Re-enable by uncommenting the line below once db:push has been run for Phase 1.
+// import { startScheduler, stopScheduler } from "./scheduler";
 
 const app = express();
 const httpServer = createServer(app);
@@ -63,18 +66,9 @@ app.use((req, res, next) => {
 (async () => {
   await registerRoutes(httpServer, app);
 
-  // ── Start agent scheduler ───────────────────────────────────────────────────
-  // SCHEDULER_TENANT_ID: set in Replit env secrets for the primary tenant.
-  // Defaults to 1 for single-tenant / development deploys.
-  const schedulerTenantId = parseInt(process.env.SCHEDULER_TENANT_ID ?? "1", 10);
-  if (process.env.NODE_ENV !== "test") {
-    startScheduler(schedulerTenantId);
-  }
-
   // ── Graceful shutdown ───────────────────────────────────────────────────────
   const gracefulShutdown = (signal: string) => {
-    log(`Received ${signal} — stopping scheduler and closing server.`);
-    stopScheduler();
+    log(`Received ${signal} — closing server.`);
     httpServer.close(() => {
       log("HTTP server closed.");
       process.exit(0);
