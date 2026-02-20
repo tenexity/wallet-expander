@@ -167,5 +167,155 @@ export async function registerRoutes(
     }
   });
 
+  // ============================================================
+  // AGENT ROUTES — Phase 3: Agent Loop Services
+  // ============================================================
+  const { generatePlaybook } = await import("./services/generate-playbook.js");
+  const { runDailyBriefing } = await import("./services/daily-briefing.js");
+  const { analyzeEmailIntelligence } = await import("./services/email-intelligence.js");
+  const { streamAskAnything } = await import("./services/ask-anything.js");
+  const { runWeeklyAccountReview } = await import("./services/weekly-account-review.js");
+  const { processCrmSyncQueue, queueCrmEvent } = await import("./services/crm-sync-push.js");
+
+  /**
+   * POST /api/agent/generate-playbook
+   * Body: { accountId, playbookType? }
+   */
+  app.post("/api/agent/generate-playbook", requireAuth, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+      const { accountId, playbookType } = req.body;
+      if (!accountId) return res.status(400).json({ message: "accountId is required" });
+      const result = await generatePlaybook(Number(accountId), tenantId, playbookType);
+      res.json(result);
+    } catch (error) {
+      handleRouteError(error, res, "Generate playbook");
+    }
+  });
+
+  /**
+   * POST /api/agent/daily-briefing
+   * Triggers briefing run for all active TMs in the tenant.
+   * Also called by node-cron scheduler on weekdays at 7am EST.
+   */
+  app.post("/api/agent/daily-briefing", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+      // Run async — respond immediately, email sends in background
+      runDailyBriefing(tenantId)
+        .then((r) => console.log("[daily-briefing] Done:", r))
+        .catch((err) => console.error("[daily-briefing] Error:", err));
+      res.json({ message: "Daily briefing started. Emails will be sent shortly." });
+    } catch (error) {
+      handleRouteError(error, res, "Daily briefing");
+    }
+  });
+
+  /**
+   * POST /api/agent/email-intelligence
+   * Body: { interactionId }
+   * Analyzes an email interaction and updates the row with extracted intel.
+   */
+  app.post("/api/agent/email-intelligence", requireAuth, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+      const { interactionId } = req.body;
+      if (!interactionId) return res.status(400).json({ message: "interactionId is required" });
+      const result = await analyzeEmailIntelligence(Number(interactionId), tenantId);
+      res.json(result);
+    } catch (error) {
+      handleRouteError(error, res, "Email intelligence");
+    }
+  });
+
+  /**
+   * GET /api/agent/ask-anything (SSE)
+   * Query: question, scope (account|portfolio|program), scopeId (accountId if scope=account)
+   */
+  app.get("/api/agent/ask-anything", requireAuth, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+      const { question, scope, scopeId } = req.query as Record<string, string>;
+      if (!question) return res.status(400).json({ message: "question is required" });
+      const validScope = (["account", "portfolio", "program"].includes(scope) ? scope : "portfolio") as "account" | "portfolio" | "program";
+      await streamAskAnything(question, validScope, scopeId ? Number(scopeId) : null, tenantId, res);
+    } catch (error) {
+      // SSE already started — can't send JSON error at this point
+      console.error("[ask-anything] Route error:", error);
+      res.end();
+    }
+  });
+
+  /**
+   * POST /api/agent/weekly-account-review
+   * Triggers weekly review for all enrolled accounts. Also called by cron.
+   */
+  app.post("/api/agent/weekly-account-review", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+      runWeeklyAccountReview(tenantId)
+        .then((r) => console.log("[weekly-review] Done:", r))
+        .catch((err) => console.error("[weekly-review] Error:", err));
+      res.json({ message: "Weekly account review started in background." });
+    } catch (error) {
+      handleRouteError(error, res, "Weekly account review");
+    }
+  });
+
+  /**
+   * POST /api/agent/crm-sync-push
+   * Processes pending CRM sync queue for the tenant.
+   */
+  app.post("/api/agent/crm-sync-push", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+      const result = await processCrmSyncQueue(tenantId);
+      res.json(result);
+    } catch (error) {
+      handleRouteError(error, res, "CRM sync push");
+    }
+  });
+
+  /**
+   * GET /api/agent/health-check
+   * Returns status of all agent services, last run times, and key counts.
+   */
+  app.get("/api/agent/health-check", requireAuth, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+
+      const runTypes = ["daily-briefing", "weekly-account-review", "email-intelligence", "generate-playbook", "synthesize-learnings"];
+      const stateRows = await Promise.all(
+        runTypes.map((rt) => storage.getAgentState(tenantId, rt))
+      );
+      const stateMap = Object.fromEntries(
+        runTypes.map((rt, i) => [rt, stateRows[i] ? {
+          lastRunAt: stateRows[i]!.lastRunAt,
+          lastRunSummary: stateRows[i]!.lastRunSummary,
+          currentFocus: stateRows[i]!.currentFocus,
+        } : null])
+      );
+
+      const openaiOk = !!(process.env.OPENAI_API_KEY);
+      const resendOk = !!(process.env.RESEND_API_KEY);
+
+      res.json({
+        status: "ok",
+        timestamp: new Date().toISOString(),
+        config: { openaiConfigured: openaiOk, resendConfigured: resendOk },
+        agentState: stateMap,
+      });
+    } catch (error) {
+      handleRouteError(error, res, "Health check");
+    }
+  });
+
   return httpServer;
 }
