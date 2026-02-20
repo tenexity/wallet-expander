@@ -130,10 +130,18 @@ export const accounts = pgTable("accounts", {
   assignedTm: text("assigned_tm"),
   status: text("status").default("active"), // active, inactive, prospect
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`),
+  // ─── Agentic fields (Phase 1) ────────────────────────────────────────────
+  walletShareDirection: text("wallet_share_direction"), // 'growing' | 'declining' | 'stable'
+  enrollmentStatus: text("enrollment_status").default("discovered"), // 'discovered' | 'enrolled' | 'graduated' | 'at_risk'
+  enrolledAt: timestamp("enrolled_at"),
+  graduatedAt: timestamp("graduated_at"),
+  seasonalityProfile: jsonb("seasonality_profile"), // { jan: 0.8, feb: 0.4, ... }
+  embedding: jsonb("embedding"),                    // 1536-dim float[] stored as jsonb for POC
 }, (table) => [
   index("idx_accounts_tenant_id").on(table.tenantId),
   index("idx_accounts_segment").on(table.segment),
   index("idx_accounts_assigned_tm").on(table.assignedTm),
+  index("idx_accounts_enrollment_status").on(table.enrollmentStatus),
 ]);
 
 export const insertAccountSchema = createInsertSchema(accounts).omit({
@@ -265,6 +273,9 @@ export const accountMetrics = pgTable("account_metrics", {
   categoryGapScore: numeric("category_gap_score"),
   opportunityScore: numeric("opportunity_score"),
   matchedProfileId: integer("matched_profile_id"),
+  // ─── Agentic fields (Phase 1) ────────────────────────────────────────────
+  walletSharePercentage: numeric("wallet_share_percentage"), // estimated % of total spend going to us
+  daysSinceLastOrder: integer("days_since_last_order"),
 }, (table) => [
   index("idx_account_metrics_tenant_id").on(table.tenantId),
   index("idx_account_metrics_account_id").on(table.accountId),
@@ -741,3 +752,293 @@ export const insertAgentPlaybookLearningSchema = createInsertSchema(agentPlayboo
 
 export type InsertAgentPlaybookLearning = z.infer<typeof insertAgentPlaybookLearningSchema>;
 export type AgentPlaybookLearning = typeof agentPlaybookLearnings.$inferSelect;
+
+// ============================================================
+// PHASE 1 — ENTITY STORE (Agent-Specific Tables)
+// All tables use tenant_id integer FK to match existing schema
+// ============================================================
+
+// ─── Agent Contacts ──────────────────────────────────────────────────────────
+export const agentContacts = pgTable("agent_contacts", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  accountId: integer("account_id").notNull(),
+  name: text("name").notNull(),
+  role: text("role"),            // 'owner' | 'pm' | 'purchasing' | 'estimator' | 'foreman'
+  email: text("email"),
+  phone: text("phone"),
+  isPrimary: boolean("is_primary").default(false),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_agent_contacts_tenant_id").on(table.tenantId),
+  index("idx_agent_contacts_account_id").on(table.accountId),
+]);
+export const insertAgentContactSchema = createInsertSchema(agentContacts).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertAgentContact = z.infer<typeof insertAgentContactSchema>;
+export type AgentContact = typeof agentContacts.$inferSelect;
+
+// ─── Agent Projects ───────────────────────────────────────────────────────────
+export const agentProjects = pgTable("agent_projects", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  accountId: integer("account_id").notNull(),
+  name: text("name").notNull(),
+  projectType: text("project_type"),   // 'new_construction' | 'retrofit' | 'service'
+  status: text("status").default("active"), // 'active' | 'bidding' | 'won' | 'lost' | 'complete'
+  estimatedValue: numeric("estimated_value"),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  notes: text("notes"),
+  source: text("source").default("rep_entered"), // 'rep_entered' | 'inferred'
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_agent_projects_tenant_id").on(table.tenantId),
+  index("idx_agent_projects_account_id").on(table.accountId),
+]);
+export const insertAgentProjectSchema = createInsertSchema(agentProjects).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertAgentProject = z.infer<typeof insertAgentProjectSchema>;
+export type AgentProject = typeof agentProjects.$inferSelect;
+
+// ─── Agent Categories (org-specific taxonomy for agentic layer) ───────────────
+export const agentCategories = pgTable("agent_categories", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  name: text("name").notNull(),
+  parentId: integer("parent_id"),
+  isIcpRequired: boolean("is_icp_required").default(false),
+  expectedMixPct: numeric("expected_mix_pct"),  // expected % of an ICP account's spend in this category
+  displayOrder: integer("display_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_agent_categories_tenant_id").on(table.tenantId),
+]);
+export const insertAgentCategorySchema = createInsertSchema(agentCategories).omit({ id: true, createdAt: true });
+export type InsertAgentCategory = z.infer<typeof insertAgentCategorySchema>;
+export type AgentCategory = typeof agentCategories.$inferSelect;
+
+// ─── Agent Account Category Spend ────────────────────────────────────────────
+// Monthly spend history per account per category — powers gap analysis in the agentic layer
+export const agentAccountCategorySpend = pgTable("agent_account_category_spend", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  accountId: integer("account_id").notNull(),
+  categoryId: integer("category_id").notNull(), // FK to agent_categories
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  spendAmount: numeric("spend_amount").notNull(),
+  spendPct: numeric("spend_pct"),          // % of total account spend in this period
+  gapDollars: numeric("gap_dollars"),      // estimated $ gap vs ICP benchmark
+  gapPct: numeric("gap_pct"),              // % gap vs ICP benchmark
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_agent_acct_cat_spend_tenant").on(table.tenantId),
+  index("idx_agent_acct_cat_spend_account").on(table.accountId),
+  index("idx_agent_acct_cat_spend_category").on(table.categoryId),
+]);
+export const insertAgentAccountCategorySpendSchema = createInsertSchema(agentAccountCategorySpend).omit({ id: true, createdAt: true });
+export type InsertAgentAccountCategorySpend = z.infer<typeof insertAgentAccountCategorySpendSchema>;
+export type AgentAccountCategorySpend = typeof agentAccountCategorySpend.$inferSelect;
+
+// ─── Agent Interactions ───────────────────────────────────────────────────────
+// Every touchpoint: emails, calls, visits, rep notes, and system-generated flags
+export const agentInteractions = pgTable("agent_interactions", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  accountId: integer("account_id").notNull(),
+  contactId: integer("contact_id"),         // FK to agent_contacts (optional)
+  interactionType: text("interaction_type").notNull(), // 'email' | 'call' | 'visit' | 'rep_note' | 'system_flag'
+  source: text("source").default("rep_entered"), // 'rep_entered' | 'email' | 'system'
+  subject: text("subject"),
+  body: text("body"),
+  sentiment: text("sentiment"),              // 'positive' | 'neutral' | 'negative' | 'at_risk_signal' | 'competitor_mention'
+  urgency: text("urgency"),                  // 'immediate' | 'this_week' | 'monitor'
+  projectMentioned: text("project_mentioned"),
+  competitorMentioned: text("competitor_mentioned"),
+  buyingSignal: text("buying_signal"),
+  followUpDate: timestamp("follow_up_date"),
+  interactionDate: timestamp("interaction_date").defaultNow(),
+  aiAnalyzed: boolean("ai_analyzed").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_agent_interactions_tenant_id").on(table.tenantId),
+  index("idx_agent_interactions_account_id").on(table.accountId),
+  index("idx_agent_interactions_type").on(table.interactionType),
+  index("idx_agent_interactions_sentiment").on(table.sentiment),
+]);
+export const insertAgentInteractionSchema = createInsertSchema(agentInteractions).omit({ id: true, createdAt: true });
+export type InsertAgentInteraction = z.infer<typeof insertAgentInteractionSchema>;
+export type AgentInteraction = typeof agentInteractions.$inferSelect;
+
+// ─── Agent Competitors ────────────────────────────────────────────────────────
+export const agentCompetitors = pgTable("agent_competitors", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  name: text("name").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_agent_competitors_tenant_id").on(table.tenantId),
+]);
+export const insertAgentCompetitorSchema = createInsertSchema(agentCompetitors).omit({ id: true, createdAt: true });
+export type InsertAgentCompetitor = z.infer<typeof insertAgentCompetitorSchema>;
+export type AgentCompetitor = typeof agentCompetitors.$inferSelect;
+
+// ─── Agent Account Competitors (join table) ───────────────────────────────────
+export const agentAccountCompetitors = pgTable("agent_account_competitors", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  accountId: integer("account_id").notNull(),
+  competitorId: integer("competitor_id").notNull(),
+  estimatedSpendPct: numeric("estimated_spend_pct"), // % of account's spend going to this competitor
+  lastConfirmedAt: timestamp("last_confirmed_at").defaultNow(),
+  notes: text("notes"),
+}, (table) => [
+  index("idx_agent_acct_competitors_tenant").on(table.tenantId),
+  index("idx_agent_acct_competitors_account").on(table.accountId),
+]);
+export const insertAgentAccountCompetitorSchema = createInsertSchema(agentAccountCompetitors).omit({ id: true });
+export type InsertAgentAccountCompetitor = z.infer<typeof insertAgentAccountCompetitorSchema>;
+export type AgentAccountCompetitor = typeof agentAccountCompetitors.$inferSelect;
+
+// ─── Agent Playbooks (agentic — distinct from existing playbooks table) ───────
+export const agentPlaybooks = pgTable("agent_playbooks", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  accountId: integer("account_id").notNull(),
+  playbookType: text("playbook_type").notNull(), // 'category_winback'|'new_category'|'at_risk_retention'|'graduation_push'|'project_based'
+  status: text("status").default("active"),       // 'active' | 'completed' | 'rotated'
+  priorityAction: text("priority_action"),         // short headline action for the rep
+  urgencyLevel: text("urgency_level"),              // 'immediate' | 'this_week' | 'this_month'
+  aiGeneratedContent: jsonb("ai_generated_content"), // { call_script, email_draft, talking_points, objection_handlers, ... }
+  learningsApplied: jsonb("learnings_applied"),      // array of learning IDs used in this playbook
+  generatedAt: timestamp("generated_at").defaultNow(),
+  rotatedAt: timestamp("rotated_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_agent_playbooks_tenant_id").on(table.tenantId),
+  index("idx_agent_playbooks_account_id").on(table.accountId),
+  index("idx_agent_playbooks_status").on(table.status),
+]);
+export const insertAgentPlaybookSchema = createInsertSchema(agentPlaybooks).omit({ id: true, createdAt: true, generatedAt: true });
+export type InsertAgentPlaybook = z.infer<typeof insertAgentPlaybookSchema>;
+export type AgentPlaybook = typeof agentPlaybooks.$inferSelect;
+
+// ─── Agent Playbook Outcomes ──────────────────────────────────────────────────
+export const agentPlaybookOutcomes = pgTable("agent_playbook_outcomes", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  playbookId: integer("playbook_id").notNull(),
+  accountId: integer("account_id").notNull(),
+  actionTaken: text("action_taken").notNull(), // what the rep did
+  outcome: text("outcome").notNull(),           // 'win' | 'progress' | 'no_response' | 'lost' | 'deferred'
+  outcomeNotes: text("outcome_notes"),
+  revenueImpact: numeric("revenue_impact"),
+  completedAt: timestamp("completed_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_agent_playbook_outcomes_tenant").on(table.tenantId),
+  index("idx_agent_playbook_outcomes_playbook").on(table.playbookId),
+  index("idx_agent_playbook_outcomes_account").on(table.accountId),
+]);
+export const insertAgentPlaybookOutcomeSchema = createInsertSchema(agentPlaybookOutcomes).omit({ id: true, createdAt: true });
+export type InsertAgentPlaybookOutcome = z.infer<typeof insertAgentPlaybookOutcomeSchema>;
+export type AgentPlaybookOutcome = typeof agentPlaybookOutcomes.$inferSelect;
+
+// ─── Agent Rep Daily Briefings ────────────────────────────────────────────────
+export const agentRepDailyBriefings = pgTable("agent_rep_daily_briefings", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  repEmail: text("rep_email").notNull(),        // territory manager email
+  briefingDate: timestamp("briefing_date").notNull(),
+  headlineAction: text("headline_action"),
+  priorityItems: jsonb("priority_items"),        // array of { account_name, action, urgency }
+  atRiskAccounts: jsonb("at_risk_accounts"),     // array of account IDs flagged
+  htmlContent: text("html_content"),             // full HTML of the sent email
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_agent_briefings_tenant_id").on(table.tenantId),
+  index("idx_agent_briefings_rep_email").on(table.repEmail),
+  index("idx_agent_briefings_date").on(table.briefingDate),
+]);
+export const insertAgentRepDailyBriefingSchema = createInsertSchema(agentRepDailyBriefings).omit({ id: true, createdAt: true });
+export type InsertAgentRepDailyBriefing = z.infer<typeof insertAgentRepDailyBriefingSchema>;
+export type AgentRepDailyBriefing = typeof agentRepDailyBriefings.$inferSelect;
+
+// ─── Agent Query Log (ask-anything) ──────────────────────────────────────────
+export const agentQueryLog = pgTable("agent_query_log", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  question: text("question").notNull(),
+  scope: text("scope").notNull(),               // 'account' | 'portfolio' | 'program'
+  scopeId: integer("scope_id"),                 // accountId if scope='account'
+  response: text("response"),
+  modelUsed: text("model_used"),
+  tokensUsed: integer("tokens_used"),
+  askedAt: timestamp("asked_at").defaultNow(),
+}, (table) => [
+  index("idx_agent_query_log_tenant_id").on(table.tenantId),
+]);
+export const insertAgentQueryLogSchema = createInsertSchema(agentQueryLog).omit({ id: true, askedAt: true });
+export type InsertAgentQueryLog = z.infer<typeof insertAgentQueryLogSchema>;
+export type AgentQueryLog = typeof agentQueryLog.$inferSelect;
+
+// ─── Agent Organization Settings ─────────────────────────────────────────────
+export const agentOrganizationSettings = pgTable("agent_organization_settings", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull().unique(),
+  resendFromEmail: text("resend_from_email").default("noreply@ignition.tenexity.ai"),
+  briefingTimeHourEst: integer("briefing_time_hour_est").default(7), // hour to send briefings (EST)
+  activeRepEmails: jsonb("active_rep_emails"),    // array of TM emails to receive briefings
+  crmWebhookUrl: text("crm_webhook_url"),         // outbound CRM webhook endpoint
+  crmWebhookSecret: text("crm_webhook_secret"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_agent_org_settings_tenant_id").on(table.tenantId),
+]);
+export const insertAgentOrganizationSettingsSchema = createInsertSchema(agentOrganizationSettings).omit({ id: true, updatedAt: true });
+export type InsertAgentOrganizationSettings = z.infer<typeof insertAgentOrganizationSettingsSchema>;
+export type AgentOrganizationSettings = typeof agentOrganizationSettings.$inferSelect;
+
+// ─── Agent CRM Sync Queue ─────────────────────────────────────────────────────
+export const agentCrmSyncQueue = pgTable("agent_crm_sync_queue", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  eventType: text("event_type").notNull(), // 'enrollment' | 'outcome' | 'graduation' | 'at_risk'
+  accountId: integer("account_id").notNull(),
+  payload: jsonb("payload"),
+  status: text("status").default("pending"),   // 'pending' | 'sent' | 'failed'
+  attempts: integer("attempts").default(0),
+  sentAt: timestamp("sent_at"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_agent_crm_sync_tenant_id").on(table.tenantId),
+  index("idx_agent_crm_sync_status").on(table.status),
+]);
+export const insertAgentCrmSyncQueueSchema = createInsertSchema(agentCrmSyncQueue).omit({ id: true, createdAt: true });
+export type InsertAgentCrmSyncQueue = z.infer<typeof insertAgentCrmSyncQueueSchema>;
+export type AgentCrmSyncQueue = typeof agentCrmSyncQueue.$inferSelect;
+
+// ─── Agent Similar Account Pairs (Phase 2 — included here to avoid migration split) ─
+export const agentSimilarAccountPairs = pgTable("agent_similar_account_pairs", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  accountIdA: integer("account_id_a").notNull(),
+  accountIdB: integer("account_id_b").notNull(),
+  similarityScore: numeric("similarity_score").notNull(), // 0.0 – 1.0
+  sharedSegment: text("shared_segment"),
+  sharedRegion: text("shared_region"),
+  accountBGraduated: boolean("account_b_graduated").default(false),
+  accountBGraduationRevenue: numeric("account_b_graduation_revenue"),
+  computedAt: timestamp("computed_at").defaultNow(),
+}, (table) => [
+  index("idx_agent_similar_pairs_tenant").on(table.tenantId),
+  index("idx_agent_similar_pairs_account_a").on(table.accountIdA),
+]);
+export const insertAgentSimilarAccountPairSchema = createInsertSchema(agentSimilarAccountPairs).omit({ id: true, computedAt: true });
+export type InsertAgentSimilarAccountPair = z.infer<typeof insertAgentSimilarAccountPairSchema>;
+export type AgentSimilarAccountPair = typeof agentSimilarAccountPairs.$inferSelect;
