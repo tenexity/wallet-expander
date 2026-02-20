@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { startScheduler, stopScheduler } from "./scheduler";
 
 const app = express();
 const httpServer = createServer(app);
@@ -61,6 +62,26 @@ app.use((req, res, next) => {
 
 (async () => {
   await registerRoutes(httpServer, app);
+
+  // ── Start agent scheduler ───────────────────────────────────────────────────
+  // SCHEDULER_TENANT_ID: set in Replit env secrets for the primary tenant.
+  // Defaults to 1 for single-tenant / development deploys.
+  const schedulerTenantId = parseInt(process.env.SCHEDULER_TENANT_ID ?? "1", 10);
+  if (process.env.NODE_ENV !== "test") {
+    startScheduler(schedulerTenantId);
+  }
+
+  // ── Graceful shutdown ───────────────────────────────────────────────────────
+  const gracefulShutdown = (signal: string) => {
+    log(`Received ${signal} — stopping scheduler and closing server.`);
+    stopScheduler();
+    httpServer.close(() => {
+      log("HTTP server closed.");
+      process.exit(0);
+    });
+  };
+  process.once("SIGTERM", () => gracefulShutdown("SIGTERM"));
+  process.once("SIGINT", () => gracefulShutdown("SIGINT"));
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
