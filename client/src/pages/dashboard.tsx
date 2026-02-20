@@ -868,7 +868,14 @@ export default function Dashboard() {
     ],
   };
 
-  const displayStats = stats || mockStats;
+  const displayStats = {
+    ...mockStats,
+    ...(stats || {}),
+    icpProfiles: stats?.icpProfiles || mockStats.icpProfiles || [],
+    recentTasks: stats?.recentTasks || mockStats.recentTasks || [],
+    segmentBreakdown: stats?.segmentBreakdown || mockStats.segmentBreakdown || [],
+    topOpportunities: stats?.topOpportunities || mockStats.topOpportunities || [],
+  };
 
   if (isLoading) {
     return (
