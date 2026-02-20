@@ -31,6 +31,7 @@ import {
   Crown,
   GraduationCap,
   Trophy,
+  Sparkles,
 } from "lucide-react";
 
 import {
@@ -41,6 +42,9 @@ import {
   MockupRevenue,
   MockupPlaybooks,
   MockupGraduationSuccess,
+  MockupDailyBriefing,
+  MockupAskAnything,
+  MockupEmailIntelligence,
 } from "@/components/feature-mockups";
 
 const showcaseFeatures = [
@@ -71,6 +75,19 @@ const showcaseFeatures = [
     ],
   },
   {
+    id: "daily-briefing",
+    badge: "Agentic Daily Briefing",
+    title: "Your AI Rep Starts Every Day With a Plan",
+    description: "Every weekday morning, each territory manager receives a personalized briefing generated overnight by your AI agent. It surfaces which enrolled accounts need attention today, what buying signals were detected in recent emails, and which accounts are quietly trending at-risk — before it becomes a problem.",
+    MockupComponent: MockupDailyBriefing,
+    benefits: [
+      "Personalized morning email to every rep, zero effort required",
+      "AI prioritizes the 2-3 accounts that need action today",
+      "Buying signals and competitor mentions surface automatically",
+      "At-risk accounts flagged before they churn, not after",
+    ],
+  },
+  {
     id: "gap-analysis",
     badge: "Revenue Opportunity Mapping",
     title: "See Exactly Where Each Account Can Grow",
@@ -81,6 +98,19 @@ const showcaseFeatures = [
       "Quantified dollar amounts for each growth opportunity",
       "Category-level insights power targeted conversations",
       "AI prioritizes the highest-value gaps to pursue first",
+    ],
+  },
+  {
+    id: "ask-anything",
+    badge: "Ask Anything Intelligence",
+    title: "Ask Your Portfolio Any Question, Get an Answer in Seconds",
+    description: "No more waiting for weekly reports or digging through spreadsheets. Type any question — \"Which accounts haven't ordered in 90 days?\" or \"Who is my highest-risk account this week?\" — and your AI agent answers instantly by analyzing your entire account portfolio in real time.",
+    MockupComponent: MockupAskAnything,
+    benefits: [
+      "Natural language Q&A across your entire account portfolio",
+      "Ask about individual accounts, segments, or the full program",
+      "Answers streamed in real time, no waiting for reports",
+      "Every query logged for pattern analysis and team learning",
     ],
   },
   {
@@ -122,14 +152,27 @@ const showcaseFeatures = [
       "Every touchpoint drives toward measurable growth",
     ],
   },
+  {
+    id: "email-intelligence",
+    badge: "Email Intelligence",
+    title: "Every Email Your Team Sends Makes the AI Smarter",
+    description: "When your rep logs a customer email, your AI agent reads it in seconds: extracting sentiment, identifying competitor mentions, detecting buying signals, and updating the account's risk profile. The next time that account appears in a briefing or playbook, the AI already knows what happened — and what to say next.",
+    MockupComponent: MockupEmailIntelligence,
+    benefits: [
+      "AI reads every logged email for sentiment and buying signals",
+      "Competitor mentions auto-flagged and tracked over time",
+      "At-risk alerts fired to the rep when urgency is detected",
+      "Each interaction makes playbooks more personalized",
+    ],
+  },
 ];
 
 
 const stats = [
-  { value: "100%", label: "Enrolled Accounts Get Custom Plans" },
   { value: "32%", label: "Avg. Wallet Share Increase*" },
   { value: "4.1x", label: "Typical ROI in First Year*" },
   { value: "94%", label: "Accounts Meet Growth Targets*" },
+  { value: "Daily", label: "AI Briefings Sent to Every Rep" },
 ];
 
 export default function Landing() {
@@ -168,7 +211,7 @@ export default function Landing() {
 
   useEffect(() => {
     document.title = "Wallet Share Expander - Grow Your Highest-Potential Accounts with AI-Enhanced Relationships";
-    
+
     const metaDescription = document.querySelector('meta[name="description"]');
     if (metaDescription) {
       metaDescription.setAttribute("content", "Find your highest-potential accounts and guarantee their growth with customized AI-powered playbooks. Enhance human relationships with intelligent insights that drive wallet share expansion.");
@@ -220,9 +263,9 @@ export default function Landing() {
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <div className="flex items-center gap-2" data-testid="logo-brand">
-            <img 
-              src={walletExpanderLogo} 
-              alt="Wallet Share Expander" 
+            <img
+              src={walletExpanderLogo}
+              alt="Wallet Share Expander"
               className="h-10 w-auto"
             />
             <span className="text-xl font-bold">Wallet Share Expander</span>
@@ -272,16 +315,17 @@ export default function Landing() {
         <div className="container mx-auto px-4 relative">
           <div className="max-w-4xl mx-auto text-center">
             <Badge variant="secondary" className="mb-6" data-testid="badge-hero">
-              Human Relationships, Enhanced by AI
+              Agentic AI That Thinks, Plans, and Reminds
             </Badge>
             <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6" data-testid="text-hero-headline">
               Recover Lost Revenue from{" "}
               <span className="text-primary">Existing Customers</span>
             </h1>
             <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto" data-testid="text-hero-description">
-              Identify wallet share leakage and prioritize your highest-potential accounts. 
-              Enroll them in a proven growth program and drive results with AI-customized playbooks 
-              that strengthen, not replace, your team's relationships.
+              Identify wallet share leakage and prioritize your highest-potential accounts.
+              Enroll them in a proven growth program, then let your AI agent monitor every account overnight,
+              send your reps a personalized daily briefing each morning, and automatically flag risk
+              before you lose revenue.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
@@ -324,7 +368,7 @@ export default function Landing() {
       </section>
       <section className="py-16 bg-muted/30">
         <div className="container mx-auto px-4">
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-4 gap-6">
             <Card className="text-center p-6" data-testid="card-step-analyze">
               <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                 <Target className="h-6 w-6 text-primary" />
@@ -341,6 +385,15 @@ export default function Landing() {
               <h3 className="font-semibold mb-2">Enroll</h3>
               <p className="text-sm text-muted-foreground">
                 Commit accounts to growth with personalized playbooks and action plans
+              </p>
+            </Card>
+            <Card className="text-center p-6 border-primary/30 bg-primary/5" data-testid="card-step-monitor">
+              <div className="mx-auto w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-4">
+                <Zap className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="font-semibold mb-2">Agent Monitors</h3>
+              <p className="text-sm text-muted-foreground">
+                Your AI runs overnight reviews, sends morning briefings, and surfaces risk — automatically
               </p>
             </Card>
             <Card className="text-center p-6" data-testid="card-step-execute">
@@ -365,7 +418,7 @@ export default function Landing() {
               A Proven System for Account Growth
             </h2>
             <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-              Discover your highest-potential accounts, enroll them with customized growth plans, and empower your team with 
+              Discover your highest-potential accounts, enroll them with customized growth plans, and empower your team with
               AI-generated action playbooks. Human relationships drive the results, AI ensures nothing falls through the cracks.
             </p>
           </div>
@@ -445,7 +498,7 @@ export default function Landing() {
                   Surface accounts with the highest wallet share growth opportunity
                 </p>
               </Card>
-              
+
               <Card className="p-6 text-center relative" data-testid="card-guarantee-step-2">
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm font-bold flex items-center justify-center">
                   2
@@ -458,7 +511,7 @@ export default function Landing() {
                   Commit to growing the account with a customized action plan
                 </p>
               </Card>
-              
+
               <Card className="p-6 text-center relative" data-testid="card-guarantee-step-3">
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm font-bold flex items-center justify-center">
                   3
@@ -471,7 +524,7 @@ export default function Landing() {
                   Custom playbook with scripts and actions tailored to their gaps
                 </p>
               </Card>
-              
+
               <Card className="p-6 text-center relative" data-testid="card-guarantee-step-4">
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full bg-primary text-primary-foreground text-sm font-bold flex items-center justify-center">
                   4
@@ -524,7 +577,7 @@ export default function Landing() {
                 Complete Visibility Into <span className="text-primary">Wallet Share Capture</span>
               </h2>
               <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-                Graduated accounts provide a clear picture of your wallet share expansion success. 
+                Graduated accounts provide a clear picture of your wallet share expansion success.
                 Track every account from enrollment to graduation and see exactly how much value you've captured.
               </p>
             </div>
@@ -538,7 +591,7 @@ export default function Landing() {
                   <div>
                     <h4 className="text-lg font-semibold mb-2">Enrollment to Graduation Tracking</h4>
                     <p className="text-muted-foreground mb-4">
-                      Track the complete journey of every enrolled account. See revenue at enrollment, 
+                      Track the complete journey of every enrolled account. See revenue at enrollment,
                       growth milestones hit, and final revenue at graduation.
                     </p>
                     <ul className="space-y-2">
@@ -604,6 +657,98 @@ export default function Landing() {
           </div>
         </div>
       </section>
+      {/* Agent Loop Overnight Section */}
+      <section id="agent-loop" className="py-20">
+        <div className="container mx-auto px-4">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-12">
+              <Badge variant="secondary" className="mb-4" data-testid="badge-agent-loop">
+                Autonomous Agent Loop
+              </Badge>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4" data-testid="text-agent-loop-title">
+                Your AI Never Sleeps —{" "}
+                <span className="text-primary">Even When Your Team Does</span>
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+                Six automated jobs run on a schedule so your team always comes in prepared,
+                and nothing ever falls through the cracks.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-4 mb-10">
+              {[
+                {
+                  time: "Weekdays 7:00am",
+                  job: "Daily Briefing",
+                  description: "Personalized morning email to each rep with today's priority accounts and overnight signals",
+                  icon: Mail,
+                  color: "text-blue-500",
+                  bg: "bg-blue-500/10",
+                },
+                {
+                  time: "Mondays 6:00am",
+                  job: "Weekly Account Review",
+                  description: "Auto-assesses graduation readiness and risk level for every enrolled account",
+                  icon: BarChart3,
+                  color: "text-primary",
+                  bg: "bg-primary/10",
+                },
+                {
+                  time: "Sundays 2:00am",
+                  job: "Similarity Refresh",
+                  description: "Finds accounts similar to your top graduates so reps can enroll look-alikes",
+                  icon: Users,
+                  color: "text-violet-500",
+                  bg: "bg-violet-500/10",
+                },
+                {
+                  time: "1st of Month 3:00am",
+                  job: "Learning Synthesis",
+                  description: "Reads 90 days of playbook outcomes and distills new cross-account patterns",
+                  icon: Sparkles,
+                  color: "text-amber-500",
+                  bg: "bg-amber-500/10",
+                },
+                {
+                  time: "Every 4 Hours",
+                  job: "CRM Sync",
+                  description: "Pushes enrollment, graduation, and at-risk events to your CRM automatically",
+                  icon: Shield,
+                  color: "text-green-500",
+                  bg: "bg-green-500/10",
+                },
+                {
+                  time: "Real-time",
+                  job: "Email Intelligence",
+                  description: "Analyzes every logged email for signals, sentiment, and competitor mentions",
+                  icon: Zap,
+                  color: "text-orange-500",
+                  bg: "bg-orange-500/10",
+                },
+              ].map((item, i) => {
+                const Icon = item.icon;
+                return (
+                  <Card key={i} className="p-5" data-testid={`card-agent-loop-${i}`}>
+                    <div className={`w-10 h-10 rounded-lg ${item.bg} flex items-center justify-center mb-3`}>
+                      <Icon className={`h-5 w-5 ${item.color}`} />
+                    </div>
+                    <div className="text-xs font-medium text-muted-foreground mb-1">{item.time}</div>
+                    <h4 className="font-semibold text-sm mb-2">{item.job}</h4>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{item.description}</p>
+                  </Card>
+                );
+              })}
+            </div>
+
+            <div className="text-center">
+              <Button size="lg" onClick={() => scrollToSection("pricing")} data-testid="button-agent-loop-cta">
+                See It In Action
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
       {/* Graduation Success Proof Section */}
       <section id="graduation-proof" className="py-20 bg-muted/30">
         <div className="container mx-auto px-4">
@@ -616,7 +761,7 @@ export default function Landing() {
                 Enroll, Work with AI, <span className="text-primary">Graduate to Huge Returns</span>
               </h2>
               <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-                This is what success looks like. Every enrolled account has a clear path from enrollment to graduation, 
+                This is what success looks like. Every enrolled account has a clear path from enrollment to graduation,
                 with full visibility into baseline revenue, growth achieved, and ICP category success.
               </p>
             </div>
@@ -672,7 +817,7 @@ export default function Landing() {
 
             <div className="mt-10 text-center">
               <p className="text-muted-foreground mb-6">
-                Every graduated account tells a story: where they started, how they grew, and the value you captured. 
+                Every graduated account tells a story: where they started, how they grew, and the value you captured.
                 <br className="hidden md:block" />
                 No guesswork, no assumptions, just measurable wallet share expansion.
               </p>
@@ -701,22 +846,20 @@ export default function Landing() {
               <div className="inline-flex items-center gap-2 p-1 rounded-lg bg-muted" data-testid="billing-toggle">
                 <button
                   onClick={() => setBillingCycle("monthly")}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                    billingCycle === "monthly"
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground"
-                  }`}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${billingCycle === "monthly"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground"
+                    }`}
                   data-testid="button-monthly-billing"
                 >
                   Monthly
                 </button>
                 <button
                   onClick={() => setBillingCycle("yearly")}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                    billingCycle === "yearly"
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground"
-                  }`}
+                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${billingCycle === "yearly"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground"
+                    }`}
                   data-testid="button-yearly-billing"
                 >
                   Yearly
@@ -750,9 +893,8 @@ export default function Landing() {
                   return (
                     <Card
                       key={plan.id}
-                      className={`relative p-6 flex flex-col ${
-                        isPopular ? "border-primary shadow-lg" : ""
-                      }`}
+                      className={`relative p-6 flex flex-col ${isPopular ? "border-primary shadow-lg" : ""
+                        }`}
                       data-testid={`card-plan-${plan.slug}`}
                     >
                       {isPopular && (
@@ -1033,11 +1175,11 @@ export default function Landing() {
                       Graduate Accounts, Control Your Costs
                     </h3>
                     <p className="text-muted-foreground text-sm leading-relaxed" data-testid="text-graduation-description">
-                      You're always in control of your subscription. When an enrolled account reaches your target revenue 
-                      level or hits its ICP potential, simply graduate it from the program. This frees up a slot for a 
-                      new account to enroll, letting you continuously work on your highest-potential opportunities without 
-                      increasing costs. We track every graduated account so you can see your total success: how many 
-                      accounts have grown, the revenue increase from enrollment to graduation, and the cumulative value 
+                      You're always in control of your subscription. When an enrolled account reaches your target revenue
+                      level or hits its ICP potential, simply graduate it from the program. This frees up a slot for a
+                      new account to enroll, letting you continuously work on your highest-potential opportunities without
+                      increasing costs. We track every graduated account so you can see your total success: how many
+                      accounts have grown, the revenue increase from enrollment to graduation, and the cumulative value
                       you've captured. It's a built-in scoreboard for your wallet share expansion efforts.
                     </p>
                   </div>
@@ -1093,9 +1235,9 @@ export default function Landing() {
 
               <Card className="p-8 bg-primary/5 border-primary/20" data-testid="card-testimonial">
                 <blockquote className="text-lg italic mb-4" data-testid="text-testimonial-quote">
-                  "We enrolled 50 accounts in the first month and every single one 
-                  has grown. The AI playbooks give our reps exactly what they need to 
-                  have confident, value-driven conversations. It's like giving each 
+                  "We enrolled 50 accounts in the first month and every single one
+                  has grown. The AI playbooks give our reps exactly what they need to
+                  have confident, value-driven conversations. It's like giving each
                   rep a personal sales strategist."
                 </blockquote>
                 <div className="flex items-center gap-3">
@@ -1126,7 +1268,7 @@ export default function Landing() {
                   Discover Your Highest-Potential Accounts
                 </h2>
                 <p className="text-muted-foreground mb-6">
-                  See which accounts have the biggest growth opportunity. 
+                  See which accounts have the biggest growth opportunity.
                   Start enrolling and watch them grow with proven playbook strategies.
                 </p>
 
@@ -1140,8 +1282,8 @@ export default function Landing() {
 
                   <p className="text-sm text-muted-foreground">
                     Already have an account?{" "}
-                    <a 
-                      href="/api/login" 
+                    <a
+                      href="/api/login"
                       className="text-primary font-medium"
                       data-testid="link-login"
                     >

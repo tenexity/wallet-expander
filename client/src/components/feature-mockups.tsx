@@ -53,7 +53,7 @@ export function MockupDashboard() {
         </div>
         <Badge variant="secondary" className="text-xs">Dashboard</Badge>
       </div>
-      
+
       <div className="grid grid-cols-4 gap-3">
         <Card className="p-3">
           <div className="flex items-center justify-between">
@@ -134,7 +134,7 @@ export function MockupEnrollment() {
         <h3 className="font-semibold">Account Discovery</h3>
         <Badge variant="outline" className="text-xs">25 Accounts Analyzed</Badge>
       </div>
-      
+
       <div className="space-y-2">
         {mockAccounts.map((account, i) => (
           <Card key={i} className={`p-3 ${account.enrolled ? 'border-primary/50 bg-primary/5' : ''}`}>
@@ -411,23 +411,23 @@ export function MockupPlaybooks() {
 }
 
 const mockGraduatedAccounts = [
-  { 
-    name: "Mountain Air HVAC", 
-    segment: "HVAC", 
-    daysEnrolled: 90, 
-    baseline: 201000, 
-    graduation: 245000, 
+  {
+    name: "Mountain Air HVAC",
+    segment: "HVAC",
+    daysEnrolled: 90,
+    baseline: 201000,
+    graduation: 245000,
     growth: 44000,
-    icpSuccess: 80 
+    icpSuccess: 80
   },
-  { 
-    name: "Great Lakes Heating", 
-    segment: "HVAC", 
-    daysEnrolled: 75, 
-    baseline: 169000, 
-    graduation: 199000, 
+  {
+    name: "Great Lakes Heating",
+    segment: "HVAC",
+    daysEnrolled: 75,
+    baseline: 169000,
+    graduation: 199000,
     growth: 30000,
-    icpSuccess: 67 
+    icpSuccess: 67
   },
 ];
 
@@ -521,6 +521,154 @@ export function MockupGraduationSuccess() {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+// ─── NEW: Daily Briefing Mockup ────────────────────────────────────────────────
+export function MockupDailyBriefing() {
+  const priorityAccounts = [
+    { name: "Metro HVAC Solutions", action: "Call re: Copper Fittings proposal", urgency: "Today", dot: "bg-red-500" },
+    { name: "Pacific Plumbing Pro", action: "Follow up on last email — no reply in 8 days", urgency: "Overdue", dot: "bg-orange-500" },
+    { name: "Summit Mechanical", action: "Send ductwork pricing sheet", urgency: "This week", dot: "bg-blue-500" },
+  ];
+
+  return (
+    <div className="bg-background rounded-lg p-4 space-y-4 text-sm border shadow-sm">
+      <div className="flex items-center justify-between border-b pb-3">
+        <div>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">Daily Briefing • Mon Feb 17</p>
+          <h3 className="font-semibold text-sm mt-0.5">Good morning, Sarah 👋</h3>
+        </div>
+        <Badge variant="secondary" className="text-[10px]">8 Enrolled Accounts</Badge>
+      </div>
+
+      <Card className="p-3 border-primary/20 bg-primary/5">
+        <p className="text-[10px] font-medium text-primary uppercase tracking-wide mb-1">Today's Focus</p>
+        <p className="text-xs text-foreground font-medium">Metro HVAC is your highest-risk account this week. Their last order was 31 days ago — copper fitting gap is widening. A call today could recover ~$12K.</p>
+      </Card>
+
+      <div>
+        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-2">Priority Actions</p>
+        <div className="space-y-2">
+          {priorityAccounts.map((acc, i) => (
+            <div key={i} className="flex items-start gap-2.5 p-2 rounded-lg border bg-background">
+              <div className={`mt-1.5 h-2 w-2 rounded-full flex-shrink-0 ${acc.dot}`} />
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-xs truncate">{acc.name}</p>
+                <p className="text-[10px] text-muted-foreground">{acc.action}</p>
+              </div>
+              <Badge variant="outline" className="text-[9px] shrink-0">{acc.urgency}</Badge>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between pt-1 border-t text-[10px] text-muted-foreground">
+        <span>Generated at 7:00am EST by your AI agent</span>
+        <span className="text-primary font-medium cursor-pointer">View Full Briefing →</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── NEW: Ask Anything Mockup ──────────────────────────────────────────────────
+export function MockupAskAnything() {
+  return (
+    <div className="bg-background rounded-lg p-4 space-y-4 text-sm border shadow-sm">
+      <div className="flex items-center justify-between border-b pb-3">
+        <h3 className="font-semibold text-sm">Ask Anything</h3>
+        <div className="flex items-center gap-1">
+          {["Portfolio", "Account", "Program"].map((scope, i) => (
+            <Badge key={i} variant={i === 0 ? "default" : "outline"} className="text-[10px] cursor-pointer">{scope}</Badge>
+          ))}
+        </div>
+      </div>
+
+      <div className="relative">
+        <div className="flex items-center gap-2 border rounded-lg px-3 py-2 bg-muted/30">
+          <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" />
+          <span className="text-xs text-muted-foreground">Which accounts haven't ordered in 90+ days?</span>
+        </div>
+      </div>
+
+      <Card className="p-3 border-primary/20 bg-primary/5">
+        <div className="flex items-center gap-1.5 mb-2">
+          <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+          <p className="text-[10px] font-medium text-primary uppercase tracking-wide">AI Response</p>
+        </div>
+        <p className="text-xs text-foreground leading-relaxed">
+          <span className="font-semibold">3 accounts</span> have gone 90+ days without an order:
+        </p>
+        <div className="mt-2 space-y-1.5">
+          {[
+            { name: "Valley General Contractors", days: "104 days", risk: "High" },
+            { name: "Summit Mechanical", days: "91 days", risk: "Med" },
+            { name: "Blue Ridge Plumbing", days: "90 days", risk: "Med" },
+          ].map((acc, i) => (
+            <div key={i} className="flex items-center justify-between text-[10px]">
+              <span className="font-medium">{acc.name}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">{acc.days} silent</span>
+                <Badge variant={acc.risk === "High" ? "destructive" : "secondary"} className="text-[9px]">{acc.risk}</Badge>
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-2">I recommend opening their dossiers and triggering playbook reviews today.</p>
+      </Card>
+
+      <div className="text-[10px] text-muted-foreground text-center">
+        Powered by your live account data · Answers stream in real time
+      </div>
+    </div>
+  );
+}
+
+// ─── NEW: Email Intelligence Mockup ───────────────────────────────────────────
+export function MockupEmailIntelligence() {
+  return (
+    <div className="bg-background rounded-lg p-4 space-y-4 text-sm border shadow-sm">
+      <div className="flex items-center justify-between border-b pb-3">
+        <div>
+          <h3 className="font-semibold text-sm">Email Intelligence</h3>
+          <p className="text-[10px] text-muted-foreground">AI analysis complete · 2 minutes ago</p>
+        </div>
+        <Badge className="text-[10px] bg-green-600">Signal Detected</Badge>
+      </div>
+
+      <Card className="p-3 bg-muted/30 border-muted">
+        <p className="text-[10px] font-medium text-muted-foreground mb-1">Logged Email — Metro HVAC Solutions</p>
+        <p className="text-xs italic text-muted-foreground line-clamp-3">
+          "…we've actually been getting some quotes from Ferguson on the copper side. Their pricing is competitive but the lead times are longer. Wanted to let you know before we make a final decision…"
+        </p>
+      </Card>
+
+      <div>
+        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-2">AI Analysis</p>
+        <div className="grid grid-cols-2 gap-2">
+          <Card className="p-2.5">
+            <p className="text-[10px] text-muted-foreground">Sentiment</p>
+            <div className="flex items-center gap-1 mt-0.5">
+              <div className="h-2 w-2 rounded-full bg-orange-500" />
+              <p className="text-xs font-semibold">At Risk</p>
+            </div>
+          </Card>
+          <Card className="p-2.5">
+            <p className="text-[10px] text-muted-foreground">Buying Signal</p>
+            <p className="text-xs font-semibold text-amber-600">Decision Near</p>
+          </Card>
+          <Card className="p-2.5 col-span-2">
+            <p className="text-[10px] text-muted-foreground mb-1">Competitor Mentioned</p>
+            <Badge variant="destructive" className="text-[10px]">Ferguson — Copper Fittings</Badge>
+          </Card>
+        </div>
+      </div>
+
+      <Card className="p-2.5 border-red-500/30 bg-red-500/5">
+        <p className="text-[10px] font-semibold text-red-600">⚠ Urgent Alert Sent to Rep</p>
+        <p className="text-[10px] text-muted-foreground mt-0.5">Metro HVAC is evaluating a competitor. Respond within 24 hours to protect this account.</p>
+      </Card>
     </div>
   );
 }
