@@ -877,11 +877,11 @@ export default function Landing() {
             ) : plans && plans.length > 0 ? (
               <div className="grid md:grid-cols-4 gap-6">
                 {plans.map((plan) => {
-                  const priceRaw = billingCycle === "yearly" ? plan.yearlyPrice : plan.monthlyPrice;
-                  const price = parseFloat(priceRaw || "0");
-                  const isPopular = plan.slug === "scale";
-                  const isEnterprise = plan.slug === "enterprise";
-                  const isFree = plan.slug === "starter";
+                  const priceRaw = billingCycle === "yearly" ? plan.priceYearly : plan.priceMonthly;
+                  const price = priceRaw || 0;
+                  const isPopular = plan.id === "scale";
+                  const isEnterprise = plan.id === "enterprise";
+                  const isFree = plan.id === "starter";
                   const features = Array.isArray(plan.features) ? plan.features : [];
                   const planDescriptions: Record<string, string> = {
                     starter: "Try it free with one account",
@@ -895,7 +895,7 @@ export default function Landing() {
                       key={plan.id}
                       className={`relative p-6 flex flex-col ${isPopular ? "border-primary shadow-lg" : ""
                         }`}
-                      data-testid={`card-plan-${plan.slug}`}
+                      data-testid={`card-plan-${plan.id}`}
                     >
                       {isPopular && (
                         <Badge
@@ -908,24 +908,24 @@ export default function Landing() {
                       )}
 
                       <div className="text-center mb-6">
-                        <h3 className="text-xl font-bold mb-2" data-testid={`text-plan-name-${plan.slug}`}>
+                        <h3 className="text-xl font-bold mb-2" data-testid={`text-plan-name-${plan.id}`}>
                           {plan.name}
                         </h3>
-                        <p className="text-sm text-muted-foreground mb-4" data-testid={`text-plan-desc-${plan.slug}`}>
-                          {planDescriptions[plan.slug] || "Flexible plan for your needs"}
+                        <p className="text-sm text-muted-foreground mb-4" data-testid={`text-plan-desc-${plan.id}`}>
+                          {planDescriptions[plan.id] || "Flexible plan for your needs"}
                         </p>
                         <div className="flex items-baseline justify-center gap-1">
                           {isEnterprise ? (
-                            <span className="text-4xl font-bold" data-testid={`text-plan-price-${plan.slug}`}>
+                            <span className="text-4xl font-bold" data-testid={`text-plan-price-${plan.id}`}>
                               Custom
                             </span>
                           ) : isFree ? (
-                            <span className="text-4xl font-bold" data-testid={`text-plan-price-${plan.slug}`}>
+                            <span className="text-4xl font-bold" data-testid={`text-plan-price-${plan.id}`}>
                               Free
                             </span>
                           ) : (
                             <>
-                              <span className="text-4xl font-bold" data-testid={`text-plan-price-${plan.slug}`}>
+                              <span className="text-4xl font-bold" data-testid={`text-plan-price-${plan.id}`}>
                                 ${billingCycle === "yearly" ? Math.round(price / 12) : Math.round(price)}
                               </span>
                               <span className="text-muted-foreground">/mo</span>
@@ -951,7 +951,7 @@ export default function Landing() {
                           <Button
                             className="w-full"
                             variant="outline"
-                            data-testid={`button-select-plan-${plan.slug}`}
+                            data-testid={`button-select-plan-${plan.id}`}
                           >
                             Contact Sales
                           </Button>
@@ -960,9 +960,9 @@ export default function Landing() {
                         <Button
                           className="w-full"
                           variant={isPopular ? "default" : "outline"}
-                          onClick={() => handleSelectPlan(plan.slug)}
+                          onClick={() => handleSelectPlan(plan.id)}
                           disabled={checkoutMutation.isPending}
-                          data-testid={`button-select-plan-${plan.slug}`}
+                          data-testid={`button-select-plan-${plan.id}`}
                         >
                           {checkoutMutation.isPending ? (
                             <>
