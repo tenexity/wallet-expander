@@ -13,6 +13,7 @@ import {
   GitBranch,
   CreditCard,
   ShieldCheck,
+  BarChart3,
 } from "lucide-react";
 import {
   Sidebar,
@@ -72,6 +73,12 @@ const mainNavItems = [
     icon: ClipboardList,
     tooltip: "Generate and manage AI-powered sales tasks with call scripts and emails",
   },
+  {
+    title: "Program Performance",
+    url: "/program-performance",
+    icon: BarChart3,
+    tooltip: "Enrolled/graduated counts, rep leaderboard, and program health metrics",
+  },
 ];
 
 const adminNavItems = [
@@ -103,11 +110,11 @@ const adminNavItems = [
 
 function UserProfile() {
   const { user } = useAuth();
-  
-  const displayName = user?.firstName && user?.lastName 
-    ? `${user.firstName} ${user.lastName}` 
+
+  const displayName = user?.firstName && user?.lastName
+    ? `${user.firstName} ${user.lastName}`
     : user?.email?.split('@')[0] || 'User';
-  
+
   const initials = user?.firstName && user?.lastName
     ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
     : displayName.slice(0, 2).toUpperCase();
@@ -176,17 +183,17 @@ export function AppSidebar() {
         <div className="flex items-center gap-3">
           {companyLogo ? (
             <div className="flex h-10 w-10 items-center justify-center rounded-md overflow-hidden bg-sidebar-primary">
-              <img 
-                src={companyLogo} 
-                alt="Company logo" 
+              <img
+                src={companyLogo}
+                alt="Company logo"
                 className="h-full w-full object-cover"
               />
             </div>
           ) : (
             <div className="flex h-10 w-10 items-center justify-center rounded-md overflow-hidden">
-              <img 
-                src={appLogo} 
-                alt="Wallet Share Expander" 
+              <img
+                src={appLogo}
+                alt="Wallet Share Expander"
                 className="h-full w-full object-contain"
               />
             </div>
@@ -244,9 +251,9 @@ export function AppSidebar() {
         <div className="border-t border-sidebar-border pt-3">
           <div className="flex items-center justify-center gap-2 text-xs text-sidebar-foreground/50">
             <span>Created with care by</span>
-            <img 
-              src={tenexityLogo} 
-              alt="Tenexity" 
+            <img
+              src={tenexityLogo}
+              alt="Tenexity"
               className="h-4 object-contain dark:invert"
             />
           </div>

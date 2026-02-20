@@ -1,4 +1,7 @@
 import { useState, useEffect, useCallback, DragEvent, useMemo } from "react";
+import { DailyBriefingCard } from "@/components/daily-briefing-card";
+import { AccountDossierPanel } from "@/components/account-dossier-panel";
+
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { KPICard } from "@/components/kpi-card";
@@ -298,16 +301,17 @@ const BLOCK_LABELS: Record<string, string> = {
 
 export default function Dashboard() {
   const [, navigate] = useLocation();
+  const [dossierAccountId, setDossierAccountId] = useState<number | null>(null);
   const [layout, setLayout] = useState<LayoutItem[]>(DEFAULT_LAYOUT);
   const [collapsedBlocks, setCollapsedBlocks] = useState<Set<string>>(new Set());
   const [isLayoutLocked, setIsLayoutLocked] = useState(false);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
-  
+
   // Opportunity table sorting state (default: score descending)
   const [opportunitySortKey, setOpportunitySortKey] = useState<OpportunitySortKey>("opportunityScore");
   const [opportunitySortDir, setOpportunitySortDir] = useState<SortDirection>("desc");
-  
+
   // Column visibility state for opportunity table
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => {
     // Initialize with defaults first (SSR-safe)
@@ -315,7 +319,7 @@ export default function Dashboard() {
       ALL_OPPORTUNITY_COLUMNS.filter((col) => col.default).map((col) => col.key)
     );
   });
-  
+
   // Load saved column visibility from localStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem(OPPORTUNITY_COLUMNS_STORAGE_KEY);
@@ -429,7 +433,7 @@ export default function Dashboard() {
   const sortedTopOpportunities = useMemo(() => {
     const accounts = allAccounts || [];
     if (accounts.length === 0) return [];
-    
+
     // First sort all accounts by the selected column
     const sorted = [...accounts].sort((a, b) => {
       let comparison = 0;
@@ -460,7 +464,7 @@ export default function Dashboard() {
       }
       return opportunitySortDir === "asc" ? comparison : -comparison;
     });
-    
+
     // Return top 10 accounts
     return sorted.slice(0, 10);
   }, [allAccounts, opportunitySortKey, opportunitySortDir]);
@@ -468,9 +472,9 @@ export default function Dashboard() {
   // Revenue by segment from enrolled accounts
   const revenueBySegment = useMemo(() => {
     if (!enrolledAccounts || enrolledAccounts.length === 0) return null;
-    
+
     const segmentMap = new Map<string, { segment: string; revenue: number; count: number }>();
-    
+
     enrolledAccounts.forEach(account => {
       const existing = segmentMap.get(account.segment);
       if (existing) {
@@ -484,7 +488,7 @@ export default function Dashboard() {
         });
       }
     });
-    
+
     return Array.from(segmentMap.values());
   }, [enrolledAccounts]);
 
@@ -550,7 +554,7 @@ export default function Dashboard() {
     e.preventDefault();
     e.stopPropagation();
     const sourceId = e.dataTransfer.getData("text/plain");
-    
+
     if (!sourceId || sourceId === targetId || isLayoutLocked) {
       setDraggedId(null);
       setDragOverId(null);
@@ -561,7 +565,7 @@ export default function Dashboard() {
       const newLayout = [...prevLayout];
       const draggedIndex = newLayout.findIndex(item => item.i === sourceId);
       const targetIndex = newLayout.findIndex(item => item.i === targetId);
-      
+
       if (draggedIndex !== -1 && targetIndex !== -1) {
         const [draggedItem] = newLayout.splice(draggedIndex, 1);
         newLayout.splice(targetIndex, 0, draggedItem);
@@ -570,7 +574,7 @@ export default function Dashboard() {
       }
       return prevLayout;
     });
-    
+
     setDraggedId(null);
     setDragOverId(null);
   };
@@ -706,7 +710,7 @@ export default function Dashboard() {
         ),
       },
     ];
-    
+
     return allColumns.filter(col => visibleColumns.has(col.key));
   }, [visibleColumns, opportunitySortKey, opportunitySortDir]);
 
@@ -928,7 +932,7 @@ export default function Dashboard() {
     const currentBlock = layout.find(item => item.i === blockId);
     const currentWidth = currentBlock?.w ?? 6;
     const currentHeight = currentBlock?.heightPreset ?? 'standard';
-    
+
     return (
       <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
         <div className="flex items-start gap-2 flex-1 min-w-0">
@@ -1027,8 +1031,8 @@ export default function Dashboard() {
                   </div>
                 </PopoverContent>
               </Popover>
-              <div 
-                className="drag-handle cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded" 
+              <div
+                className="drag-handle cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded"
                 data-testid={`drag-handle-${blockId}`}
                 draggable
                 onDragStart={(e) => handleDragStart(e, blockId)}
@@ -1045,7 +1049,7 @@ export default function Dashboard() {
 
   const renderBlock = (blockId: string) => {
     const isCollapsed = collapsedBlocks.has(blockId);
-    
+
     switch (blockId) {
       case "daily-focus":
         return (
@@ -1164,8 +1168,8 @@ export default function Dashboard() {
                         </div>
                       </PopoverContent>
                     </Popover>
-                    <div 
-                      className="drag-handle cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded" 
+                    <div
+                      className="drag-handle cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded"
                       data-testid={`drag-handle-${blockId}`}
                       draggable
                       onDragStart={(e) => handleDragStart(e, blockId)}
@@ -1202,9 +1206,8 @@ export default function Dashboard() {
                           onClick={() => handleTaskClick(task.id)}
                           data-testid={`daily-focus-task-${task.id}`}
                         >
-                          <div className={`flex h-8 w-8 items-center justify-center rounded-md ${
-                            task.isOverdue ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
-                          }`}>
+                          <div className={`flex h-8 w-8 items-center justify-center rounded-md ${task.isOverdue ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary"
+                            }`}>
                             <TaskIcon className="h-4 w-4" />
                           </div>
                           <div className="flex-1 min-w-0">
@@ -1566,9 +1569,9 @@ export default function Dashboard() {
         <div className="flex items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <Button
+                variant="ghost"
+                size="icon"
                 data-testid="button-layout-menu"
               >
                 {isLayoutLocked ? (
@@ -1606,6 +1609,9 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Agent Daily Briefing */}
+      <DailyBriefingCard onAccountClick={(id) => setDossierAccountId(id)} />
+
       {!allComplete && (
         <Card className="border-chart-1/20 bg-chart-1/5" data-testid="card-getting-started">
           <CardHeader className="pb-3">
@@ -1632,22 +1638,20 @@ export default function Dashboard() {
                   <div key={step.id} className="flex items-center gap-4 flex-1">
                     <Link href={step.href}>
                       <div
-                        className={`flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer ${
-                          step.completed
-                            ? "bg-chart-2/10 border-chart-2/30"
-                            : isNextStep
+                        className={`flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer ${step.completed
+                          ? "bg-chart-2/10 border-chart-2/30"
+                          : isNextStep
                             ? "bg-primary/10 border-primary/30 hover-elevate"
                             : "bg-muted/50 border-muted"
-                        }`}
+                          }`}
                         data-testid={`step-${step.id}`}
                       >
-                        <div className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                          step.completed
-                            ? "bg-chart-2 text-chart-2-foreground"
-                            : isNextStep
+                        <div className={`flex h-8 w-8 items-center justify-center rounded-full ${step.completed
+                          ? "bg-chart-2 text-chart-2-foreground"
+                          : isNextStep
                             ? "bg-primary text-primary-foreground"
                             : "bg-muted text-muted-foreground"
-                        }`}>
+                          }`}>
                           {step.completed ? (
                             <CheckCircle2 className="h-4 w-4" />
                           ) : (
@@ -1665,9 +1669,8 @@ export default function Dashboard() {
                       </div>
                     </Link>
                     {index < workflowSteps.length - 1 && (
-                      <div className={`hidden lg:block h-0.5 flex-1 ${
-                        step.completed ? "bg-chart-2/50" : "bg-muted"
-                      }`} />
+                      <div className={`hidden lg:block h-0.5 flex-1 ${step.completed ? "bg-chart-2/50" : "bg-muted"
+                        }`} />
                     )}
                   </div>
                 );
@@ -1785,7 +1788,7 @@ export default function Dashboard() {
                 </p>
                 <div className="flex items-center justify-center gap-1">
                   <p className="text-xs text-muted-foreground">Accounts Graduated</p>
-                  <InfoTooltip 
+                  <InfoTooltip
                     content="Total number of accounts that have successfully completed the program and met their graduation objectives."
                     testId="tooltip-graduated-count"
                   />
@@ -1797,7 +1800,7 @@ export default function Dashboard() {
                 </p>
                 <div className="flex items-center justify-center gap-1">
                   <p className="text-xs text-muted-foreground">Incremental Revenue</p>
-                  <InfoTooltip 
+                  <InfoTooltip
                     content="Sum of incremental revenue across all graduated accounts. Calculated as: Graduation Revenue - Pro-rated Baseline. The baseline is adjusted to match enrollment duration for fair comparison."
                     testId="tooltip-incremental-revenue"
                   />
@@ -1809,7 +1812,7 @@ export default function Dashboard() {
                 </p>
                 <div className="flex items-center justify-center gap-1">
                   <p className="text-xs text-muted-foreground">Avg Days to Graduate</p>
-                  <InfoTooltip 
+                  <InfoTooltip
                     content="Average number of days from enrollment to graduation across all graduated accounts. Calculated as: Total enrollment days / Number of graduated accounts."
                     testId="tooltip-avg-days"
                   />
@@ -1821,21 +1824,21 @@ export default function Dashboard() {
                 </p>
                 <div className="flex items-center justify-center gap-1">
                   <p className="text-xs text-muted-foreground">Avg ICP Category Success</p>
-                  <InfoTooltip 
+                  <InfoTooltip
                     content="Average percentage of ICP category gaps filled at graduation. Calculated as: (Categories Achieved / Categories Missing at Enrollment) × 100, averaged across all graduated accounts with ICP data."
                     testId="tooltip-icp-success"
                   />
                 </div>
               </div>
             </div>
-            
+
             {/* Recent Graduates with Revenue Details */}
             {graduationAnalytics.graduatedAccounts.length > 0 && (
               <div className="space-y-3">
                 <p className="text-sm font-medium text-muted-foreground">Recent Graduates</p>
                 <div className="space-y-2">
                   {graduationAnalytics.graduatedAccounts.slice(0, 5).map((account) => (
-                    <Card 
+                    <Card
                       key={account.id}
                       className="p-3"
                       data-testid={`card-graduate-${account.id}`}
@@ -1848,7 +1851,7 @@ export default function Dashboard() {
                           <div>
                             <p className="font-medium" data-testid={`text-graduate-name-${account.id}`}>{account.accountName}</p>
                             <p className="text-xs text-muted-foreground" data-testid={`text-graduate-info-${account.id}`}>
-                              {account.segment || "No segment"} 
+                              {account.segment || "No segment"}
                               {account.enrollmentDurationDays && ` · ${account.enrollmentDurationDays} days enrolled`}
                             </p>
                           </div>
@@ -1902,7 +1905,7 @@ export default function Dashboard() {
           const isDragOver = dragOverId === item.i && draggedId !== item.i;
           const isCollapsed = collapsedBlocks.has(item.i);
           const heightClass = isCollapsed ? 'h-auto' : HEIGHT_CLASSES[item.heightPreset];
-          
+
           const getWidthClasses = (w: WidthPreset) => {
             switch (w) {
               case 3: return "col-span-12 sm:col-span-6 lg:col-span-3";
@@ -1914,7 +1917,7 @@ export default function Dashboard() {
               default: return "col-span-12 md:col-span-6";
             }
           };
-          
+
           return (
             <div
               key={item.i}
@@ -1936,6 +1939,13 @@ export default function Dashboard() {
           );
         })}
       </div>
+
+      {/* Account Dossier — slide-out panel */}
+      <AccountDossierPanel
+        accountId={dossierAccountId}
+        onClose={() => setDossierAccountId(null)}
+      />
     </div>
   );
 }
+

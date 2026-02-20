@@ -21,6 +21,8 @@ import Profile from "@/pages/profile";
 import Subscription from "@/pages/subscription";
 import AppAdmin from "@/pages/app-admin";
 import Landing from "@/pages/landing";
+import ProgramPerformance from "@/pages/program-performance";
+import { AskAnythingBar } from "@/components/ask-anything-bar";
 
 function AuthenticatedRouter() {
   return (
@@ -36,6 +38,7 @@ function AuthenticatedRouter() {
       <Route path="/profile" component={Profile} />
       <Route path="/subscription" component={Subscription} />
       <Route path="/app-admin" component={AppAdmin} />
+      <Route path="/program-performance" component={ProgramPerformance} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -54,6 +57,7 @@ function AuthenticatedLayout() {
         <div className="flex flex-col flex-1 min-w-0">
           <header className="flex items-center justify-between gap-1 p-2 border-b sticky top-0 z-50 bg-background">
             <SidebarTrigger data-testid="button-sidebar-toggle" />
+            <AskAnythingBar />
             <ThemeToggle />
           </header>
           <main className="flex-1 overflow-auto">

@@ -170,6 +170,25 @@ export async function registerRoutes(
   // ============================================================
   // AGENT ROUTES — Phase 3: Agent Loop Services
   // ============================================================
+
+  /**
+   * GET /api/agent/state/:runType
+   * Returns agentState row for the given runType and tenant.
+   * Used by frontend DailyBriefingCard and other dashboard components.
+   */
+  app.get("/api/agent/state/:runType", requireAuth, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+      const { runType } = req.params;
+      const state = await storage.getAgentState(tenantId, runType);
+      if (!state) return res.status(404).json({ message: "No state found for this runType" });
+      res.json(state);
+    } catch (error) {
+      handleRouteError(error, res, "Get agent state");
+    }
+  });
+
   const { generatePlaybook } = await import("./services/generate-playbook.js");
   const { runDailyBriefing } = await import("./services/daily-briefing.js");
   const { analyzeEmailIntelligence } = await import("./services/email-intelligence.js");
