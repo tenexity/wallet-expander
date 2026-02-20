@@ -4,8 +4,8 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import { storage } from "./storage";
-import { 
-  insertAccountSchema, 
+import {
+  insertAccountSchema,
   insertSegmentProfileSchema,
   insertProfileCategorySchema,
   insertTaskSchema,
@@ -26,10 +26,10 @@ import {
 import type Stripe from "stripe";
 import { db } from "./db";
 import { eq, sql, count } from "drizzle-orm";
-import { 
-  accounts, 
-  playbooks, 
-  segmentProfiles, 
+import {
+  accounts,
+  playbooks,
+  segmentProfiles,
   programAccounts,
   userRoles,
   users,
@@ -48,10 +48,10 @@ import {
   calculateTerritoryRanking,
   type AccountWithMetrics,
 } from "./services/dataInsightsService";
-import { 
-  getEmailSettings, 
-  saveEmailSettings, 
-  sendTestEmail, 
+import {
+  getEmailSettings,
+  saveEmailSettings,
+  sendTestEmail,
   sendTaskNotification,
   isEmailConfigured,
   DEFAULT_EMAIL_SETTINGS,
@@ -110,19 +110,19 @@ export async function registerRoutes(
   // All routes below require authentication and tenant context
   // Middleware chain: isAuthenticated -> withTenantContext
   // This ensures every protected route has access to req.tenantContext
-  
+
   // Base authentication: requires login + tenant context
   const requireAuth = [isAuthenticated, withTenantContext];
-  
+
   // Write permission: authentication + write permission
   const requireWrite = [...requireAuth, requirePermission("write")];
-  
+
   // Admin permission: authentication + manage_settings permission
   const requireAdmin = [...requireAuth, requirePermission("manage_settings")];
-  
+
   // Active subscription: authentication + active subscription status
   const requireSubscription = [...requireAuth, requireActiveSubscription];
-  
+
   // Plan-specific: authentication + active subscription + minimum plan level
   const requireProPlan = [...requireAuth, requireActiveSubscription, requirePlan("professional")];
   const requireEnterprisePlan = [...requireAuth, requireActiveSubscription, requirePlan("enterprise")];
@@ -168,26 +168,26 @@ export async function registerRoutes(
       // Get top opportunities (accounts with highest opportunity scores) - using batch queries
       const categories = await tenantStorage.getProductCategories();
       const categoryMap = new Map(categories.map(c => [c.id, c]));
-      
+
       // Get all account IDs for batch queries
       const allAccountIds = allAccounts.map(a => a.id);
-      
+
       const [metricsMap, gapsMap] = await Promise.all([
         tenantStorage.getAccountMetricsBatch(allAccountIds),
         tenantStorage.getAccountCategoryGapsBatch(allAccountIds)
       ]);
-      
+
       // Track which accounts are enrolled
       const enrolledAccountIds = new Set(programAccounts.map(p => p.accountId));
-      
+
       // Build full metrics for all accounts
       const allAccountsWithMetrics = allAccounts.map(account => {
         const metrics = metricsMap.get(account.id);
         const gaps = gapsMap.get(account.id) || [];
-        
+
         // Calculate total estimated revenue opportunity by summing all category gaps for this account
         const estimatedValue = gaps.reduce((sum, g) => sum + parseFloat(g.estimatedOpportunity || "0"), 0);
-        
+
         return {
           id: account.id,
           name: account.name,
@@ -210,7 +210,7 @@ export async function registerRoutes(
           enrolled: enrolledAccountIds.has(account.id),
         };
       });
-      
+
       // Sort by opportunity score and get top 10
       const accountsWithMetrics = [...allAccountsWithMetrics]
         .sort((a, b) => b.opportunityScore - a.opportunityScore)
@@ -289,17 +289,17 @@ export async function registerRoutes(
       const tenantStorage = getStorage(req);
       const allTasks = await tenantStorage.getAllTasks();
       const allAccounts = await tenantStorage.getAccounts();
-      
+
       // Use UTC to avoid timezone issues with database dates
       const now = new Date();
       const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-      
+
       const yesterdayUTC = new Date(todayUTC);
       yesterdayUTC.setUTCDate(yesterdayUTC.getUTCDate() - 1);
-      
+
       const tomorrowUTC = new Date(todayUTC);
       tomorrowUTC.setUTCDate(tomorrowUTC.getUTCDate() + 1);
-      
+
       // Filter for tasks due today or overdue (not completed)
       // Use Map for O(1) account lookups
       const accountMap = new Map(allAccounts.map(a => [a.id, a]));
@@ -307,10 +307,10 @@ export async function registerRoutes(
         .filter(task => {
           if (task.status === "completed" || task.status === "skipped") return false;
           if (!task.dueDate) return false;
-          
+
           const dueDate = new Date(task.dueDate);
           const dueDateUTC = new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate()));
-          
+
           // Due today or overdue (before today)
           return dueDateUTC <= todayUTC;
         })
@@ -318,7 +318,7 @@ export async function registerRoutes(
           const account = accountMap.get(task.accountId);
           const dueDate = new Date(task.dueDate!);
           const dueDateUTC = new Date(Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate()));
-          
+
           return {
             id: task.id,
             accountId: task.accountId,
@@ -367,7 +367,7 @@ export async function registerRoutes(
       // Fetch categories once outside the loop and create a Map for O(1) lookups
       const categories = await tenantStorage.getProductCategories();
       const categoryMap = new Map(categories.map(c => [c.id, c]));
-      
+
       // Use batch queries to avoid N+1 problem
       const accountIds = allAccounts.map(a => a.id);
       const [metricsMap, gapsMap] = await Promise.all([
@@ -446,7 +446,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Invalid account ID" });
       }
       const account = await tenantStorage.getAccount(accountId);
-      
+
       if (!account) {
         return res.status(404).json({ message: "Account not found" });
       }
@@ -547,7 +547,7 @@ export async function registerRoutes(
           // Deterministic task type selection based on gap index (round-robin)
           const taskTypes = ["call", "email", "visit"] as const;
           const taskType = taskTypes[i % taskTypes.length];
-          
+
           // Calculate due date deterministically based on priority (higher priority = sooner)
           const daysFromNow = 7 + i * 2; // First gap: 7 days, second: 9 days, etc.
           const dueDate = new Date();
@@ -659,11 +659,11 @@ KEY TALKING POINTS:
       // Fetch all categories once outside the loop for O(1) lookups
       const allCategories = await tenantStorage.getProductCategories();
       const categoryMap = new Map(allCategories.map(c => [c.id, c]));
-      
+
       const profilesWithDetails = await Promise.all(
         profiles.map(async profile => {
           const categories = await tenantStorage.getProfileCategories(profile.id);
-          
+
           return {
             ...profile,
             minAnnualRevenue: profile.minAnnualRevenue ? parseFloat(profile.minAnnualRevenue) : 0,
@@ -819,7 +819,7 @@ KEY TALKING POINTS:
       }
 
       const analysis = await analyzeSegment(segment);
-      
+
       res.json({
         message: `Analysis complete for ${segment}`,
         suggestions: {
@@ -838,31 +838,31 @@ KEY TALKING POINTS:
     try {
       const tenantStorage = getStorage(req);
       const { segment } = req.params;
-      
+
       const allAccounts = await tenantStorage.getAccounts();
       const allProfiles = await tenantStorage.getSegmentProfiles();
       const productCats = await tenantStorage.getProductCategories();
-      
+
       // Create Maps for O(1) lookups
       const productCatMap = new Map(productCats.map(c => [c.id, c]));
-      
+
       const segmentAccounts = allAccounts.filter(a => a.segment === segment);
       const segmentProfile = allProfiles.find(p => p.segment === segment);
-      
+
       // Use batch queries for all accounts to avoid N+1
       const allAccountIds = allAccounts.map(a => a.id);
       const [allMetricsMap, allGapsMap] = await Promise.all([
         tenantStorage.getAccountMetricsBatch(allAccountIds),
         tenantStorage.getAccountCategoryGapsBatch(allAccountIds)
       ]);
-      
+
       const accountsWithMetrics: AccountWithMetrics[] = segmentAccounts.map(account => {
         const metrics = allMetricsMap.get(account.id);
         return { account, metrics };
       });
 
-      const minRevenue = segmentProfile?.minAnnualRevenue 
-        ? parseFloat(segmentProfile.minAnnualRevenue) 
+      const minRevenue = segmentProfile?.minAnnualRevenue
+        ? parseFloat(segmentProfile.minAnnualRevenue)
         : DEFAULT_VALUES.BASELINE_REVENUE;
 
       // Use service functions for calculations
@@ -898,9 +898,9 @@ KEY TALKING POINTS:
         category: cat.categoryName,
         avgPct: cat.expectedPct,
         stdDev: Math.round(cat.expectedPct * 0.08 * 10) / 10,
-        correlation: cat.isRequired ? "Primary revenue driver" : 
-                    cat.importance >= 1.5 ? "Higher LTV indicator" : 
-                    cat.importance <= 0.75 ? "Low margin, convenience" : "Consistent purchases",
+        correlation: cat.isRequired ? "Primary revenue driver" :
+          cat.importance >= 1.5 ? "Higher LTV indicator" :
+            cat.importance <= 0.75 ? "Low margin, convenience" : "Consistent purchases",
       }));
 
       // Use service function for category data points aggregation
@@ -917,17 +917,17 @@ KEY TALKING POINTS:
         const maxPct = dataPointsList.length > 0
           ? Math.round(Math.max(...dataPointsList.map(dp => dp.categoryPct)) * 10) / 10
           : cat.expectedPct;
-        
+
         return {
           category: cat.categoryName,
           expectedPct: cat.expectedPct,
-          reasoning: cat.isRequired 
+          reasoning: cat.isRequired
             ? `Required category for ${segment} contractors. Class A customers average ${avgActualPct}% (range: ${minPct}%-${maxPct}%).`
             : cat.importance >= 1.5
-            ? `Strategic growth opportunity. Customers with higher ${cat.categoryName} spending show increased lifetime value. Class A average: ${avgActualPct}%.`
-            : `Baseline category set at ${cat.expectedPct}% based on Class A customer averages (actual avg: ${avgActualPct}%).`,
-          confidence: (cat.isRequired || classACustomers.length >= 3) ? "high" as const : 
-                     classACustomers.length >= 2 ? "medium" as const : "low" as const,
+              ? `Strategic growth opportunity. Customers with higher ${cat.categoryName} spending show increased lifetime value. Class A average: ${avgActualPct}%.`
+              : `Baseline category set at ${cat.expectedPct}% based on Class A customer averages (actual avg: ${avgActualPct}%).`,
+          confidence: (cat.isRequired || classACustomers.length >= 3) ? "high" as const :
+            classACustomers.length >= 2 ? "medium" as const : "low" as const,
           dataPoints: classACustomers.length,
           dataPointsDetail: dataPointsList.map(dp => ({
             accountName: dp.accountName,
@@ -963,10 +963,10 @@ KEY TALKING POINTS:
             return bOpp - aOpp;
           });
         const topAccountGap = accountGaps[0];
-        const gapCategory = topAccountGap 
+        const gapCategory = topAccountGap
           ? productCatMap.get(topAccountGap.categoryId)?.name || "Unknown"
           : topGaps[idx % Math.max(1, topGaps.length)]?.category || "Unknown";
-        const potentialRevenue = topAccountGap?.estimatedOpportunity 
+        const potentialRevenue = topAccountGap?.estimatedOpportunity
           ? parseFloat(topAccountGap.estimatedOpportunity)
           : 5000;
         return {
@@ -981,21 +981,21 @@ KEY TALKING POINTS:
 
       const requiredCategories = profileCategories.filter(c => c.isRequired).map(c => c.categoryName);
       const growthCategories = profileCategories.filter(c => c.importance >= 1.5).map(c => c.categoryName);
-      
+
       const crossSellOpps = [
-        { 
-          categories: requiredCategories.slice(0, 2).length >= 2 
-            ? requiredCategories.slice(0, 2) 
+        {
+          categories: requiredCategories.slice(0, 2).length >= 2
+            ? requiredCategories.slice(0, 2)
             : [profileCategories[0]?.categoryName || "Equipment", profileCategories[1]?.categoryName || "Supplies"],
           frequency: classACustomers.length > 0 ? Math.min(85, 60 + classACustomers.length * 5) : 65
         },
-        { 
-          categories: growthCategories.length >= 2 
+        {
+          categories: growthCategories.length >= 2
             ? growthCategories.slice(0, 2)
             : [profileCategories[2]?.categoryName || "Controls", profileCategories[3]?.categoryName || "Tools"],
           frequency: classACustomers.length > 0 ? Math.min(75, 50 + classACustomers.length * 5) : 55
         },
-        { 
+        {
           categories: profileCategories.length >= 5
             ? [profileCategories[4]?.categoryName || "Water Heaters", profileCategories[0]?.categoryName || "Equipment"]
             : ["Water Heaters", "Equipment"],
@@ -1007,9 +1007,9 @@ KEY TALKING POINTS:
 
       const patternSummary = profileCategories.length > 0
         ? `Analysis of your ${classACustomers.length} Class A ${segment} customers reveals strong purchasing patterns. ` +
-          `Top performers spend ${profileCategories[0]?.expectedPct || 40}% on ${profileCategories[0]?.categoryName || "Equipment"}, ` +
-          `with ${profileCategories[1]?.categoryName || "Supplies"} as the second largest category at ${profileCategories[1]?.expectedPct || 18}%. ` +
-          `Customers with balanced category coverage show 23% higher lifetime value.`
+        `Top performers spend ${profileCategories[0]?.expectedPct || 40}% on ${profileCategories[0]?.categoryName || "Equipment"}, ` +
+        `with ${profileCategories[1]?.categoryName || "Supplies"} as the second largest category at ${profileCategories[1]?.expectedPct || 18}%. ` +
+        `Customers with balanced category coverage show 23% higher lifetime value.`
         : `No Class A customer data available for ${segment} segment. Upload customer data to generate insights.`;
 
       res.json({
@@ -1071,20 +1071,20 @@ KEY TALKING POINTS:
 
       // Optional filter by playbook - if specified, return all tasks for that playbook
       const playbookId = req.query.playbookId ? parseInt(req.query.playbookId as string) : null;
-      
+
       // Pagination parameters with defaults and max limits
       const page = Math.max(1, parseInt(req.query.page as string) || PAGINATION.DEFAULT_PAGE);
       const limit = Math.min(
-        PAGINATION.MAX_LIMIT, 
+        PAGINATION.MAX_LIMIT,
         Math.max(1, parseInt(req.query.limit as string) || PAGINATION.DEFAULT_LIMIT)
       );
 
       // Use Map for O(1) account lookups
       const accountMap = new Map(allAccounts.map(a => [a.id, a]));
-      
+
       let tasksWithDetails;
       let paginationInfo;
-      
+
       if (playbookId) {
         // When filtering by playbook, return all tasks (no pagination)
         const allTasks = await tenantStorage.getAllTasks();
@@ -1145,7 +1145,7 @@ KEY TALKING POINTS:
       const tenantStorage = getStorage(req);
       const data = insertTaskSchema.parse(req.body);
       const task = await tenantStorage.createTask(data);
-      
+
       // Send email notification if configured
       if (task.assignedTmId) {
         const territoryManager = await tenantStorage.getTerritoryManager(task.assignedTmId);
@@ -1157,7 +1157,7 @@ KEY TALKING POINTS:
           });
         }
       }
-      
+
       res.status(201).json(task);
     } catch (error) {
       handleRouteError(error, res, "Create task");
@@ -1225,7 +1225,7 @@ KEY TALKING POINTS:
           const playbookTaskLinks = await tenantStorage.getPlaybookTasks(playbook.id);
           const taskIds = new Set(playbookTaskLinks.map(pt => pt.taskId));
           const playbookTasks = allTasks.filter(t => taskIds.has(t.id));
-          
+
           const completedCount = playbookTasks.filter(t => t.status === "completed").length;
           const tasksWithDetails = playbookTasks.map(task => {
             const account = accountMap.get(task.accountId);
@@ -1262,10 +1262,10 @@ KEY TALKING POINTS:
       const playbookTaskLinks = await tenantStorage.getPlaybookTasks(playbookId);
       const allTasks = await tenantStorage.getAllTasks();
       const allAccounts = await tenantStorage.getAccounts();
-      
+
       const taskIds = new Set(playbookTaskLinks.map(pt => pt.taskId));
       const playbookTasks = allTasks.filter(t => taskIds.has(t.id));
-      
+
       // Use Map for O(1) account lookups
       const accountMap = new Map(allAccounts.map(a => [a.id, a]));
       const tasksWithDetails = playbookTasks.map(task => {
@@ -1342,14 +1342,14 @@ KEY TALKING POINTS:
       }
 
       const { name, segment, topN = 10, priorityCategories = [] } = req.body;
-      
+
       // Get accounts with gap data
       const allAccounts = await tenantStorage.getAccounts();
       const categories = await tenantStorage.getProductCategories();
       const categoryMap = new Map(categories.map(c => [c.id, c]));
-      
+
       // Filter accounts by segment if specified
-      let targetAccounts = segment 
+      let targetAccounts = segment
         ? allAccounts.filter(a => a.segment === segment)
         : allAccounts;
 
@@ -1358,7 +1358,7 @@ KEY TALKING POINTS:
         targetAccounts.slice(0, topN).map(async account => {
           const metrics = await tenantStorage.getAccountMetrics(account.id);
           const gaps = await tenantStorage.getAccountCategoryGaps(account.id);
-          
+
           // Use Map for O(1) category lookups
           const gapCategories = gaps.map(g => {
             const cat = categoryMap.get(g.categoryId);
@@ -1401,7 +1401,7 @@ KEY TALKING POINTS:
       for (const task of generatedTasks) {
         // Try to find TM by name and link by ID
         const tm = tmMap.get(task.assignedTm);
-        
+
         const createdTask = await tenantStorage.createTask({
           accountId: task.accountId,
           playbookId: playbook.id,
@@ -1415,7 +1415,7 @@ KEY TALKING POINTS:
           status: "pending",
           dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 1 week from now
         });
-        
+
         // Also link task to playbook via join table for backwards compatibility
         await tenantStorage.createPlaybookTask({
           playbookId: playbook.id,
@@ -1476,7 +1476,7 @@ KEY TALKING POINTS:
       const tenantStorage = getStorage(req);
       const data = insertProgramAccountSchema.parse(req.body);
       const programAccount = await tenantStorage.createProgramAccount(data);
-      
+
       // Auto-generate a playbook for this enrolled account
       const account = await tenantStorage.getAccount(programAccount.accountId);
       if (account) {
@@ -1484,7 +1484,7 @@ KEY TALKING POINTS:
         const categoryMap = new Map(categories.map(c => [c.id, c]));
         const metrics = await tenantStorage.getAccountMetrics(account.id);
         const gaps = await tenantStorage.getAccountCategoryGaps(account.id);
-        
+
         // Use Map for O(1) category lookups
         const gapCategories = gaps.map(g => {
           const cat = categoryMap.get(g.categoryId);
@@ -1519,7 +1519,7 @@ KEY TALKING POINTS:
           // Create tasks in database and link to playbook
           for (const task of generatedTasks) {
             const tm = tmMap.get(task.assignedTm);
-            
+
             const createdTask = await tenantStorage.createTask({
               accountId: task.accountId,
               playbookId: playbook.id,
@@ -1533,7 +1533,7 @@ KEY TALKING POINTS:
               status: "pending",
               dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
             });
-            
+
             await tenantStorage.createPlaybookTask({
               playbookId: playbook.id,
               taskId: createdTask.id,
@@ -1551,7 +1551,7 @@ KEY TALKING POINTS:
           });
         }
       }
-      
+
       res.status(201).json(programAccount);
     } catch (error) {
       handleRouteError(error, res, "Enroll account");
@@ -1595,17 +1595,17 @@ KEY TALKING POINTS:
 
       // Calculate current penetration from account metrics
       const currentPenetration = metrics ? parseFloat(metrics.categoryPenetration || "0") : 0;
-      const targetPenetration = programAccount.targetPenetration 
-        ? parseFloat(programAccount.targetPenetration) 
+      const targetPenetration = programAccount.targetPenetration
+        ? parseFloat(programAccount.targetPenetration)
         : null;
-      
+
       // Calculate incremental revenue from snapshots
       const totalIncrementalRevenue = snapshots.reduce(
-        (sum, s) => sum + parseFloat(s.incrementalRevenue || "0"), 
+        (sum, s) => sum + parseFloat(s.incrementalRevenue || "0"),
         0
       );
-      const targetIncrementalRevenue = programAccount.targetIncrementalRevenue 
-        ? parseFloat(programAccount.targetIncrementalRevenue) 
+      const targetIncrementalRevenue = programAccount.targetIncrementalRevenue
+        ? parseFloat(programAccount.targetIncrementalRevenue)
         : null;
 
       // Calculate months enrolled
@@ -1636,14 +1636,14 @@ KEY TALKING POINTS:
       };
 
       const hasObjectives = targetPenetration !== null || targetIncrementalRevenue !== null || targetDurationMonths !== null;
-      
+
       let isReadyToGraduate = false;
       if (hasObjectives) {
         if (criteria === "all") {
           // All defined objectives must be met
           isReadyToGraduate = (targetPenetration === null || objectivesMet.penetration) &&
-                              (targetIncrementalRevenue === null || objectivesMet.revenue) &&
-                              (targetDurationMonths === null || objectivesMet.duration);
+            (targetIncrementalRevenue === null || objectivesMet.revenue) &&
+            (targetDurationMonths === null || objectivesMet.duration);
         } else {
           // Any objective being met is sufficient
           isReadyToGraduate = objectivesMet.penetration || objectivesMet.revenue || objectivesMet.duration;
@@ -1706,28 +1706,28 @@ KEY TALKING POINTS:
       }
 
       const account = await tenantStorage.getAccount(programAccount.accountId);
-      
+
       // Calculate graduation analytics
       const now = new Date();
       const enrolledAt = new Date(programAccount.enrolledAt);
       const enrollmentDurationDays = Math.floor((now.getTime() - enrolledAt.getTime()) / (1000 * 60 * 60 * 24));
-      
+
       // Get cumulative revenue from orders during enrollment period
       // graduationRevenue = total revenue generated during the enrollment period (not baseline)
       const orders = await tenantStorage.getOrdersByAccount(programAccount.accountId);
       const ordersAfterEnrollment = orders.filter(o => new Date(o.orderDate) >= enrolledAt);
       const graduationRevenue = ordersAfterEnrollment.reduce((sum, o) => sum + parseFloat(o.totalAmount?.toString() || "0"), 0);
-      
+
       // Get account metrics for penetration
       const metrics = await tenantStorage.getAccountMetrics(programAccount.accountId);
       const graduationPenetration = metrics?.categoryPenetration ? parseFloat(metrics.categoryPenetration.toString()) : null;
-      
+
       // Get ICP categories from segment profile if account has a segment
       // icpCategoriesAtEnrollment = categories that were MISSING at enrollment (gaps to fill)
       // icpCategoriesAchieved = how many of those gaps were filled after enrollment
       let icpCategoriesAtEnrollment = null;
       let icpCategoriesAchieved = null;
-      
+
       if (account?.segment) {
         const segmentProfiles = await tenantStorage.getSegmentProfiles();
         const profile = segmentProfiles.find(p => p.name?.toLowerCase() === account.segment?.toLowerCase());
@@ -1735,10 +1735,10 @@ KEY TALKING POINTS:
           // Get profile categories (ICP categories for this segment)
           const profileCategories = await tenantStorage.getProfileCategories(profile.id);
           const icpCategoryIds = new Set(profileCategories.map(pc => pc.categoryId));
-          
+
           // Get ALL orders for this account (before and after enrollment)
           const ordersBeforeEnrollment = orders.filter(o => new Date(o.orderDate) < enrolledAt);
-          
+
           // Get products purchased BEFORE enrollment
           const orderItemsBefore = await Promise.all(
             ordersBeforeEnrollment.map(async (order) => {
@@ -1748,7 +1748,7 @@ KEY TALKING POINTS:
           );
           const allItemsBefore = orderItemsBefore.flat();
           const productIdsBefore = Array.from(new Set(allItemsBefore.map(item => item.productId)));
-          
+
           // Get products purchased AFTER enrollment  
           const orderItemsAfter = await Promise.all(
             ordersAfterEnrollment.map(async (order) => {
@@ -1758,10 +1758,10 @@ KEY TALKING POINTS:
           );
           const allItemsAfter = orderItemsAfter.flat();
           const productIdsAfter = Array.from(new Set(allItemsAfter.map(item => item.productId)));
-          
+
           // Get products to find their category IDs
           const products = await tenantStorage.getProducts();
-          
+
           // Categories already purchased before enrollment
           const categoriesPurchasedBefore = new Set(
             products
@@ -1769,7 +1769,7 @@ KEY TALKING POINTS:
               .map(p => p.categoryId)
               .filter((id): id is number => id !== null)
           );
-          
+
           // Categories purchased after enrollment
           const categoriesPurchasedAfter = new Set(
             products
@@ -1777,17 +1777,17 @@ KEY TALKING POINTS:
               .map(p => p.categoryId)
               .filter((id): id is number => id !== null)
           );
-          
+
           // ICP categories that were MISSING at enrollment (gaps)
-          const missingIcpAtEnrollment = profileCategories.filter(pc => 
+          const missingIcpAtEnrollment = profileCategories.filter(pc =>
             !categoriesPurchasedBefore.has(pc.categoryId)
           );
-          
+
           // ICP categories that were filled AFTER enrollment (gaps that were closed)
           const newlyAchievedCategories = missingIcpAtEnrollment.filter(pc =>
             categoriesPurchasedAfter.has(pc.categoryId)
           );
-          
+
           icpCategoriesAtEnrollment = missingIcpAtEnrollment.length;
           icpCategoriesAchieved = newlyAchievedCategories.length;
         }
@@ -1797,7 +1797,7 @@ KEY TALKING POINTS:
       const baselineRevenue = parseFloat(programAccount.baselineRevenue?.toString() || "0");
       const baselineStart = programAccount.baselineStart ? new Date(programAccount.baselineStart) : null;
       const baselineEnd = programAccount.baselineEnd ? new Date(programAccount.baselineEnd) : null;
-      
+
       let incrementalRevenue = graduationRevenue - baselineRevenue; // Default: simple difference
       if (baselineStart && baselineEnd && enrollmentDurationDays > 0) {
         const baselinePeriodDays = Math.floor((baselineEnd.getTime() - baselineStart.getTime()) / (1000 * 60 * 60 * 24));
@@ -1818,7 +1818,7 @@ KEY TALKING POINTS:
         enrollmentDurationDays,
         incrementalRevenue: incrementalRevenue.toString(),
       });
-      
+
       res.json({
         success: true,
         message: "Account graduated successfully",
@@ -1836,24 +1836,24 @@ KEY TALKING POINTS:
       const tenantStorage = getStorage(req);
       const allProgramAccounts = await tenantStorage.getProgramAccounts();
       const activeAccounts = allProgramAccounts.filter(pa => pa.status === "active");
-      
+
       if (activeAccounts.length === 0) {
         return res.json({ count: 0, accounts: [] });
       }
 
       const accountIds = activeAccounts.map(pa => pa.accountId);
       const programAccountIds = activeAccounts.map(pa => pa.id);
-      
+
       const [accountsMap, metricsMap, snapshotsMap] = await Promise.all([
         tenantStorage.getAccountsBatch(accountIds),
         tenantStorage.getAccountMetricsBatch(accountIds),
         tenantStorage.getProgramRevenueSnapshotsBatch(programAccountIds),
       ]);
-      
+
       const readyAccounts = [];
       const now = new Date();
       const MS_PER_MONTH = 1000 * 60 * 60 * 24 * 30;
-      
+
       for (const pa of activeAccounts) {
         const account = accountsMap.get(pa.accountId);
         const metrics = metricsMap.get(pa.accountId);
@@ -1861,13 +1861,13 @@ KEY TALKING POINTS:
 
         const currentPenetration = metrics ? parseFloat(metrics.categoryPenetration || "0") : 0;
         const targetPenetration = pa.targetPenetration ? parseFloat(pa.targetPenetration) : null;
-        
+
         const totalIncrementalRevenue = snapshots.reduce(
-          (sum, s) => sum + parseFloat(s.incrementalRevenue || "0"), 
+          (sum, s) => sum + parseFloat(s.incrementalRevenue || "0"),
           0
         );
-        const targetIncrementalRevenue = pa.targetIncrementalRevenue 
-          ? parseFloat(pa.targetIncrementalRevenue) 
+        const targetIncrementalRevenue = pa.targetIncrementalRevenue
+          ? parseFloat(pa.targetIncrementalRevenue)
           : null;
 
         const enrolledAt = new Date(pa.enrolledAt);
@@ -1881,14 +1881,14 @@ KEY TALKING POINTS:
         };
 
         const hasObjectives = targetPenetration !== null || targetIncrementalRevenue !== null || targetDurationMonths !== null;
-        
+
         let isReadyToGraduate = false;
         const criteria = pa.graduationCriteria || "any";
         if (hasObjectives) {
           if (criteria === "all") {
             isReadyToGraduate = (targetPenetration === null || objectivesMet.penetration) &&
-                                (targetIncrementalRevenue === null || objectivesMet.revenue) &&
-                                (targetDurationMonths === null || objectivesMet.duration);
+              (targetIncrementalRevenue === null || objectivesMet.revenue) &&
+              (targetDurationMonths === null || objectivesMet.duration);
           } else {
             isReadyToGraduate = objectivesMet.penetration || objectivesMet.revenue || objectivesMet.duration;
           }
@@ -1927,7 +1927,7 @@ KEY TALKING POINTS:
       const tenantStorage = getStorage(req);
       const allProgramAccounts = await tenantStorage.getProgramAccounts();
       const graduatedAccounts = allProgramAccounts.filter(pa => pa.status === "graduated");
-      
+
       if (graduatedAccounts.length === 0) {
         return res.json({
           totalGraduated: 0,
@@ -1938,7 +1938,7 @@ KEY TALKING POINTS:
           graduatedAccounts: [],
         });
       }
-      
+
       // Calculate aggregate metrics from graduated accounts
       let totalRevenueGrowth = 0;
       let totalDays = 0;
@@ -1946,14 +1946,14 @@ KEY TALKING POINTS:
       let accountsWithIcpData = 0;
       let accountsWithDuration = 0;
       let accountsWithRevenue = 0;
-      
+
       const detailedAccounts = await Promise.all(
         graduatedAccounts.map(async (pa) => {
           const account = await tenantStorage.getAccount(pa.accountId);
-          
+
           const baselineRevenue = parseFloat(pa.baselineRevenue?.toString() || "0");
           const graduationRevenue = parseFloat(pa.graduationRevenue?.toString() || "0");
-          
+
           // Use stored incremental revenue (calculated at graduation using pro-rated baseline)
           // Falls back to recalculation for accounts graduated before this field was added
           let revenueGrowth = pa.incrementalRevenue ? parseFloat(pa.incrementalRevenue.toString()) : 0;
@@ -1962,7 +1962,7 @@ KEY TALKING POINTS:
             const baselineStart = pa.baselineStart ? new Date(pa.baselineStart) : null;
             const baselineEnd = pa.baselineEnd ? new Date(pa.baselineEnd) : null;
             const enrollmentDuration = pa.enrollmentDurationDays || 0;
-            
+
             let proRatedBaseline = baselineRevenue;
             if (baselineStart && baselineEnd && enrollmentDuration > 0) {
               const baselinePeriodDays = Math.floor((baselineEnd.getTime() - baselineStart.getTime()) / (1000 * 60 * 60 * 24));
@@ -1972,24 +1972,24 @@ KEY TALKING POINTS:
             }
             revenueGrowth = graduationRevenue - proRatedBaseline;
           }
-          
+
           if (graduationRevenue > 0 || pa.incrementalRevenue) {
             totalRevenueGrowth += revenueGrowth;
             accountsWithRevenue++;
           }
-          
+
           if (pa.enrollmentDurationDays) {
             totalDays += pa.enrollmentDurationDays;
             accountsWithDuration++;
           }
-          
+
           let icpSuccessRate = 0;
           if (pa.icpCategoriesAtEnrollment && pa.icpCategoriesAtEnrollment > 0) {
             icpSuccessRate = ((pa.icpCategoriesAchieved || 0) / pa.icpCategoriesAtEnrollment) * 100;
             totalIcpSuccess += icpSuccessRate;
             accountsWithIcpData++;
           }
-          
+
           return {
             id: pa.id,
             accountId: pa.accountId,
@@ -2008,7 +2008,7 @@ KEY TALKING POINTS:
           };
         })
       );
-      
+
       res.json({
         totalGraduated: graduatedAccounts.length,
         cumulativeRevenueGrowth: totalRevenueGrowth,
@@ -2039,7 +2039,7 @@ KEY TALKING POINTS:
       // In real implementation, this would handle file upload
       const data = insertDataUploadSchema.parse(req.body);
       const upload = await tenantStorage.createDataUpload(data);
-      
+
       // Simulate processing
       setTimeout(async () => {
         await tenantStorage.updateDataUpload(upload.id, {
@@ -2058,17 +2058,17 @@ KEY TALKING POINTS:
   app.get("/api/templates/:type", (req, res) => {
     const { type } = req.params;
     const validTypes = ["accounts", "products", "categories", "orders"];
-    
+
     if (!validTypes.includes(type)) {
       return res.status(400).json({ message: "Invalid template type" });
     }
-    
+
     const templatePath = path.join(process.cwd(), "public", "templates", `${type}_template.csv`);
-    
+
     if (!fs.existsSync(templatePath)) {
       return res.status(404).json({ message: "Template not found" });
     }
-    
+
     res.setHeader("Content-Type", "text/csv");
     res.setHeader("Content-Disposition", `attachment; filename="${type}_template.csv"`);
     res.sendFile(templatePath);
@@ -2187,12 +2187,12 @@ KEY TALKING POINTS:
   app.put("/api/scoring-weights", requireAuth, async (req, res) => {
     try {
       const { gapSizeWeight, revenuePotentialWeight, categoryCountWeight, description } = req.body;
-      
+
       // Validate weights sum to 100
       const total = gapSizeWeight + revenuePotentialWeight + categoryCountWeight;
       if (Math.abs(total - 100) > 0.01) {
-        return res.status(400).json({ 
-          message: `Weights must sum to 100%. Current total: ${total}%` 
+        return res.status(400).json({
+          message: `Weights must sum to 100%. Current total: ${total}%`
         });
       }
 
@@ -2206,7 +2206,7 @@ KEY TALKING POINTS:
         isActive: true,
         updatedBy: "admin",
       });
-      
+
       res.json({
         ...weights,
         gapSizeWeight: parseFloat(weights.gapSizeWeight),
@@ -2362,7 +2362,7 @@ KEY TALKING POINTS:
         const category = await tenantStorage.createCustomCategory(cat);
         created.push(category);
       }
-      
+
       res.status(201).json({ message: "Default categories created", categories: created });
     } catch (error) {
       handleRouteError(error, res, "Seed default categories");
@@ -2383,12 +2383,12 @@ KEY TALKING POINTS:
   app.post("/api/rev-share-tiers", requireAdmin, async (req, res) => {
     try {
       const validated = insertRevShareTierSchema.parse(req.body);
-      
+
       // Validate min/max relationship
       const minRev = parseFloat(validated.minRevenue ?? "0");
       const maxRev = validated.maxRevenue ? parseFloat(validated.maxRevenue) : null;
       const shareRate = parseFloat(validated.shareRate ?? "0");
-      
+
       if (isNaN(minRev) || minRev < 0) {
         return res.status(400).json({ message: "Minimum revenue must be a non-negative number" });
       }
@@ -2398,7 +2398,7 @@ KEY TALKING POINTS:
       if (isNaN(shareRate) || shareRate < 0 || shareRate > 100) {
         return res.status(400).json({ message: "Share rate must be between 0 and 100" });
       }
-      
+
       const tenantStorage = getStorage(req);
       const tier = await tenantStorage.createRevShareTier(validated);
       res.status(201).json(tier);
@@ -2413,15 +2413,15 @@ KEY TALKING POINTS:
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid tier ID" });
       }
-      
+
       // First validate against schema
       const updateData = insertRevShareTierSchema.partial().parse(req.body);
-      
+
       // Additional business logic validation for min/max relationship
       if (updateData.minRevenue !== undefined || updateData.maxRevenue !== undefined) {
         const minRev = updateData.minRevenue ? parseFloat(updateData.minRevenue) : null;
         const maxRev = updateData.maxRevenue ? parseFloat(updateData.maxRevenue) : null;
-        
+
         if (minRev !== null && (isNaN(minRev) || minRev < 0)) {
           return res.status(400).json({ message: "Minimum revenue must be a non-negative number" });
         }
@@ -2435,7 +2435,7 @@ KEY TALKING POINTS:
           return res.status(400).json({ message: "Share rate must be between 0 and 100" });
         }
       }
-      
+
       const tenantStorage = getStorage(req);
       const tier = await tenantStorage.updateRevShareTier(id, updateData);
       if (!tier) {
@@ -2471,7 +2471,7 @@ KEY TALKING POINTS:
       }
 
       const tiers = await tenantStorage.getRevShareTiers();
-      
+
       // If no tiers defined, use default 15%
       if (tiers.length === 0) {
         const fee = incrementalRevenue * 0.15;
@@ -2567,14 +2567,14 @@ KEY TALKING POINTS:
     const userEmail = req.user?.claims?.email;
     console.log(`[Platform Admin Check] User email: ${userEmail}, Is admin: ${isPlatformAdmin(userEmail)}`);
     if (!isPlatformAdmin(userEmail)) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         message: "Access denied. Platform administrator privileges required.",
         error: "PLATFORM_ADMIN_REQUIRED"
       });
     }
     next();
   };
-  
+
   /**
    * Get all tenants with usage metrics for platform administration
    * @route GET /api/app-admin/tenants
@@ -2585,7 +2585,7 @@ KEY TALKING POINTS:
     try {
       // Get all tenants
       const allTenants = await db.select().from(tenants);
-      
+
       // Get usage metrics for each tenant
       const tenantsWithMetrics = await Promise.all(
         allTenants.map(async (tenant) => {
@@ -2593,29 +2593,29 @@ KEY TALKING POINTS:
           const [accountCountResult] = await db.select({ count: count() })
             .from(accounts)
             .where(eq(accounts.tenantId, tenant.id));
-          
+
           const [playbookCountResult] = await db.select({ count: count() })
             .from(playbooks)
             .where(eq(playbooks.tenantId, tenant.id));
-          
+
           const [icpCountResult] = await db.select({ count: count() })
             .from(segmentProfiles)
             .where(eq(segmentProfiles.tenantId, tenant.id));
-          
+
           const [enrolledCountResult] = await db.select({ count: count() })
             .from(programAccounts)
             .where(eq(programAccounts.tenantId, tenant.id));
-          
+
           const [userCountResult] = await db.select({ count: count() })
             .from(userRoles)
             .where(eq(userRoles.tenantId, tenant.id));
-          
+
           // Get owner email (first user with super_admin role)
           const [ownerRole] = await db.select()
             .from(userRoles)
             .where(eq(userRoles.tenantId, tenant.id))
             .limit(1);
-          
+
           let ownerEmail: string | undefined;
           if (ownerRole) {
             const [user] = await db.select()
@@ -2624,7 +2624,7 @@ KEY TALKING POINTS:
               .limit(1);
             ownerEmail = user?.email || undefined;
           }
-          
+
           return {
             ...tenant,
             ownerEmail,
@@ -2636,7 +2636,7 @@ KEY TALKING POINTS:
           };
         })
       );
-      
+
       res.json({
         tenants: tenantsWithMetrics,
         totalTenants: allTenants.length,
@@ -2658,33 +2658,33 @@ KEY TALKING POINTS:
       if (isNaN(tenantId)) {
         return res.status(400).json({ message: "Invalid tenant ID" });
       }
-      
+
       const { planType, subscriptionStatus } = req.body;
-      
+
       const updateData: { planType?: string; subscriptionStatus?: string; updatedAt: Date } = {
         updatedAt: new Date(),
       };
-      
+
       if (planType !== undefined) {
         updateData.planType = planType;
       }
       if (subscriptionStatus !== undefined) {
         updateData.subscriptionStatus = subscriptionStatus;
       }
-      
+
       await db.update(tenants)
         .set(updateData)
         .where(eq(tenants.id, tenantId));
-      
+
       const [updatedTenant] = await db.select()
         .from(tenants)
         .where(eq(tenants.id, tenantId))
         .limit(1);
-      
+
       if (!updatedTenant) {
         return res.status(404).json({ message: "Tenant not found" });
       }
-      
+
       res.json(updatedTenant);
     } catch (error) {
       handleRouteError(error, res, "Update tenant");
@@ -2694,7 +2694,7 @@ KEY TALKING POINTS:
   // ============ Stripe & Subscription ============
   const stripeConfig = initializeStripeConfig();
   const stripe = stripeConfig.stripe;
-  
+
   // Validation schemas for Stripe endpoints
   const checkoutSessionSchema = z.object({
     priceId: z.string().optional(),
@@ -2703,7 +2703,7 @@ KEY TALKING POINTS:
   }).refine(data => data.priceId || data.planSlug, {
     message: "Either priceId or planSlug is required"
   });
-  
+
   const portalSessionSchema = z.object({}).optional();
 
   /**
@@ -2732,7 +2732,7 @@ KEY TALKING POINTS:
   app.get("/api/stripe/debug", [...requireAuth, requirePlatformAdmin], async (req, res) => {
     try {
       const debugInfo = getStripeDebugInfo();
-      
+
       // Get subscription plan price IDs from database
       const plans = await db.select({
         slug: subscriptionPlans.slug,
@@ -2740,7 +2740,7 @@ KEY TALKING POINTS:
         stripeYearlyPriceId: subscriptionPlans.stripeYearlyPriceId,
       }).from(subscriptionPlans)
         .where(eq(subscriptionPlans.isActive, true));
-      
+
       res.json({
         ...debugInfo,
         configuredPlans: plans,
@@ -2809,7 +2809,7 @@ KEY TALKING POINTS:
     try {
       const tenantContext = req.tenantContext;
       const tenant = tenantContext.tenant;
-      
+
       // Get plan details if tenant has a plan
       let planDetails = null;
       if (tenant.planType && tenant.planType !== 'free') {
@@ -2818,7 +2818,7 @@ KEY TALKING POINTS:
           .limit(1);
         planDetails = plan || null;
       }
-      
+
       res.json({
         subscriptionStatus: tenant.subscriptionStatus || 'none',
         planType: tenant.planType || 'free',
@@ -2847,69 +2847,69 @@ KEY TALKING POINTS:
       if (!stripe) {
         return res.status(503).json({ message: "Stripe is not configured" });
       }
-      
+
       // Validate request body
       const parseResult = checkoutSessionSchema.safeParse(req.body);
       if (!parseResult.success) {
         return res.status(400).json({ message: "Invalid request", errors: parseResult.error.errors });
       }
-      
+
       const { priceId, planSlug, billingCycle } = parseResult.data;
       const tenantContext = req.tenantContext;
       const tenant = tenantContext.tenant;
       const user = req.user;
-      
+
       if (!priceId && !planSlug) {
         return res.status(400).json({ message: "Price ID or plan slug required" });
       }
-      
+
       // Get the price ID from plan if not provided
       let stripePriceId = priceId;
       if (!stripePriceId && planSlug) {
         const [plan] = await db.select().from(subscriptionPlans)
           .where(eq(subscriptionPlans.slug, planSlug))
           .limit(1);
-        
+
         if (!plan) {
           return res.status(404).json({ message: "Plan not found" });
         }
-        
-        stripePriceId = billingCycle === 'yearly' 
-          ? plan.stripeYearlyPriceId 
+
+        stripePriceId = billingCycle === 'yearly'
+          ? plan.stripeYearlyPriceId
           : plan.stripeMonthlyPriceId;
-          
+
         if (!stripePriceId) {
           return res.status(400).json({ message: "Stripe price not configured for this plan" });
         }
       }
-      
+
       // Validate price ID against whitelist (if configured)
       if (stripePriceId && !isPriceIdWhitelisted(stripePriceId)) {
         console.warn(`Checkout attempt with non-whitelisted price ID: ${stripePriceId}`);
         return res.status(400).json({ message: "Invalid price ID for this application" });
       }
-      
+
       const config = getStripeConfig();
-      
+
       // Get or create Stripe customer (with app metadata for webhook validation)
       let customerId = tenant.stripeCustomerId;
       if (!customerId) {
         const customer = await stripe.customers.create({
           email: user?.claims?.email || 'unknown@example.com',
           name: tenant.name,
-          metadata: { 
+          metadata: {
             tenantId: tenant.id.toString(),
             app: config.appSlug,
           }
         });
         customerId = customer.id;
-        
+
         // Save customer ID to database
         await db.update(tenants)
           .set({ stripeCustomerId: customerId })
           .where(eq(tenants.id, tenant.id));
       }
-      
+
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
         mode: 'subscription',
@@ -2917,20 +2917,20 @@ KEY TALKING POINTS:
         line_items: [{ price: stripePriceId, quantity: 1 }],
         success_url: `${config.baseUrl}/subscription?success=true&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${config.baseUrl}/subscription?canceled=true`,
-        metadata: { 
+        metadata: {
           tenantId: tenant.id.toString(),
           app: config.appSlug,
           priceId: stripePriceId || '',
         },
         subscription_data: {
-          metadata: { 
+          metadata: {
             tenantId: tenant.id.toString(),
             app: config.appSlug,
             priceId: stripePriceId || '',
           }
         }
       });
-      
+
       res.json({ url: session.url, sessionId: session.id });
     } catch (error: any) {
       handleRouteError(error, res, "Create checkout session");
@@ -2948,22 +2948,22 @@ KEY TALKING POINTS:
       if (!stripe) {
         return res.status(503).json({ message: "Stripe is not configured" });
       }
-      
+
       const tenantContext = req.tenantContext;
       const tenant = tenantContext.tenant;
-      
+
       if (!tenant.stripeCustomerId) {
         return res.status(400).json({ message: "No billing account found" });
       }
-      
+
       const config = getStripeConfig();
       const returnUrl = process.env.STRIPE_CUSTOMER_PORTAL_RETURN_URL || `${config.baseUrl}/subscription`;
-      
+
       const session = await stripe.billingPortal.sessions.create({
         customer: tenant.stripeCustomerId,
         return_url: returnUrl
       });
-      
+
       res.json({ url: session.url });
     } catch (error: any) {
       handleRouteError(error, res, "Create portal session");
@@ -2976,16 +2976,16 @@ KEY TALKING POINTS:
     let [plan] = await db.select().from(subscriptionPlans)
       .where(eq(subscriptionPlans.stripeMonthlyPriceId, priceId))
       .limit(1);
-    
+
     if (plan) return { slug: plan.slug };
-    
+
     // Try yearly price
     [plan] = await db.select().from(subscriptionPlans)
       .where(eq(subscriptionPlans.stripeYearlyPriceId, priceId))
       .limit(1);
-    
+
     if (plan) return { slug: plan.slug };
-    
+
     return null;
   }
 
@@ -2995,36 +2995,36 @@ KEY TALKING POINTS:
       console.error('Webhook error: Stripe not configured');
       return res.status(503).send('Webhook Error: Stripe not configured');
     }
-    
+
     const sig = req.headers['stripe-signature'] as string;
     let event: Stripe.Event;
-    
+
     // Use rawBody stored by the global JSON parser in index.ts
     const rawBody = (req as any).rawBody;
-    
+
     if (!rawBody) {
       console.error('Webhook error: No raw body available');
       return res.status(400).send('Webhook Error: No raw body');
     }
-    
+
     if (!process.env.STRIPE_WEBHOOK_SECRET) {
       console.error('Webhook error: STRIPE_WEBHOOK_SECRET not configured');
       return res.status(500).send('Webhook Error: Not configured');
     }
-    
+
     try {
       event = stripe.webhooks.constructEvent(
-        rawBody, 
-        sig, 
+        rawBody,
+        sig,
         process.env.STRIPE_WEBHOOK_SECRET
       );
     } catch (err: any) {
       console.error('Webhook signature verification failed:', err.message);
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
-    
+
     const config = getStripeConfig();
-    
+
     // ATOMIC IDEMPOTENCY: Try to insert first, check if it was a conflict
     // Using a try-catch to detect unique constraint violation
     try {
@@ -3048,14 +3048,14 @@ KEY TALKING POINTS:
       // Re-throw other errors
       throw insertError;
     }
-    
+
     // Helper to get app slug from subscription or customer metadata (fallback)
     const getAppSlugFromRelatedObject = async (eventData: any): Promise<string | undefined> => {
       // First try direct metadata
       if (eventData.metadata?.app) {
         return eventData.metadata.app;
       }
-      
+
       // For invoice events, check subscription metadata
       if (eventData.subscription && typeof eventData.subscription === 'string') {
         try {
@@ -3067,7 +3067,7 @@ KEY TALKING POINTS:
           console.warn(`Failed to retrieve subscription ${eventData.subscription} for app validation`);
         }
       }
-      
+
       // For customer events or as last resort, check customer metadata
       const customerId = eventData.customer as string | undefined;
       if (customerId) {
@@ -3080,27 +3080,27 @@ KEY TALKING POINTS:
           console.warn(`Failed to retrieve customer ${customerId} for app validation`);
         }
       }
-      
+
       return undefined;
     };
-    
+
     // Helper to get price ID from metadata or related objects (fallback)
     const getPriceIdFromRelatedObject = async (eventData: any): Promise<string | undefined> => {
       // First try direct metadata
       if (eventData.metadata?.priceId) {
         return eventData.metadata.priceId;
       }
-      
+
       // From subscription items
       if (eventData.items?.data?.[0]?.price?.id) {
         return eventData.items.data[0].price.id;
       }
-      
+
       // From invoice lines
       if (eventData.lines?.data?.[0]?.price?.id) {
         return eventData.lines.data[0].price.id;
       }
-      
+
       // For checkout session, check subscription
       if (eventData.subscription && typeof eventData.subscription === 'string') {
         try {
@@ -3117,25 +3117,25 @@ KEY TALKING POINTS:
           console.warn(`Failed to retrieve subscription for price validation`);
         }
       }
-      
+
       return undefined;
     };
-    
+
     const eventData = event.data.object as any;
-    
+
     // Get app slug with fallback to subscription/customer metadata
     const eventAppSlug = await getAppSlugFromRelatedObject(eventData);
-    
+
     // Strict app slug validation: require metadata.app to match
     if (eventAppSlug !== config.appSlug) {
-      const reason = eventAppSlug 
+      const reason = eventAppSlug
         ? `Event for different app: ${eventAppSlug}`
         : "Event missing app metadata - skipping for security";
-      
+
       await db.update(stripeWebhookEvents)
         .set({ result: "skipped_app_mismatch" })
         .where(eq(stripeWebhookEvents.stripeEventId, event.id));
-      
+
       logWebhookEvent({
         eventId: event.id,
         eventType: event.type,
@@ -3144,18 +3144,18 @@ KEY TALKING POINTS:
       });
       return res.json({ received: true, status: "skipped_app_mismatch" });
     }
-    
+
     // Validate price ID against whitelist (if whitelist is configured)
     // FAIL CLOSED: If whitelist is set and we can't determine the priceId, skip the event
     if (config.whitelistedPriceIds.length > 0) {
       const priceId = await getPriceIdFromRelatedObject(eventData);
-      
+
       // Fail closed: if we have a whitelist but can't determine priceId, skip
       if (!priceId) {
         await db.update(stripeWebhookEvents)
           .set({ result: "skipped_unknown_price" })
           .where(eq(stripeWebhookEvents.stripeEventId, event.id));
-        
+
         logWebhookEvent({
           eventId: event.id,
           eventType: event.type,
@@ -3164,12 +3164,12 @@ KEY TALKING POINTS:
         });
         return res.json({ received: true, status: "skipped_unknown_price" });
       }
-      
+
       if (!isPriceIdWhitelisted(priceId)) {
         await db.update(stripeWebhookEvents)
           .set({ result: "skipped_invalid_price" })
           .where(eq(stripeWebhookEvents.stripeEventId, event.id));
-        
+
         logWebhookEvent({
           eventId: event.id,
           eventType: event.type,
@@ -3179,28 +3179,28 @@ KEY TALKING POINTS:
         return res.json({ received: true, status: "skipped_invalid_price" });
       }
     }
-    
+
     console.log(`Stripe webhook received: ${event.type}`);
-    
+
     try {
       switch (event.type) {
         case 'checkout.session.completed': {
           const session = event.data.object as Stripe.Checkout.Session;
           const tenantId = session.metadata?.tenantId ? parseInt(session.metadata.tenantId) : null;
-          
+
           if (tenantId && session.subscription) {
             // Get subscription details to extract plan info
             const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
             const priceId = subscription.items.data[0]?.price.id;
-            
+
             // Find matching plan by price ID (monthly or yearly)
             const matchingPlan = priceId ? await findPlanByPriceId(priceId) : null;
-            
+
             if (!matchingPlan) {
               console.error(`Webhook: No plan found for price ID ${priceId}`);
               // Don't fail - just log and continue with unknown plan
             }
-            
+
             await db.update(tenants)
               .set({
                 stripeSubscriptionId: session.subscription as string,
@@ -3209,18 +3209,18 @@ KEY TALKING POINTS:
                 billingPeriodEnd: new Date(subscription.current_period_end * 1000),
               })
               .where(eq(tenants.id, tenantId));
-              
+
             console.log(`Tenant ${tenantId} subscription activated: ${matchingPlan?.slug || 'unknown'}`);
           }
           break;
         }
-        
+
         case 'customer.subscription.created': {
           // Handle subscription created directly (backup for checkout.session.completed)
           const subscription = event.data.object as Stripe.Subscription;
           const customerId = subscription.customer as string;
           const tenantIdFromMeta = subscription.metadata?.tenantId ? parseInt(subscription.metadata.tenantId) : null;
-          
+
           // Try to find tenant by metadata first, then by customer ID
           let tenant = null;
           if (tenantIdFromMeta) {
@@ -3235,15 +3235,15 @@ KEY TALKING POINTS:
               .limit(1);
             tenant = foundTenant;
           }
-          
+
           if (tenant) {
             const priceId = subscription.items.data[0]?.price.id;
             const matchingPlan = priceId ? await findPlanByPriceId(priceId) : null;
-            
-            const status = subscription.status === 'active' ? 'active' 
+
+            const status = subscription.status === 'active' ? 'active'
               : subscription.status === 'trialing' ? 'trialing'
-              : 'none';
-            
+                : 'none';
+
             await db.update(tenants)
               .set({
                 stripeSubscriptionId: subscription.id,
@@ -3252,28 +3252,28 @@ KEY TALKING POINTS:
                 billingPeriodEnd: new Date(subscription.current_period_end * 1000),
               })
               .where(eq(tenants.id, tenant.id));
-              
+
             console.log(`Tenant ${tenant.id} subscription created: ${matchingPlan?.slug || 'unknown'} (${status})`);
           }
           break;
         }
-        
+
         case 'customer.subscription.updated': {
           const subscription = event.data.object as Stripe.Subscription;
           const customerId = subscription.customer as string;
-          
+
           // Find tenant by customer ID
           const [tenant] = await db.select().from(tenants)
             .where(eq(tenants.stripeCustomerId, customerId))
             .limit(1);
-            
+
           if (tenant) {
-            const status = subscription.status === 'active' ? 'active' 
+            const status = subscription.status === 'active' ? 'active'
               : subscription.status === 'trialing' ? 'trialing'
-              : subscription.status === 'past_due' ? 'past_due'
-              : subscription.status === 'canceled' ? 'canceled'
-              : 'none';
-              
+                : subscription.status === 'past_due' ? 'past_due'
+                  : subscription.status === 'canceled' ? 'canceled'
+                    : 'none';
+
             await db.update(tenants)
               .set({
                 subscriptionStatus: status,
@@ -3281,20 +3281,20 @@ KEY TALKING POINTS:
                 canceledAt: subscription.canceled_at ? new Date(subscription.canceled_at * 1000) : null,
               })
               .where(eq(tenants.id, tenant.id));
-              
+
             console.log(`Tenant ${tenant.id} subscription updated: ${status}`);
           }
           break;
         }
-        
+
         case 'customer.subscription.deleted': {
           const subscription = event.data.object as Stripe.Subscription;
           const customerId = subscription.customer as string;
-          
+
           const [tenant] = await db.select().from(tenants)
             .where(eq(tenants.stripeCustomerId, customerId))
             .limit(1);
-            
+
           if (tenant) {
             await db.update(tenants)
               .set({
@@ -3302,58 +3302,58 @@ KEY TALKING POINTS:
                 canceledAt: new Date(),
               })
               .where(eq(tenants.id, tenant.id));
-              
+
             console.log(`Tenant ${tenant.id} subscription canceled`);
           }
           break;
         }
-        
+
         case 'invoice.paid': {
           const invoice = event.data.object as Stripe.Invoice;
           const customerId = invoice.customer as string;
-          
+
           const [tenant] = await db.select().from(tenants)
             .where(eq(tenants.stripeCustomerId, customerId))
             .limit(1);
-            
+
           if (tenant && invoice.subscription) {
             const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
-            
+
             await db.update(tenants)
               .set({
                 subscriptionStatus: 'active',
                 billingPeriodEnd: new Date(subscription.current_period_end * 1000),
               })
               .where(eq(tenants.id, tenant.id));
-              
+
             console.log(`Tenant ${tenant.id} invoice paid, subscription renewed`);
           }
           break;
         }
-        
+
         case 'invoice.payment_failed': {
           const invoice = event.data.object as Stripe.Invoice;
           const customerId = invoice.customer as string;
-          
+
           const [tenant] = await db.select().from(tenants)
             .where(eq(tenants.stripeCustomerId, customerId))
             .limit(1);
-            
+
           if (tenant) {
             await db.update(tenants)
               .set({ subscriptionStatus: 'past_due' })
               .where(eq(tenants.id, tenant.id));
-              
+
             console.log(`Tenant ${tenant.id} payment failed, marked as past_due`);
           }
           break;
         }
       }
-      
+
       // Log event for audit trail
       const webhookEventData = event.data.object as any;
       let tenantId: number | null = null;
-      
+
       if (webhookEventData.metadata?.tenantId) {
         tenantId = parseInt(webhookEventData.metadata.tenantId);
       } else if (webhookEventData.customer) {
@@ -3362,12 +3362,12 @@ KEY TALKING POINTS:
           .limit(1);
         tenantId = foundTenant?.id || null;
       }
-      
+
       // Get subscription and customer IDs for logging
       const subscriptionId = webhookEventData.subscription || webhookEventData.id;
       const customerId = webhookEventData.customer;
       const priceId = webhookEventData.items?.data?.[0]?.price?.id;
-      
+
       if (tenantId) {
         await db.insert(subscriptionEvents).values({
           tenantId,
@@ -3376,12 +3376,12 @@ KEY TALKING POINTS:
           data: webhookEventData,
         });
       }
-      
+
       // Update idempotency record with success result
       await db.update(stripeWebhookEvents)
         .set({ result: "processed" })
         .where(eq(stripeWebhookEvents.stripeEventId, event.id));
-      
+
       logWebhookEvent({
         eventId: event.id,
         eventType: event.type,
@@ -3391,13 +3391,13 @@ KEY TALKING POINTS:
         priceId,
         result: "processed",
       });
-      
+
     } catch (error) {
       // Update idempotency record with error result
       await db.update(stripeWebhookEvents)
         .set({ result: "error" })
         .where(eq(stripeWebhookEvents.stripeEventId, event.id));
-      
+
       logWebhookEvent({
         eventId: event.id,
         eventType: event.type,
@@ -3407,7 +3407,7 @@ KEY TALKING POINTS:
       console.error(`Error processing webhook ${event.type}:`, error);
       // Still return 200 to acknowledge receipt
     }
-    
+
     res.json({ received: true });
   });
 
@@ -3440,7 +3440,7 @@ KEY TALKING POINTS:
       if (!email) {
         return res.status(400).json({ message: "Email address required" });
       }
-      
+
       const result = await sendTestEmail(email);
       if (result.success) {
         res.json({ message: "Test email sent successfully", messageId: result.messageId });
@@ -3449,6 +3449,89 @@ KEY TALKING POINTS:
       }
     } catch (error) {
       handleRouteError(error, res, "Send test email");
+    }
+  });
+
+  // ============================================================
+  // AGENT ROUTES — Phase 0: Identity & Continuity
+  // ============================================================
+  // Import inline to avoid circular dependency issues with top-level import
+  const { getCoreSystemPrompt, readAgentState } = await import("./services/agent-identity.js");
+
+  /**
+   * GET /api/agent/system-prompt
+   * Returns the active core_agent_identity prompt content.
+   * Used by admin UI and for debugging.
+   */
+  app.get("/api/agent/system-prompt", requireAuth, async (req, res) => {
+    try {
+      const content = await getCoreSystemPrompt();
+      res.json({ promptKey: "core_agent_identity", content });
+    } catch (error) {
+      handleRouteError(error, res, "Get agent system prompt");
+    }
+  });
+
+  /**
+   * GET /api/agent/state/:runType
+   * Returns the current agent heartbeat state for a given run type.
+   */
+  app.get("/api/agent/state/:runType", requireAuth, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+      const state = await readAgentState(tenantId, req.params.runType);
+      if (!state) return res.status(404).json({ message: "No agent state found for this run type" });
+      res.json(state);
+    } catch (error) {
+      handleRouteError(error, res, "Get agent state");
+    }
+  });
+
+  /**
+   * GET /api/agent/learnings
+   * Returns active playbook learnings for the tenant.
+   * Query params: tradeType, playbookType, limit (default 5)
+   */
+  app.get("/api/agent/learnings", requireAuth, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+      const { tradeType, playbookType, limit } = req.query;
+      const learnings = await storage.getAgentPlaybookLearnings(
+        tenantId,
+        tradeType as string | undefined,
+        playbookType as string | undefined,
+        limit ? parseInt(limit as string) : 5,
+      );
+      res.json(learnings);
+    } catch (error) {
+      handleRouteError(error, res, "Get agent learnings");
+    }
+  });
+
+  /**
+   * POST /api/agent/learnings
+   * Creates a new playbook learning manually (admin use).
+   */
+  app.post("/api/agent/learnings", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+      const { learning, tradeType, playbookType, evidenceCount, successRate } = req.body;
+      if (!learning) return res.status(400).json({ message: "learning field is required" });
+      const created = await storage.createAgentPlaybookLearning({
+        tenantId,
+        learning,
+        tradeType: tradeType ?? null,
+        playbookType: playbookType ?? null,
+        evidenceCount: evidenceCount ?? 1,
+        successRate: successRate ?? null,
+        isActive: true,
+      });
+      res.status(201).json(created);
+    } catch (error) {
+      handleRouteError(error, res, "Create agent learning");
     }
   });
 

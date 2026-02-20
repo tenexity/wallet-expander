@@ -617,7 +617,7 @@ export const subscriptionPlans = pgTable("subscription_plans", {
   monthlyPrice: numeric("monthly_price").notNull(),
   yearlyPrice: numeric("yearly_price").notNull(),
   features: jsonb("features").$type<string[]>(),
-  limits: jsonb("limits").$type<{ accounts?: number; users?: number; [key: string]: any }>(),
+  limits: jsonb("limits").$type<{ accounts?: number; users?: number;[key: string]: any }>(),
   isActive: boolean("is_active").default(true),
   displayOrder: integer("display_order").default(0),
   createdAt: timestamp("created_at").defaultNow(),
@@ -663,3 +663,81 @@ export const stripeWebhookEvents = pgTable("stripe_webhook_events", {
 ]);
 
 export type StripeWebhookEvent = typeof stripeWebhookEvents.$inferSelect;
+
+// ============ AGENT IDENTITY & CONTINUITY (Phase 0) ============
+
+// The agent "soul" — core identity prompt read by every agent service
+export const agentSystemPrompts = pgTable("agent_system_prompts", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id"),
+  promptKey: text("prompt_key").notNull().unique(),
+  content: text("content").notNull(),
+  version: integer("version").notNull().default(1),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_agent_system_prompts_tenant_id").on(table.tenantId),
+  index("idx_agent_system_prompts_key").on(table.promptKey),
+]);
+
+export const insertAgentSystemPromptSchema = createInsertSchema(agentSystemPrompts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAgentSystemPrompt = z.infer<typeof insertAgentSystemPromptSchema>;
+export type AgentSystemPrompt = typeof agentSystemPrompts.$inferSelect;
+
+// The agent "heartbeat" — one row per run_type per tenant, updated after each agent run
+export const agentState = pgTable("agent_state", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  agentRunType: text("agent_run_type").notNull(), // 'daily-briefing' | 'weekly-account-review' | 'email-intelligence' | 'generate-playbook' | 'synthesize-learnings'
+  lastRunAt: timestamp("last_run_at"),
+  lastRunSummary: text("last_run_summary"),      // 2-4 sentence memo of what the agent did
+  currentFocus: text("current_focus"),             // what patterns or accounts it is actively watching
+  pendingActions: jsonb("pending_actions"),         // actions generated but not yet confirmed executed
+  openQuestions: jsonb("open_questions"),           // things flagged as needing more data or monitoring
+  patternNotes: text("pattern_notes"),             // cross-account patterns, appended over time with date stamps
+  anomaliesWatching: jsonb("anomalies_watching"),  // specific accounts or signals being monitored
+  lastUpdatedAt: timestamp("last_updated_at").defaultNow(),
+}, (table) => [
+  index("idx_agent_state_tenant_run_type").on(table.tenantId, table.agentRunType),
+]);
+
+export const insertAgentStateSchema = createInsertSchema(agentState).omit({
+  id: true,
+  lastUpdatedAt: true,
+});
+
+export type InsertAgentState = z.infer<typeof insertAgentStateSchema>;
+export type AgentState = typeof agentState.$inferSelect;
+
+// The agent "memory" — durable learnings derived from playbook outcome data
+export const agentPlaybookLearnings = pgTable("agent_playbook_learnings", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id"),
+  learning: text("learning").notNull(),           // concise, actionable rule
+  tradeType: text("trade_type").array(),           // which trade types this applies to
+  playbookType: text("playbook_type").array(),     // which playbook types this applies to
+  evidenceCount: integer("evidence_count").default(1),
+  successRate: numeric("success_rate"),            // percentage of times this approach succeeded
+  dateDerived: timestamp("date_derived").defaultNow(),
+  isActive: boolean("is_active").default(true),
+  supersededById: integer("superseded_by_id"),     // FK to self — set when a newer learning overrides this one
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_agent_playbook_learnings_tenant_id").on(table.tenantId),
+  index("idx_agent_playbook_learnings_active").on(table.isActive),
+]);
+
+export const insertAgentPlaybookLearningSchema = createInsertSchema(agentPlaybookLearnings).omit({
+  id: true,
+  createdAt: true,
+  dateDerived: true,
+});
+
+export type InsertAgentPlaybookLearning = z.infer<typeof insertAgentPlaybookLearningSchema>;
+export type AgentPlaybookLearning = typeof agentPlaybookLearnings.$inferSelect;

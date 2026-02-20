@@ -1,4 +1,4 @@
-import { 
+import {
   type User, type UpsertUser,
   type Account, type InsertAccount,
   type Product, type InsertProduct,
@@ -20,11 +20,17 @@ import {
   type TerritoryManager, type InsertTerritoryManager,
   type CustomCategory, type InsertCustomCategory,
   type RevShareTier, type InsertRevShareTier,
+  // Phase 0 — Agent Identity
+  type AgentSystemPrompt, type InsertAgentSystemPrompt,
+  type AgentState, type InsertAgentState,
+  type AgentPlaybookLearning, type InsertAgentPlaybookLearning,
   users, accounts, products, productCategories, orders, orderItems,
   segmentProfiles, profileCategories, accountMetrics, accountCategoryGaps,
   tasks, playbooks, playbookTasks, programAccounts, programRevenueSnapshots,
   dataUploads, settings, scoringWeights, territoryManagers, customCategories,
   revShareTiers,
+  // Phase 0 tables
+  agentSystemPrompts, agentState, agentPlaybookLearnings,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql, gte, lte } from "drizzle-orm";
@@ -91,7 +97,7 @@ export interface IStorage {
   getPlaybooks(): Promise<Playbook[]>;
   getPlaybook(id: number): Promise<Playbook | undefined>;
   createPlaybook(playbook: InsertPlaybook): Promise<Playbook>;
-  
+
   // Playbook Tasks
   createPlaybookTask(playbookTask: InsertPlaybookTask): Promise<PlaybookTask>;
   getPlaybookTasks(playbookId: number): Promise<PlaybookTask[]>;
@@ -150,6 +156,19 @@ export interface IStorage {
   createRevShareTier(tier: InsertRevShareTier): Promise<RevShareTier>;
   updateRevShareTier(id: number, tier: Partial<InsertRevShareTier>): Promise<RevShareTier | undefined>;
   deleteRevShareTier(id: number): Promise<boolean>;
+
+  // Agent System Prompts (Phase 0)
+  getAgentSystemPrompt(promptKey: string): Promise<AgentSystemPrompt | undefined>;
+  upsertAgentSystemPrompt(prompt: InsertAgentSystemPrompt): Promise<AgentSystemPrompt>;
+
+  // Agent State / Heartbeat (Phase 0)
+  getAgentState(tenantId: number, runType: string): Promise<AgentState | undefined>;
+  upsertAgentState(tenantId: number, runType: string, data: Partial<InsertAgentState>): Promise<AgentState>;
+
+  // Agent Playbook Learnings / Memory (Phase 0)
+  getAgentPlaybookLearnings(tenantId: number, tradeType?: string, playbookType?: string, limit?: number): Promise<AgentPlaybookLearning[]>;
+  createAgentPlaybookLearning(learning: InsertAgentPlaybookLearning): Promise<AgentPlaybookLearning>;
+  supersedeLearning(oldId: number, newId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -451,7 +470,7 @@ export class DatabaseStorage implements IStorage {
   async upsertScoringWeights(weights: InsertScoringWeights): Promise<ScoringWeights> {
     // First deactivate any existing active weights
     await db.update(scoringWeights).set({ isActive: false }).where(eq(scoringWeights.isActive, true));
-    
+
     // Insert new weights
     const [created] = await db.insert(scoringWeights).values({
       ...weights,
@@ -556,6 +575,109 @@ export class DatabaseStorage implements IStorage {
   async deleteRevShareTier(id: number): Promise<boolean> {
     const result = await db.delete(revShareTiers).where(eq(revShareTiers.id, id)).returning();
     return result.length > 0;
+  }
+
+  // ─── Agent System Prompts (Phase 0) ────────────────────────────────────────
+
+  async getAgentSystemPrompt(promptKey: string): Promise<AgentSystemPrompt | undefined> {
+    const [prompt] = await db
+      .select()
+      .from(agentSystemPrompts)
+      .where(and(eq(agentSystemPrompts.promptKey, promptKey), eq(agentSystemPrompts.isActive, true)))
+      .limit(1);
+    return prompt;
+  }
+
+  async upsertAgentSystemPrompt(prompt: InsertAgentSystemPrompt): Promise<AgentSystemPrompt> {
+    const [upserted] = await db
+      .insert(agentSystemPrompts)
+      .values(prompt)
+      .onConflictDoUpdate({
+        target: agentSystemPrompts.promptKey,
+        set: {
+          content: prompt.content,
+          version: sql`${agentSystemPrompts.version} + 1`,
+          isActive: prompt.isActive ?? true,
+          updatedAt: sql`CURRENT_TIMESTAMP`,
+        },
+      })
+      .returning();
+    return upserted;
+  }
+
+  // ─── Agent State / Heartbeat (Phase 0) ─────────────────────────────────────
+
+  async getAgentState(tenantId: number, runType: string): Promise<AgentState | undefined> {
+    const [state] = await db
+      .select()
+      .from(agentState)
+      .where(and(eq(agentState.tenantId, tenantId), eq(agentState.agentRunType, runType)))
+      .limit(1);
+    return state;
+  }
+
+  async upsertAgentState(tenantId: number, runType: string, data: Partial<InsertAgentState>): Promise<AgentState> {
+    const existing = await this.getAgentState(tenantId, runType);
+    if (existing) {
+      const [updated] = await db
+        .update(agentState)
+        .set({ ...data, lastUpdatedAt: sql`CURRENT_TIMESTAMP` })
+        .where(and(eq(agentState.tenantId, tenantId), eq(agentState.agentRunType, runType)))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(agentState)
+        .values({ tenantId, agentRunType: runType, ...data })
+        .returning();
+      return created;
+    }
+  }
+
+  // ─── Agent Playbook Learnings / Memory (Phase 0) ───────────────────────────
+
+  async getAgentPlaybookLearnings(
+    tenantId: number,
+    tradeType?: string,
+    playbookType?: string,
+    limit: number = 5,
+  ): Promise<AgentPlaybookLearning[]> {
+    // Fetch all active learnings for this tenant, then filter in-memory by trade/playbook type
+    // (Postgres array contains operator via drizzle is available but kept simple for POC)
+    const all = await db
+      .select()
+      .from(agentPlaybookLearnings)
+      .where(and(
+        eq(agentPlaybookLearnings.isActive, true),
+        // tenantId null means global (seeded) learnings apply to all tenants
+        sql`(${agentPlaybookLearnings.tenantId} = ${tenantId} OR ${agentPlaybookLearnings.tenantId} IS NULL)`,
+      ))
+      .orderBy(desc(agentPlaybookLearnings.evidenceCount));
+
+    let filtered = all;
+    if (tradeType) {
+      filtered = filtered.filter(
+        (l) => !l.tradeType || l.tradeType.includes(tradeType),
+      );
+    }
+    if (playbookType) {
+      filtered = filtered.filter(
+        (l) => !l.playbookType || l.playbookType.includes(playbookType),
+      );
+    }
+    return filtered.slice(0, limit);
+  }
+
+  async createAgentPlaybookLearning(learning: InsertAgentPlaybookLearning): Promise<AgentPlaybookLearning> {
+    const [created] = await db.insert(agentPlaybookLearnings).values(learning).returning();
+    return created;
+  }
+
+  async supersedeLearning(oldId: number, newId: number): Promise<void> {
+    await db
+      .update(agentPlaybookLearnings)
+      .set({ isActive: false, supersededById: newId })
+      .where(eq(agentPlaybookLearnings.id, oldId));
   }
 }
 
