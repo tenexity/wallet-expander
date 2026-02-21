@@ -684,7 +684,7 @@ export type StripeWebhookEvent = typeof stripeWebhookEvents.$inferSelect;
 // Stores the versioned core identity prompts for the AI agent.
 export const agentSystemPrompts = pgTable("agent_system_prompts", {
   id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull(),
+  tenantId: integer("tenant_id"),
   promptKey: text("prompt_key").notNull(),       // e.g. "core_agent_identity"
   content: text("content").notNull(),
   version: integer("version").default(1),
@@ -699,7 +699,7 @@ export type AgentSystemPrompt = typeof agentSystemPrompts.$inferSelect;
 // Persists the agent's rolling memory between runs.
 export const agentState = pgTable("agent_state", {
   id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull(),
+  tenantId: integer("tenant_id"),
   agentRunType: text("agent_run_type").notNull(), // daily-briefing, weekly-review, etc.
   lastRunAt: timestamp("last_run_at"),
   lastRunSummary: text("last_run_summary"),
@@ -743,7 +743,7 @@ export type AgentPlaybookLearning = typeof agentPlaybookLearnings.$inferSelect;
 // Key people at each account (buyer, owner, AP, etc.)
 export const agentContacts = pgTable("agent_contacts", {
   id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull(),
+  tenantId: integer("tenant_id"),
   accountId: integer("account_id").notNull(),
   name: text("name").notNull(),
   role: text("role"),                            // owner, purchasing_mgr, ap, coo
@@ -763,7 +763,7 @@ export type AgentContact = typeof agentContacts.$inferSelect;
 // Email/call/meeting history per account (source for email intelligence).
 export const agentInteractions = pgTable("agent_interactions", {
   id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull(),
+  tenantId: integer("tenant_id"),
   accountId: integer("account_id").notNull(),
   interactionType: text("interaction_type").notNull(), // email, call, meeting, note
   direction: text("direction"),                        // inbound, outbound
@@ -786,7 +786,7 @@ export type AgentInteraction = typeof agentInteractions.$inferSelect;
 // AI-generated playbook records linked to specific accounts.
 export const agentPlaybooks = pgTable("agent_playbooks", {
   id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull(),
+  tenantId: integer("tenant_id"),
   accountId: integer("account_id").notNull(),
   repEmail: text("rep_email"),
   playbookJson: jsonb("playbook_json"),               // Full structured playbook from GPT
@@ -805,7 +805,7 @@ export type AgentPlaybook = typeof agentPlaybooks.$inferSelect;
 // Record of every daily briefing generated and sent to each rep.
 export const agentRepDailyBriefings = pgTable("agent_rep_daily_briefings", {
   id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull(),
+  tenantId: integer("tenant_id"),
   repEmail: text("rep_email").notNull(),
   briefingDate: timestamp("briefing_date").notNull(),
   headlineAction: text("headline_action"),
@@ -825,7 +825,7 @@ export type AgentRepDailyBriefing = typeof agentRepDailyBriefings.$inferSelect;
 // Records every Ask Anything query and response for audit + analytics.
 export const agentQueryLog = pgTable("agent_query_log", {
   id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull(),
+  tenantId: integer("tenant_id"),
   repEmail: text("rep_email"),
   query: text("query").notNull(),
   responseText: text("response_text"),
@@ -841,7 +841,7 @@ export type AgentQueryLog = typeof agentQueryLog.$inferSelect;
 // Events queued for push to the customer's CRM (Salesforce, HubSpot, etc.)
 export const agentCrmSyncQueue = pgTable("agent_crm_sync_queue", {
   id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull(),
+  tenantId: integer("tenant_id"),
   entityType: text("entity_type").notNull(),          // account, task, playbook, graduation
   entityId: integer("entity_id").notNull(),
   eventType: text("event_type").notNull(),            // enrolled, graduated, task_completed, etc.
@@ -863,7 +863,7 @@ export type AgentCrmSyncQueue = typeof agentCrmSyncQueue.$inferSelect;
 // Per-tenant configuration for the agentic layer.
 export const agentOrganizationSettings = pgTable("agent_organization_settings", {
   id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull().unique(),
+  tenantId: integer("tenant_id").unique(),
   activeRepEmails: jsonb("active_rep_emails"),        // Which TM emails get daily briefings
   briefingEnabled: boolean("briefing_enabled").default(true),
   briefingTime: text("briefing_time").default("07:00"), // HH:MM local time
