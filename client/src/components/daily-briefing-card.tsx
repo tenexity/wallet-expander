@@ -60,10 +60,16 @@ export function DailyBriefingCard({ onAccountClick }: DailyBriefingCardProps) {
     const triggerBriefingMutation = useMutation({
         mutationFn: () => apiRequest("POST", "/api/agent/daily-briefing", {}),
         onSuccess: () => {
-            toast({ title: "Briefing triggered!", description: "Emails will be sent in a moment." });
+            toast({
+                title: "Briefing Triggered!",
+                description: "The AI is now scanning your accounts and drafting actions. This takes about 30 seconds. The card will update automatically.",
+            });
             setTimeout(() => {
                 queryClient.invalidateQueries({ queryKey: ["/api/agent/state/daily-briefing"] });
-            }, 5000);
+            }, 10000); // Wait 10s before first refresh to show progress
+            setTimeout(() => {
+                queryClient.invalidateQueries({ queryKey: ["/api/agent/state/daily-briefing"] });
+            }, 25000); // Secondary refresh to capture completion
         },
         onError: () => toast({ title: "Error", description: "Failed to trigger briefing.", variant: "destructive" }),
     });
@@ -84,8 +90,8 @@ export function DailyBriefingCard({ onAccountClick }: DailyBriefingCardProps) {
                             <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                         </div>
                         <div>
-                            <p className="font-semibold text-sm">Revenue Intelligence Agent</p>
-                            <p className="text-xs text-muted-foreground">No briefing has run yet. Trigger one to get started.</p>
+                            <p className="font-semibold text-sm">Morning Intelligence Briefing</p>
+                            <p className="text-xs text-muted-foreground">Analyzes your territory, identifies missing revenue, and drafts action plans every morning at 7:00 AM.</p>
                         </div>
                     </div>
                     <Button
@@ -95,7 +101,7 @@ export function DailyBriefingCard({ onAccountClick }: DailyBriefingCardProps) {
                         disabled={triggerBriefingMutation.isPending}
                     >
                         <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${triggerBriefingMutation.isPending ? "animate-spin" : ""}`} />
-                        Run Briefing
+                        {triggerBriefingMutation.isPending ? "Drafting..." : "Sync Latest Data"}
                     </Button>
                 </div>
             </div>
@@ -116,23 +122,22 @@ export function DailyBriefingCard({ onAccountClick }: DailyBriefingCardProps) {
                         <Sparkles className="h-3.5 w-3.5 text-white" />
                     </div>
                     <div>
-                        <span className="text-sm font-semibold">Daily Briefing</span>
-                        {lastRun && (
-                            <span className="text-xs text-muted-foreground ml-2">
-                                · {lastRun.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                            </span>
-                        )}
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold">Morning Intelligence Briefing</span>
+                            <Badge variant="outline" className="text-[10px] uppercase tracking-wider h-4 px-1.5 bg-blue-50/50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300">Automated</Badge>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">Scheduled at 7:00 AM EST · Scans your territory for new gaps and signals</p>
                     </div>
                 </div>
                 <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 text-xs text-muted-foreground"
+                    className="h-7 text-xs text-muted-foreground hover:text-primary transition-colors"
                     onClick={() => triggerBriefingMutation.mutate()}
                     disabled={triggerBriefingMutation.isPending}
                 >
                     <RefreshCw className={`h-3 w-3 mr-1 ${triggerBriefingMutation.isPending ? "animate-spin" : ""}`} />
-                    Refresh
+                    {triggerBriefingMutation.isPending ? "Syncing..." : "Sync Latest Data"}
                 </Button>
             </div>
 
