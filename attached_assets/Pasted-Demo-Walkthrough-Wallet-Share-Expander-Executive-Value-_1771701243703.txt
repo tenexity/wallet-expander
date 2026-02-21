@@ -1,0 +1,59 @@
+Demo Walkthrough — Wallet Share Expander (Executive Value Prop)
+ABC Supply Co. · February 2026
+Before You Start
+Ensure the Replit deployment is perfectly synced (npm run db:push completed) and fully seeded.
+Log in.
+Open the app — you're now inside ABC Supply Co.'s command center.
+Act 1 — The AI Finds the Missing Money (3 min)
+Screen: Dashboard Overview
+
+Talking point: "Your team is busy. They are order-takers who focus on their top 10 buddies and ignore the other 150 accounts. You have thousands of accounts buying millions of SKUs — no human can track who stopped buying copper fittings three weeks ago. Our Agent does it automatically."
+
+Point to the Daily Briefing Card at the top of the feed:
+
+Show the Headline Action.
+Highlight the Priority Items that hand the rep exactly what to do today.
+Show the At-Risk Watch List (e.g., Palmetto Heating & Air).
+Talking point: "Reps don't have time to dig through data to plan their day. So we don't make them. At 7 AM, the Agent hands them a sticky note with their top 3 tasks. It even reads their emails overnight and flags if a competitor like Ferguson is mentioned."
+
+Act 2 — The AI Does the Prep Work (4 min)
+Screen: Account Dossier Panel
+
+Click on Midwest Pipe & Supply from the Daily Briefing Card. The Account Dossier Panel slides out.
+
+Talking point: "Let's look at Midwest Pipe. They buy $162k from us, but exactly $0 in PVF. We found a $29k leak."
+
+Walk through the Dossier anatomy:
+
+Gap Summary Bars: Visually show the missing PVF spend ($29K).
+Active Action Plan: Draw attention to the AI-generated next step.
+Click "Send Email" / Email Composer:
+The Email Composer Modal opens.
+Show how the Agent has already drafted the email with pricing and a personalized angle.
+Talking point: "We didn't just find the gap; we wrote the email for them. The rep doesn't stare at a blank screen wondering what to say. They click, review the draft, and hit send. What used to take 20 minutes of research now takes 20 seconds to chase a $29k opportunity."
+
+(Optional/Manager feature) Point out the Ask Anything Bar at the top as a way for managers to instantly query the entire database without running clunky CRM reports.
+
+Act 3 — The AI Keeps Score (3 min)
+Screen: Program Performance Page (The Manager's Command Center)
+
+Navigate to the 
+ProgramPerformance
+ page via the sidebar.
+
+Talking point: "Managers don't have time to chase reps to see if they made their calls. The system tracks the revenue lift automatically."
+
+Walk through the overarching stats:
+
+Total Targeted vs. Gaps Closed vs. At-Risk
+Average Wallet Share Growth
+Show the Rep Leaderboard.
+Talking point: "This is indisputable proof of execution. You see exactly who is closing the gaps and exactly how many new dollars were won this week, automatically tied back to the AI's recommendations. Your team doesn't have to think about who to call or what to say—they just execute."
+
+Quick Reference — Key Accounts to Click
+Account	How to Access	What It Shows
+Midwest Pipe & Supply	Daily Briefing Card	High Score (89) — Top untapped opportunity. Best for showing Dossier Slide-out and the AI Email Draft.
+Palmetto Heating & Air	Daily Briefing Card / At Risk	Showcases the Agent flagging a competitor mention from an email thread to prevent churn.
+Allied Mechanical Group	Accounts Table	Active targeting. Great for showing the Interactions log with sentiment tags.
+Sunshine HVAC Florida	Program Performance Page	Fastest gap closed (71 days). Hero proof point for the manager dashboard.
+Total demo runtime: ~10 minutes
