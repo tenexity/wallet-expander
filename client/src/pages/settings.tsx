@@ -1479,7 +1479,7 @@ export default function SettingsPage() {
   const [editingManager, setEditingManager] = useState<TerritoryManager | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [companyName, setCompanyName] = useState("Mark Supply");
+  const [companyName, setCompanyName] = useState("ABC Supply");
   const [appTitle, setAppTitle] = useState("AI VP Dashboard");
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
 

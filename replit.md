@@ -2,7 +2,7 @@
 
 ## Overview
 
-The AI VP Dashboard is a sales intelligence tool designed for Mark Supply. Its primary purpose is to identify wallet share leakage within existing customer accounts and to generate actionable tasks for Territory Managers, thereby helping to recover lost revenue. The system leverages AI to analyze purchasing patterns, construct Ideal Customer Profiles (ICPs) by market segment, score accounts based on category gaps, and create personalized sales tools like call scripts and email templates. The project aims to enhance sales efficiency, improve customer penetration, and drive revenue growth for Mark Supply.
+The AI VP Dashboard is a sales intelligence tool designed for ABC Supply. Its primary purpose is to identify wallet share leakage within existing customer accounts and to generate actionable tasks for Territory Managers, thereby helping to recover lost revenue. The system leverages AI to analyze purchasing patterns, construct Ideal Customer Profiles (ICPs) by market segment, score accounts based on category gaps, and create personalized sales tools like call scripts and email templates. The project aims to enhance sales efficiency, improve customer penetration, and drive revenue growth for ABC Supply.
 
 ## User Preferences
 

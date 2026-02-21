@@ -211,7 +211,7 @@ export default function Playbooks() {
       taskType: "call",
       title: "Introduce Water Heater Line",
       description: "High-opportunity account missing water heater category",
-      script: "Hi [Contact Name], this is [Your Name] from Mark Supply...",
+      script: "Hi [Contact Name], this is [Your Name] from ABC Supply...",
       gapCategories: ["Water Heaters"],
       status: "pending",
       dueDate: "2026-01-25",

@@ -116,11 +116,11 @@ describe('API Resilience Integration Tests', () => {
         title: 'Discuss products with Account',
         taskType: 'call',
         description: 'High-opportunity account missing products category',
-        script: 'Hi, this is [Your Name] from Mark Supply...',
+        script: 'Hi, this is [Your Name] from ABC Supply...',
       };
 
       expect(fallbackCallScript.title).toBeDefined();
-      expect(fallbackCallScript.script).toContain('Mark Supply');
+      expect(fallbackCallScript.script).toContain('ABC Supply');
     });
   });
 

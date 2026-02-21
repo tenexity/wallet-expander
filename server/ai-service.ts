@@ -163,7 +163,7 @@ export async function generateCallScript(
   gapCategories: string[],
   revenue: number
 ): Promise<TaskGenerationResult> {
-  const prompt = `You are a Territory Manager at Mark Supply, a wholesale distributor.
+  const prompt = `You are a Territory Manager at ABC Supply, a wholesale distributor.
 
 Account: ${accountName}
 Segment: ${segment}
@@ -176,7 +176,7 @@ The script should:
 1. Start with a warm, relationship-focused opening
 2. Reference that they're a valued customer
 3. Naturally transition to discussing the gap category (pick the most strategic one)
-4. Include specific benefits of consolidating purchases with Mark Supply
+4. Include specific benefits of consolidating purchases with ABC Supply
 5. End with a clear next step (scheduling a call, sending a quote, etc.)
 
 Keep it conversational - this is a trusted supplier relationship, not a cold call.
@@ -209,7 +209,7 @@ Respond in JSON format:
       title: `Discuss ${gapCategories[0] || "products"} with ${accountName}`,
       taskType: "call",
       description: `High-opportunity account missing ${gapCategories[0] || "products"} category`,
-      script: `Hi, this is [Your Name] from Mark Supply. I wanted to reach out about our ${gapCategories[0] || "products"} line that I think could benefit your business. Would you have time this week for a quick call?`,
+      script: `Hi, this is [Your Name] from ABC Supply. I wanted to reach out about our ${gapCategories[0] || "products"} line that I think could benefit your business. Would you have time this week for a quick call?`,
     };
 
     return safeParseJSON(content, taskGenerationResultSchema, fallback);
@@ -219,7 +219,7 @@ Respond in JSON format:
       title: `Discuss ${gapCategories[0] || "products"} with ${accountName}`,
       taskType: "call",
       description: `High-opportunity account missing ${gapCategories[0] || "products"} category`,
-      script: `Hi, this is [Your Name] from Mark Supply. I wanted to reach out about our ${gapCategories[0] || "products"} line that I think could benefit your business. Would you have time this week for a quick call?`,
+      script: `Hi, this is [Your Name] from ABC Supply. I wanted to reach out about our ${gapCategories[0] || "products"} line that I think could benefit your business. Would you have time this week for a quick call?`,
     };
   }
 }
@@ -230,7 +230,7 @@ export async function generateEmailTemplate(
   gapCategories: string[],
   revenue: number
 ): Promise<TaskGenerationResult> {
-  const prompt = `You are a Territory Manager at Mark Supply, a wholesale distributor.
+  const prompt = `You are a Territory Manager at ABC Supply, a wholesale distributor.
 
 Account: ${accountName}
 Segment: ${segment}  
@@ -241,7 +241,7 @@ Generate an email template for reaching out to this account about the gap catego
 
 The email should:
 1. Be brief (3 paragraphs max)
-2. Reference their business and relationship with Mark Supply
+2. Reference their business and relationship with ABC Supply
 3. Introduce the gap category naturally (seasonal tie-in, new inventory, promotion, etc.)
 4. Highlight 2-3 specific benefits
 5. Include a clear call-to-action
@@ -297,7 +297,7 @@ export async function generateVisitPlan(
   gapCategories: string[],
   revenue: number
 ): Promise<TaskGenerationResult> {
-  const prompt = `You are a Territory Manager at Mark Supply, a wholesale distributor.
+  const prompt = `You are a Territory Manager at ABC Supply, a wholesale distributor.
 
 Account: ${accountName}
 Segment: ${segment}

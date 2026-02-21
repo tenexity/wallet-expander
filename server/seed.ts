@@ -26,7 +26,7 @@ import { sql } from "drizzle-orm";
 const TENANT_ID = 8; // Graham's demo tenant
 
 async function seed() {
-  console.log("🌱 Seeding Mark Supply Co. demo data...");
+  console.log("🌱 Seeding ABC Supply Co. demo data...");
 
   // ── Clear in FK-safe order ────────────────────────────────────────────────
   await db.delete(programRevenueSnapshots);
@@ -287,7 +287,7 @@ async function seed() {
         description: "HVAC contractors who purchase across all major categories — equipment, refrigerant, controls, and water heaters",
         minAnnualRevenue: "75000",
         status: "approved",
-        approvedBy: "Mark Minnich",
+        approvedBy: "Admin",
         approvedAt: sql`CURRENT_TIMESTAMP`,
       },
       {
@@ -297,7 +297,7 @@ async function seed() {
         description: "Plumbing contractors purchasing pipe, fixtures, water heaters, and drainage across all job types",
         minAnnualRevenue: "60000",
         status: "approved",
-        approvedBy: "Mark Minnich",
+        approvedBy: "Admin",
         approvedAt: sql`CURRENT_TIMESTAMP`,
       },
       {
@@ -307,7 +307,7 @@ async function seed() {
         description: "Commercial mechanical with diverse HVAC and plumbing needs — highest-value segment",
         minAnnualRevenue: "100000",
         status: "approved",
-        approvedBy: "Mark Minnich",
+        approvedBy: "Admin",
         approvedAt: sql`CURRENT_TIMESTAMP`,
       },
     ])
@@ -503,7 +503,7 @@ async function seed() {
   console.log(`✓ ${pbs.length} playbooks`);
 
   // ── Tasks (scripted call/email scripts per playbook) ──────────────────────
-  const waterHeaterCall = `Hi [Contact], this is [Rep] from Mark Supply. I wanted to reach out because I've been reviewing your account and noticed a big opportunity on the water heater side.
+  const waterHeaterCall = `Hi [Contact], this is [Rep] from ABC Supply. I wanted to reach out because I've been reviewing your account and noticed a big opportunity on the water heater side.
 
 We just became a preferred Bradford White and Rheem distributor — which means contractor-exclusive pricing and same-day availability on the 20 most popular models.
 
@@ -528,19 +528,19 @@ Would you share what models you install most? I'll put together a custom quote t
 
 Best, [Rep]`;
 
-  const pvfCall = `Hi [Contact], this is [Rep] from Mark Supply. Quick call — I know you're sourcing pipe, valves, and fittings from a few different places right now.
+  const pvfCall = `Hi [Contact], this is [Rep] from ABC Supply. Quick call — I know you're sourcing pipe, valves, and fittings from a few different places right now.
 
 We've significantly expanded our PVF inventory and now stock full lines of brass, copper, and plastic. Single-source convenience, next-day delivery, volume discounts on case orders.
 
 Can I send you our updated PVF pricing sheet and a sample quote?`;
 
-  const thermostatCall = `Hi [Contact], [Rep] from Mark Supply. Wanted to flag our Q1 thermostat promotion before it closes.
+  const thermostatCall = `Hi [Contact], [Rep] from ABC Supply. Wanted to flag our Q1 thermostat promotion before it closes.
 
 15% off all Honeywell and Ecobee smart thermostats, and buy-10-get-1-free on Nest Learning. Given your HVAC installation volume, I think you'd see solid savings.
 
 Would you be interested in a quote for your typical monthly quantity?`;
 
-  const atRiskCall = `Hi [Contact], this is [Rep] from Mark Supply. I wanted to check in — I noticed we haven't seen an order from you in a few weeks and wanted to make sure everything is going smoothly.
+  const atRiskCall = `Hi [Contact], this is [Rep] from ABC Supply. I wanted to check in — I noticed we haven't seen an order from you in a few weeks and wanted to make sure everything is going smoothly.
 
 Is there anything we can do better on service, pricing, or availability? I want to make sure we're continuing to earn your business.
 
@@ -699,7 +699,7 @@ Is there 10 minutes this week to reconnect?`;
 
   // ── Settings ──────────────────────────────────────────────────────────────
   await db.insert(settings).values([
-    { tenantId: TENANT_ID, key: "companyName", value: "Mark Supply Co." },
+    { tenantId: TENANT_ID, key: "companyName", value: "ABC Supply Co." },
     { tenantId: TENANT_ID, key: "appTitle", value: "Wallet Share Expander" },
   ]);
 
@@ -765,7 +765,7 @@ Is there 10 minutes this week to reconnect?`;
     },
   ]);
 
-  console.log("\n✅ Mark Supply Co. demo data seeded successfully.");
+  console.log("\n✅ ABC Supply Co. demo data seeded successfully.");
   console.log("   3 TMs · 20 accounts · 3 graduated · 6 enrolled · 2 at-risk");
   console.log("   Run on Replit: npx tsx server/seed.ts");
 }

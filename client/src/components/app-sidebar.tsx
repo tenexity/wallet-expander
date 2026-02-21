@@ -160,7 +160,7 @@ export function AppSidebar() {
   };
 
   const appTitle = getSettingValue("appTitle", "AI VP Dashboard");
-  const companyName = getSettingValue("companyName", "Mark Supply");
+  const companyName = getSettingValue("companyName", "ABC Supply");
   const companyLogo = getSettingValue("companyLogo", "");
 
   // Platform admin emails (tenexity team members) - case-insensitive comparison

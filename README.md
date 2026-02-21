@@ -1,6 +1,6 @@
 # AI VP Dashboard
 
-A sales intelligence tool designed for Mark Supply to identify wallet share leakage within existing customer accounts and generate actionable tasks for Territory Managers.
+A sales intelligence tool designed for ABC Supply to identify wallet share leakage within existing customer accounts and generate actionable tasks for Territory Managers.
 
 ## Quick Start
 
