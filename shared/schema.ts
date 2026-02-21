@@ -129,6 +129,13 @@ export const accounts = pgTable("accounts", {
   region: text("region"),
   assignedTm: text("assigned_tm"),
   status: text("status").default("active"), // active, inactive, prospect
+  // Agent / agentic-layer columns
+  enrollmentStatus: text("enrollment_status"),   // enrolled, graduated, at_risk, candidate
+  enrolledAt: timestamp("enrolled_at"),
+  graduatedAt: timestamp("graduated_at"),
+  walletShareDirection: text("wallet_share_direction"), // growing, flat, declining
+  seasonalityProfile: jsonb("seasonality_profile"),     // monthly multipliers
+  embedding: text("embedding"),                         // vector for similarity search (stored as text)
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [
   index("idx_accounts_tenant_id").on(table.tenantId),
@@ -265,6 +272,9 @@ export const accountMetrics = pgTable("account_metrics", {
   categoryGapScore: numeric("category_gap_score"),
   opportunityScore: numeric("opportunity_score"),
   matchedProfileId: integer("matched_profile_id"),
+  // Agent-layer derived metrics
+  walletSharePercentage: numeric("wallet_share_percentage"), // % of contractor's total spend captured
+  daysSinceLastOrder: integer("days_since_last_order"),
 }, (table) => [
   index("idx_account_metrics_tenant_id").on(table.tenantId),
   index("idx_account_metrics_account_id").on(table.accountId),
@@ -697,10 +707,30 @@ export const agentState = pgTable("agent_state", {
   patternNotes: text("pattern_notes"),            // Appended each run — rolling log
   anomaliesWatching: jsonb("anomalies_watching"), // Array of { account_name, signal, watch_until_date }
   openQuestions: jsonb("open_questions"),
+  pendingActions: jsonb("pending_actions"),        // Queued follow-up actions for next run
+  lastUpdatedAt: timestamp("last_updated_at"),     // Alias kept for backward compat
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (t) => [index("idx_agent_state_tenant_run").on(t.tenantId, t.agentRunType)]);
 
 export type AgentState = typeof agentState.$inferSelect;
+
+// ── Agent Playbook Learnings ──────────────────────────────────
+// Cross-account learnings captured after playbook execution —
+// what worked, what didn't, for which segment/category combos.
+export const agentPlaybookLearnings = pgTable("agent_playbook_learnings", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  segment: text("segment"),                          // HVAC, Plumbing, Mechanical
+  category: text("category"),                        // Which gap category
+  tactic: text("tactic"),                            // What approach was used
+  outcome: text("outcome"),                          // positive, negative, neutral
+  observations: text("observations"),                // Free-text AI-written summary
+  sampleSize: integer("sample_size").default(1),     // How many accounts this learning came from
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [index("idx_agent_pb_learnings_tenant").on(t.tenantId)]);
+
+export type AgentPlaybookLearning = typeof agentPlaybookLearnings.$inferSelect;
 
 // ── Agent Contacts ────────────────────────────────────────────
 // Key people at each account (buyer, owner, AP, etc.)
