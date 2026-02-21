@@ -715,17 +715,24 @@ export const agentState = pgTable("agent_state", {
 export type AgentState = typeof agentState.$inferSelect;
 
 // ── Agent Playbook Learnings ──────────────────────────────────
-// Cross-account learnings captured after playbook execution —
-// what worked, what didn't, for which segment/category combos.
+// Cross-account learnings captured after playbook execution.
 export const agentPlaybookLearnings = pgTable("agent_playbook_learnings", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenant_id").notNull(),
-  segment: text("segment"),                          // HVAC, Plumbing, Mechanical
-  category: text("category"),                        // Which gap category
-  tactic: text("tactic"),                            // What approach was used
-  outcome: text("outcome"),                          // positive, negative, neutral
-  observations: text("observations"),                // Free-text AI-written summary
-  sampleSize: integer("sample_size").default(1),     // How many accounts this learning came from
+  segment: text("segment"),
+  category: text("category"),
+  tactic: text("tactic"),
+  learning: text("learning"),
+  tradeType: text("trade_type"),
+  playbookType: text("playbook_type"),
+  outcome: text("outcome"),
+  observations: text("observations"),
+  evidenceCount: integer("evidence_count").default(1),
+  sampleSize: integer("sample_size").default(1),
+  successRate: numeric("success_rate"),
+  dateDerived: timestamp("date_derived"),
+  isActive: boolean("is_active").default(true),
+  supersededById: integer("superseded_by_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (t) => [index("idx_agent_pb_learnings_tenant").on(t.tenantId)]);
