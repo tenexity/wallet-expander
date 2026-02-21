@@ -23,6 +23,7 @@ import { db } from "../db";
 import {
     accounts,
     accountMetrics,
+    productCategories,
     agentContacts,
     agentAccountCategorySpend,
     agentInteractions,
@@ -34,7 +35,7 @@ import {
     agentPlaybookLearnings,
     agentState,
 } from "@shared/schema";
-import { and, eq, desc, gte, isNull, or } from "drizzle-orm";
+import { and, eq, desc, gte, isNull, or, inArray } from "drizzle-orm";
 import { getCoreSystemPrompt, buildStatePreamble } from "./agent-identity";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -67,6 +68,7 @@ export interface AccountContext {
     }>;
     categorySpend: Array<{
         categoryId: number;
+        categoryName: string | null;
         periodStart: Date;
         spendAmount: string;
         spendPct: string | null;
@@ -97,6 +99,7 @@ export interface AccountContext {
     }>;
     similarGraduatedAccounts: Array<{
         accountIdB: number;
+        accountBName: string | null;
         similarityScore: string;
         sharedSegment: string | null;
         accountBGraduationRevenue: string | null;
@@ -169,6 +172,20 @@ export async function assembleAccountContext(
     const account = accountRow[0];
     if (!account) throw new Error(`Account ${accountId} not found for tenant ${tenantId}`);
 
+    // Look up category names for spend rows
+    const catIds = spendRows.map((s) => s.categoryId).filter((id): id is number => id !== null);
+    const categoryNameRows = catIds.length > 0
+        ? await db.select({ id: productCategories.id, name: productCategories.name }).from(productCategories).where(inArray(productCategories.id, catIds))
+        : [];
+    const categoryNameMap = new Map(categoryNameRows.map((c) => [c.id, c.name]));
+
+    // Look up account names for similar accounts
+    const similarAccountIds = similarRows.map((s) => s.accountIdB);
+    const similarAccountNameRows = similarAccountIds.length > 0
+        ? await db.select({ id: accounts.id, name: accounts.name }).from(accounts).where(inArray(accounts.id, similarAccountIds))
+        : [];
+    const similarAccountNameMap = new Map(similarAccountNameRows.map((a) => [a.id, a.name]));
+
     // Fetch applicable learnings based on account segment/trade type
     const learningRows = await db.select().from(agentPlaybookLearnings)
         .where(and(
@@ -208,6 +225,7 @@ export async function assembleAccountContext(
         })),
         categorySpend: spendRows.map((s) => ({
             categoryId: s.categoryId ?? 0,
+            categoryName: categoryNameMap.get(s.categoryId ?? 0) ?? null,
             periodStart: s.lastOrderDate ?? new Date(),
             spendAmount: s.currentSpend ?? "0",
             spendPct: null,
@@ -240,6 +258,7 @@ export async function assembleAccountContext(
         })),
         similarGraduatedAccounts: similarRows.map((s) => ({
             accountIdB: s.accountIdB,
+            accountBName: similarAccountNameMap.get(s.accountIdB) ?? null,
             similarityScore: s.similarityScore ?? "0",
             sharedSegment: ((s.similarityBasis as any)?.shared_segment) ?? null,
             accountBGraduationRevenue: ((s.similarityBasis as any)?.graduation_revenue) ?? null,
@@ -288,7 +307,7 @@ export function contextToPromptString(ctx: AccountContext): string {
     if (ctx.categorySpend.length > 0) {
         lines.push(`\nCAT SPEND (last 12 months, top gaps first):`);
         ctx.categorySpend.slice(0, 8).forEach((s) => {
-            lines.push(`  - Cat ${s.categoryId}: $${s.spendAmount} spend | gap: ${s.gapPct ?? "?"}% ($${s.gapDollars ?? "?"} est.)`);
+            lines.push(`  - ${s.categoryName ?? `Cat ${s.categoryId}`}: $${s.spendAmount} spend | gap: ${s.gapPct ?? "?"}% ($${s.gapDollars ?? "?"} est.)`);
         });
     }
 
@@ -325,7 +344,7 @@ export function contextToPromptString(ctx: AccountContext): string {
     if (ctx.similarGraduatedAccounts.length > 0) {
         lines.push(`\nSIMILAR GRADUATED ACCOUNTS (proof points):`);
         ctx.similarGraduatedAccounts.forEach((s) => {
-            lines.push(`  - Account ${s.accountIdB} (${s.sharedSegment ?? "same segment"}, similarity: ${s.similarityScore}) — Graduated at $${s.accountBGraduationRevenue ?? "?"} revenue`);
+            lines.push(`  - ${s.accountBName ?? `Account ${s.accountIdB}`} (${s.sharedSegment ?? "same segment"}, similarity: ${s.similarityScore}) — Graduated at $${s.accountBGraduationRevenue ?? "?"} revenue`);
         });
     }
 

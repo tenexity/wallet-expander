@@ -27,6 +27,7 @@ import {
   agentCompetitors,
   agentAccountCompetitors,
   agentPlaybookLearnings,
+  agentProjects,
 } from "@shared/schema";
 import { sql } from "drizzle-orm";
 
@@ -902,6 +903,23 @@ Is there 10 minutes this week to reconnect?`;
     { tenantId: TENANT_ID, tradeType: "HVAC", playbookType: "gap_closure", learning: "Accounts with score >80 convert to enrollment 3x faster when approached with category-specific pricing sheets", evidenceCount: 12, successRate: "78", isActive: true },
   ]);
   console.log("✓ Agent playbook learnings seeded");
+
+  // ── Agent Projects ──────────────────────────────────────────────────────────
+  await db.delete(agentProjects).where(sql`tenant_id = ${TENANT_ID}`);
+
+  const midwestId = accs[12].id;
+  const palmettoId = accs[8].id;
+  const alliedId = accs[1].id;
+
+  await db.insert(agentProjects).values([
+    { tenantId: TENANT_ID, accountId: midwestId, name: "Eastside Mixed-Use Development", projectType: "new_construction", status: "bidding", estimatedValue: "340000", inferredFrom: "permit_data" },
+    { tenantId: TENANT_ID, accountId: midwestId, name: "Downtown Office HVAC Retrofit", projectType: "renovation", status: "active", estimatedValue: "125000", inferredFrom: "order_pattern" },
+    { tenantId: TENANT_ID, accountId: palmettoId, name: "Palmetto Gardens Condo Complex", projectType: "new_construction", status: "active", estimatedValue: "210000", inferredFrom: "rep_note" },
+    { tenantId: TENANT_ID, accountId: palmettoId, name: "County Hospital Wing Expansion", projectType: "renovation", status: "bidding", estimatedValue: "175000", inferredFrom: "permit_data" },
+    { tenantId: TENANT_ID, accountId: alliedId, name: "Metro Transit Authority — Station Upgrades", projectType: "renovation", status: "active", estimatedValue: "420000", inferredFrom: "order_pattern" },
+    { tenantId: TENANT_ID, accountId: alliedId, name: "Riverwalk Commercial Strip", projectType: "new_construction", status: "complete", estimatedValue: "95000", inferredFrom: "rep_note" },
+  ]);
+  console.log("✓ Agent projects seeded");
 
   // ── Agent State (Daily Briefing demo data) ──────────────────────────────────
   await db.delete(agentState).where(sql`tenant_id = ${TENANT_ID}`);

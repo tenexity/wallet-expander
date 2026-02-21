@@ -24,6 +24,12 @@ import {
     SheetHeader,
     SheetTitle,
 } from "@/components/ui/sheet";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -60,7 +66,7 @@ interface AccountContext {
         categoryPenetration: string | null;
     } | null;
     contacts: Array<{ name: string; role: string | null; email: string | null; isPrimary: boolean | null }>;
-    categorySpend: Array<{ categoryId: number; spendAmount: string; gapPct: string | null; gapDollars: string | null }>;
+    categorySpend: Array<{ categoryId: number; categoryName: string | null; spendAmount: string; gapPct: string | null; gapDollars: string | null }>;
     recentInteractions: Array<{
         interactionType: string; subject: string | null; sentiment: string | null;
         urgency: string | null; interactionDate: string | null; buyingSignal: string | null;
@@ -71,7 +77,7 @@ interface AccountContext {
     } | null;
     projects: Array<{ name: string; projectType: string | null; status: string | null; estimatedValue: string | null }>;
     competitors: Array<{ name: string; estimatedSpendPct: string | null }>;
-    similarGraduatedAccounts: Array<{ accountIdB: number; similarityScore: string; sharedSegment: string | null; accountBGraduationRevenue: string | null }>;
+    similarGraduatedAccounts: Array<{ accountIdB: number; accountBName: string | null; similarityScore: string; sharedSegment: string | null; accountBGraduationRevenue: string | null }>;
     applicableLearnings: Array<{ learning: string; evidenceCount: number | null; successRate: string | null }>;
 }
 
@@ -116,6 +122,7 @@ export function AccountDossierPanel({ accountId, onClose }: AccountDossierPanelP
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const [emailComposerOpen, setEmailComposerOpen] = useState(false);
+    const [callScriptOpen, setCallScriptOpen] = useState(false);
     const [repNote, setRepNote] = useState("");
     const [activeTab, setActiveTab] = useState<"playbook" | "intel" | "context">("playbook");
 
@@ -260,7 +267,12 @@ export function AccountDossierPanel({ accountId, onClose }: AccountDossierPanelP
                                                             <Mail className="h-3.5 w-3.5 mr-1.5" />
                                                             Send Email
                                                         </Button>
-                                                        <Button variant="outline" size="sm" className="flex-1">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="flex-1"
+                                                            onClick={() => setCallScriptOpen(true)}
+                                                        >
                                                             <Phone className="h-3.5 w-3.5 mr-1.5" />
                                                             View Call Script
                                                         </Button>
@@ -306,7 +318,7 @@ export function AccountDossierPanel({ accountId, onClose }: AccountDossierPanelP
                                                             return (
                                                                 <div key={s.categoryId}>
                                                                     <div className="flex justify-between text-sm mb-1">
-                                                                        <span className="font-medium">Category {s.categoryId}</span>
+                                                                        <span className="font-medium">{s.categoryName ?? `Category ${s.categoryId}`}</span>
                                                                         <span className="text-muted-foreground">{s.gapPct ? `${gap.toFixed(0)}% gap` : "—"} · {fmt(s.gapDollars)}</span>
                                                                     </div>
                                                                     <Progress value={Math.min(Math.abs(gap), 100)} className="h-1.5" />
@@ -476,7 +488,7 @@ export function AccountDossierPanel({ accountId, onClose }: AccountDossierPanelP
                                                             <div key={i} className="flex items-center gap-2 text-sm p-2 rounded-lg bg-green-50 dark:bg-green-950/20">
                                                                 <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
                                                                 <div>
-                                                                    <span className="font-medium">Account #{s.accountIdB}</span>
+                                                                    <span className="font-medium">{s.accountBName ?? `Account #${s.accountIdB}`}</span>
                                                                     <span className="text-muted-foreground text-xs ml-2">
                                                                         {s.sharedSegment} · graduated at {fmt(s.accountBGraduationRevenue)}
                                                                     </span>
@@ -507,6 +519,40 @@ export function AccountDossierPanel({ accountId, onClose }: AccountDossierPanelP
                     personalizationNotes={ctx.activePlaybook.aiGeneratedContent?.personalization_notes ?? ""}
                 />
             )}
+
+            {/* Call script dialog */}
+            <Dialog open={callScriptOpen} onOpenChange={setCallScriptOpen}>
+                <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Phone className="h-4 w-4" />
+                            Call Script — {ctx?.account.name}
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        {ctx?.activePlaybook?.aiGeneratedContent?.call_script ? (
+                            <div className="whitespace-pre-wrap text-sm leading-relaxed bg-muted/30 rounded-lg p-4 border">
+                                {ctx.activePlaybook.aiGeneratedContent.call_script}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-muted-foreground text-center py-4">No call script available for this playbook.</p>
+                        )}
+                        {(ctx?.activePlaybook?.aiGeneratedContent?.talking_points?.length ?? 0) > 0 && (
+                            <div>
+                                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Key Talking Points</h4>
+                                <ul className="space-y-1.5">
+                                    {ctx?.activePlaybook?.aiGeneratedContent?.talking_points?.map((pt: string, i: number) => (
+                                        <li key={i} className="flex items-start gap-2 text-sm">
+                                            <CheckCircle className="h-3.5 w-3.5 text-green-500 mt-0.5 shrink-0" />
+                                            {pt}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }

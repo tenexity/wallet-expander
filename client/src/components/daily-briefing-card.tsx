@@ -15,7 +15,7 @@
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, ChevronUp, AlertTriangle, Zap, Sparkles, RefreshCw, ExternalLink, X } from "lucide-react";
+import { ChevronDown, ChevronUp, AlertTriangle, Zap, Sparkles, RefreshCw, ExternalLink, X, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
@@ -52,19 +52,23 @@ export function DailyBriefingCard({ onAccountClick, showAdminControls = false }:
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const [atRiskExpanded, setAtRiskExpanded] = useState(false);
+    const [fullBriefingExpanded, setFullBriefingExpanded] = useState(false);
     const [isDismissed, setIsDismissed] = useState(false);
     const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
         setIsMounted(true);
-        const dismissedDate = localStorage.getItem("daily-briefing-dismissed");
-        const today = new Date().toDateString();
-        if (dismissedDate === today) {
-            setIsDismissed(true);
+        if (!showAdminControls) {
+            const dismissedDate = localStorage.getItem("daily-briefing-dismissed");
+            const today = new Date().toDateString();
+            if (dismissedDate === today) {
+                setIsDismissed(true);
+            }
         }
-    }, []);
+    }, [showAdminControls]);
 
     const handleDismiss = () => {
+        if (showAdminControls) return;
         const today = new Date().toDateString();
         localStorage.setItem("daily-briefing-dismissed", today);
         setIsDismissed(true);
@@ -215,6 +219,47 @@ export function DailyBriefingCard({ onAccountClick, showAdminControls = false }:
                     </div>
                 )}
 
+                {/* View Full Briefing expandable */}
+                {agentState?.lastRunSummary && (
+                    <div>
+                        <button
+                            className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 font-medium transition-colors"
+                            onClick={() => setFullBriefingExpanded(!fullBriefingExpanded)}
+                            data-testid="view-full-briefing"
+                        >
+                            <Eye className="h-3 w-3" />
+                            {fullBriefingExpanded ? "Hide Full Briefing" : "View Full Briefing"}
+                            {fullBriefingExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                        </button>
+                        {fullBriefingExpanded && (
+                            <div className="mt-3 p-3 rounded-lg bg-white dark:bg-card border text-sm space-y-3">
+                                {agentState.lastRunSummary && (
+                                    <div>
+                                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Analysis Summary</p>
+                                        <p className="text-sm leading-relaxed">{agentState.lastRunSummary}</p>
+                                    </div>
+                                )}
+                                {priorityItems.length > 0 && (
+                                    <div>
+                                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">All Priority Actions ({priorityItems.length})</p>
+                                        <div className="space-y-1.5">
+                                            {priorityItems.map((item: any, i: number) => (
+                                                <div key={i} className="text-xs flex items-start gap-2">
+                                                    <span className="font-medium shrink-0">{item.account_name}:</span>
+                                                    <span className="text-muted-foreground">{item.action} — {item.why}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                {lastRun && (
+                                    <p className="text-[10px] text-muted-foreground">Last updated: {lastRun.toLocaleString()}</p>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* At-risk banner */}
                 {atRiskItems.length > 0 && (
                     <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/20 overflow-hidden">
@@ -233,9 +278,15 @@ export function DailyBriefingCard({ onAccountClick, showAdminControls = false }:
                         {atRiskExpanded && (
                             <div className="px-3 pb-3 space-y-1.5 border-t border-red-200 dark:border-red-900/50 pt-2">
                                 {atRiskItems.map((item: any, i: number) => (
-                                    <div key={i} className="flex items-center gap-2 text-xs">
+                                    <div
+                                        key={i}
+                                        className={`flex items-center gap-2 text-xs ${item.account_id ? "cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/30 rounded px-1 py-0.5 -mx-1 transition-colors" : ""}`}
+                                        onClick={() => item.account_id && onAccountClick?.(item.account_id)}
+                                        data-testid={`at-risk-account-${item.account_id ?? i}`}
+                                    >
                                         <span className="font-medium text-red-800 dark:text-red-300">{item.account_name ?? item}</span>
                                         {item.signal && <span className="text-red-600 dark:text-red-400">· {item.signal}</span>}
+                                        {item.account_id && <ExternalLink className="h-3 w-3 text-red-400 ml-auto shrink-0" />}
                                     </div>
                                 ))}
                             </div>
