@@ -617,7 +617,7 @@ export const subscriptionPlans = pgTable("subscription_plans", {
   monthlyPrice: numeric("monthly_price").notNull(),
   yearlyPrice: numeric("yearly_price").notNull(),
   features: jsonb("features").$type<string[]>(),
-  limits: jsonb("limits").$type<{ accounts?: number; users?: number; [key: string]: any }>(),
+  limits: jsonb("limits").$type<{ accounts?: number; users?: number;[key: string]: any }>(),
   isActive: boolean("is_active").default(true),
   displayOrder: integer("display_order").default(0),
   createdAt: timestamp("created_at").defaultNow(),
@@ -663,3 +663,177 @@ export const stripeWebhookEvents = pgTable("stripe_webhook_events", {
 ]);
 
 export type StripeWebhookEvent = typeof stripeWebhookEvents.$inferSelect;
+
+// ============================================================
+// PHASE 1 — AGENT INTELLIGENCE TABLES
+// These tables power the agentic layer: daily briefings,
+// ask-anything, email intelligence, weekly review, CRM sync.
+// ============================================================
+
+// ── Agent System Prompts ─────────────────────────────────────
+// Stores the versioned core identity prompts for the AI agent.
+export const agentSystemPrompts = pgTable("agent_system_prompts", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  promptKey: text("prompt_key").notNull(),       // e.g. "core_agent_identity"
+  content: text("content").notNull(),
+  version: integer("version").default(1),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [index("idx_agent_system_prompts_tenant").on(t.tenantId)]);
+
+export type AgentSystemPrompt = typeof agentSystemPrompts.$inferSelect;
+
+// ── Agent State ──────────────────────────────────────────────
+// Persists the agent's rolling memory between runs.
+export const agentState = pgTable("agent_state", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  agentRunType: text("agent_run_type").notNull(), // daily-briefing, weekly-review, etc.
+  lastRunAt: timestamp("last_run_at"),
+  lastRunSummary: text("last_run_summary"),
+  currentFocus: text("current_focus"),
+  patternNotes: text("pattern_notes"),            // Appended each run — rolling log
+  anomaliesWatching: jsonb("anomalies_watching"), // Array of { account_name, signal, watch_until_date }
+  openQuestions: jsonb("open_questions"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [index("idx_agent_state_tenant_run").on(t.tenantId, t.agentRunType)]);
+
+export type AgentState = typeof agentState.$inferSelect;
+
+// ── Agent Contacts ────────────────────────────────────────────
+// Key people at each account (buyer, owner, AP, etc.)
+export const agentContacts = pgTable("agent_contacts", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  accountId: integer("account_id").notNull(),
+  name: text("name").notNull(),
+  role: text("role"),                            // owner, purchasing_mgr, ap, coo
+  email: text("email"),
+  phone: text("phone"),
+  isPrimary: boolean("is_primary").default(false),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("idx_agent_contacts_tenant").on(t.tenantId),
+  index("idx_agent_contacts_account").on(t.accountId),
+]);
+
+export type AgentContact = typeof agentContacts.$inferSelect;
+
+// ── Agent Interactions ────────────────────────────────────────
+// Email/call/meeting history per account (source for email intelligence).
+export const agentInteractions = pgTable("agent_interactions", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  accountId: integer("account_id").notNull(),
+  interactionType: text("interaction_type").notNull(), // email, call, meeting, note
+  direction: text("direction"),                        // inbound, outbound
+  subject: text("subject"),
+  body: text("body"),
+  repEmail: text("rep_email"),
+  contactEmail: text("contact_email"),
+  occurredAt: timestamp("occurred_at").notNull(),
+  sentimentSignal: text("sentiment_signal"),           // positive, neutral, negative, competitor_mention
+  flaggedForReview: boolean("flagged_for_review").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("idx_agent_interactions_tenant").on(t.tenantId),
+  index("idx_agent_interactions_account").on(t.accountId),
+]);
+
+export type AgentInteraction = typeof agentInteractions.$inferSelect;
+
+// ── Agent Playbooks ───────────────────────────────────────────
+// AI-generated playbook records linked to specific accounts.
+export const agentPlaybooks = pgTable("agent_playbooks", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  accountId: integer("account_id").notNull(),
+  repEmail: text("rep_email"),
+  playbookJson: jsonb("playbook_json"),               // Full structured playbook from GPT
+  focusCategories: jsonb("focus_categories"),         // Which gap categories this playbook targets
+  status: text("status").default("active"),           // active, completed, archived
+  generatedAt: timestamp("generated_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+}, (t) => [
+  index("idx_agent_playbooks_tenant").on(t.tenantId),
+  index("idx_agent_playbooks_account").on(t.accountId),
+]);
+
+export type AgentPlaybook = typeof agentPlaybooks.$inferSelect;
+
+// ── Agent Rep Daily Briefings ─────────────────────────────────
+// Record of every daily briefing generated and sent to each rep.
+export const agentRepDailyBriefings = pgTable("agent_rep_daily_briefings", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  repEmail: text("rep_email").notNull(),
+  briefingDate: timestamp("briefing_date").notNull(),
+  headlineAction: text("headline_action"),
+  priorityItems: jsonb("priority_items"),             // Array of { account_name, action, urgency, why }
+  atRiskAccounts: jsonb("at_risk_accounts"),          // Array of { account_name, signal }
+  htmlContent: text("html_content"),                  // Full HTML email sent
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("idx_agent_briefings_tenant").on(t.tenantId),
+  index("idx_agent_briefings_rep").on(t.repEmail),
+]);
+
+export type AgentRepDailyBriefing = typeof agentRepDailyBriefings.$inferSelect;
+
+// ── Agent Query Log ───────────────────────────────────────────
+// Records every Ask Anything query and response for audit + analytics.
+export const agentQueryLog = pgTable("agent_query_log", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  repEmail: text("rep_email"),
+  query: text("query").notNull(),
+  responseText: text("response_text"),
+  accountsReferenced: jsonb("accounts_referenced"),   // Array of account IDs surfaced
+  tokensUsed: integer("tokens_used"),
+  latencyMs: integer("latency_ms"),
+  askedAt: timestamp("asked_at").defaultNow(),
+}, (t) => [index("idx_agent_query_log_tenant").on(t.tenantId)]);
+
+export type AgentQueryLog = typeof agentQueryLog.$inferSelect;
+
+// ── Agent CRM Sync Queue ──────────────────────────────────────
+// Events queued for push to the customer's CRM (Salesforce, HubSpot, etc.)
+export const agentCrmSyncQueue = pgTable("agent_crm_sync_queue", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  entityType: text("entity_type").notNull(),          // account, task, playbook, graduation
+  entityId: integer("entity_id").notNull(),
+  eventType: text("event_type").notNull(),            // enrolled, graduated, task_completed, etc.
+  payload: jsonb("payload"),
+  status: text("status").default("pending"),          // pending, synced, failed
+  attempts: integer("attempts").default(0),
+  lastAttemptAt: timestamp("last_attempt_at"),
+  syncedAt: timestamp("synced_at"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("idx_agent_crm_sync_tenant").on(t.tenantId),
+  index("idx_agent_crm_sync_status").on(t.status),
+]);
+
+export type AgentCrmSyncQueue = typeof agentCrmSyncQueue.$inferSelect;
+
+// ── Agent Organization Settings ───────────────────────────────
+// Per-tenant configuration for the agentic layer.
+export const agentOrganizationSettings = pgTable("agent_organization_settings", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull().unique(),
+  activeRepEmails: jsonb("active_rep_emails"),        // Which TM emails get daily briefings
+  briefingEnabled: boolean("briefing_enabled").default(true),
+  briefingTime: text("briefing_time").default("07:00"), // HH:MM local time
+  emailIntelligenceEnabled: boolean("email_intelligence_enabled").default(true),
+  crmSyncEnabled: boolean("crm_sync_enabled").default(false),
+  crmProvider: text("crm_provider"),                 // salesforce, hubspot, none
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [index("idx_agent_org_settings_tenant").on(t.tenantId)]);
+
+export type AgentOrganizationSettings = typeof agentOrganizationSettings.$inferSelect;

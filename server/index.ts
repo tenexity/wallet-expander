@@ -2,10 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
-// NOTE: Scheduler disabled until Phase 1 schema migration is complete.
-// The scheduler imports agent services that reference tables not yet in shared/schema.ts.
-// Re-enable by uncommenting the line below once db:push has been run for Phase 1.
-// import { startScheduler, stopScheduler } from "./scheduler";
+import { startScheduler, stopScheduler } from "./scheduler";
 
 const app = express();
 const httpServer = createServer(app);
@@ -66,9 +63,14 @@ app.use((req, res, next) => {
 (async () => {
   await registerRoutes(httpServer, app);
 
+  // ── Scheduler (agent cron jobs) ─────────────────────────────────────────────
+  const schedulerTenantId = parseInt(process.env.SCHEDULER_TENANT_ID ?? "8", 10);
+  startScheduler(schedulerTenantId);
+
   // ── Graceful shutdown ───────────────────────────────────────────────────────
   const gracefulShutdown = (signal: string) => {
     log(`Received ${signal} — closing server.`);
+    stopScheduler();
     httpServer.close(() => {
       log("HTTP server closed.");
       process.exit(0);
