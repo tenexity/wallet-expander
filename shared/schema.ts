@@ -718,7 +718,7 @@ export type AgentState = typeof agentState.$inferSelect;
 // Cross-account learnings captured after playbook execution.
 export const agentPlaybookLearnings = pgTable("agent_playbook_learnings", {
   id: serial("id").primaryKey(),
-  tenantId: integer("tenant_id").notNull(),
+  tenantId: integer("tenant_id"),
   segment: text("segment"),
   category: text("category"),
   tactic: text("tactic"),
