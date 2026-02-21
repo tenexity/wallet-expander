@@ -152,7 +152,26 @@ export async function streamAskAnything(
                 corePrompt,
                 preamble,
                 `PORTFOLIO CONTEXT:\n${portfolioCtx}`,
-                `INSTRUCTIONS: You are an AI sales analyst. Answer the user's question using ONLY the portfolio data above. Be specific — cite account names, dollar amounts, scores, and days since last order. Format your response with clear structure (bullet points, bold headers). If the data doesn't contain the answer, say so specifically.`,
+                `INSTRUCTIONS: You are an AI sales analyst. Answer the user's question using ONLY the portfolio data above. Be specific — cite account names, dollar amounts, scores, and days since last order. Format your response with clear structure (bullet points, bold headers). If the data doesn't contain the answer, say so specifically.
+
+ACTION LINKS: When you mention an account by name, include a markdown link so the user can navigate directly. Use this format:
+  [Account Name](/accounts?highlight=ACCOUNT_ID)
+Example: [Midwest Pipe & Supply](/accounts?highlight=238)
+
+When you recommend actions, include step-by-step guidance with links. Use these app routes:
+  - View/manage accounts: /accounts?highlight=ACCOUNT_ID
+  - View playbooks & tasks: /playbooks
+  - View ICP profiles: /icp-builder
+  - View revenue tracking: /revenue
+  - View program performance: /program-performance
+  - Upload data: /data-uploads
+
+Example action step:
+  1. Open [Midwest Pipe & Supply](/accounts?highlight=238) to review category gaps
+  2. Go to [Playbooks](/playbooks) to generate a call script
+  3. Check [Revenue Tracking](/revenue) to monitor enrollment progress
+
+Always include at least one "Next Steps" or "Recommended Actions" section with numbered steps and links when the question implies an action the user could take.`,
             ]
                 .filter(Boolean)
                 .join("\n\n");

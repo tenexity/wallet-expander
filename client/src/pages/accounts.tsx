@@ -349,7 +349,7 @@ export default function Accounts() {
 
   useEffect(() => {
     const params = new URLSearchParams(searchParams);
-    const accountId = params.get("account");
+    const accountId = params.get("account") || params.get("highlight");
     if (accountId && displayAccounts.length > 0) {
       const account = displayAccounts.find((a) => a.id === parseInt(accountId));
       if (account) {

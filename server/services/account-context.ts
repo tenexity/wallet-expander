@@ -365,10 +365,25 @@ export function contextToPromptString(ctx: AccountContext): string {
 // ─── Full system prompt builder ───────────────────────────────────────────────
 // Convenience function used by every agent service.
 
+const ACTION_LINK_INSTRUCTIONS = `
+ACTION LINKS: When recommending actions, include markdown links to in-app pages so the user can navigate directly. Use these app routes:
+  - View this account: /accounts?highlight=ACCOUNT_ID
+  - View playbooks & tasks: /playbooks
+  - View ICP profiles: /icp-builder
+  - View revenue tracking: /revenue
+  - View program performance: /program-performance
+
+When you suggest steps, format them as a numbered "Next Steps" section with links. Example:
+  1. Go to [Playbooks](/playbooks) to generate a call script for this account
+  2. Check [Revenue Tracking](/revenue) to monitor enrollment progress
+`;
+
 export async function buildFullSystemPrompt(ctx: AccountContext): Promise<string> {
     const [corePrompt, contextStr] = await Promise.all([
         getCoreSystemPrompt(),
         Promise.resolve(contextToPromptString(ctx)),
     ]);
-    return `${corePrompt}\n\n---\nACCOUNT CONTEXT:\n${contextStr}`;
+    const accountLink = `/accounts?highlight=${ctx.account.id}`;
+    const linkInstructions = ACTION_LINK_INSTRUCTIONS.replace(/ACCOUNT_ID/g, String(ctx.account.id));
+    return `${corePrompt}\n\n---\nACCOUNT CONTEXT:\n${contextStr}\n\n${linkInstructions}`;
 }
