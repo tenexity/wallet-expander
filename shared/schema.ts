@@ -132,6 +132,8 @@ export const accounts = pgTable("accounts", {
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [
   index("idx_accounts_tenant_id").on(table.tenantId),
+  index("idx_accounts_segment").on(table.segment),
+  index("idx_accounts_assigned_tm").on(table.assignedTm),
 ]);
 
 export const insertAccountSchema = createInsertSchema(accounts).omit({
@@ -263,7 +265,10 @@ export const accountMetrics = pgTable("account_metrics", {
   categoryGapScore: numeric("category_gap_score"),
   opportunityScore: numeric("opportunity_score"),
   matchedProfileId: integer("matched_profile_id"),
-});
+}, (table) => [
+  index("idx_account_metrics_tenant_id").on(table.tenantId),
+  index("idx_account_metrics_account_id").on(table.accountId),
+]);
 
 export const insertAccountMetricsSchema = createInsertSchema(accountMetrics).omit({
   id: true,
@@ -284,7 +289,10 @@ export const accountCategoryGaps = pgTable("account_category_gaps", {
   gapPct: numeric("gap_pct"),
   estimatedOpportunity: numeric("estimated_opportunity"),
   computedAt: timestamp("computed_at").default(sql`CURRENT_TIMESTAMP`),
-});
+}, (table) => [
+  index("idx_account_category_gaps_tenant_id").on(table.tenantId),
+  index("idx_account_category_gaps_account_id").on(table.accountId),
+]);
 
 export const insertAccountCategoryGapSchema = createInsertSchema(accountCategoryGaps).omit({
   id: true,
@@ -314,6 +322,8 @@ export const tasks = pgTable("tasks", {
   createdAt: timestamp("created_at").default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [
   index("idx_tasks_tenant_id").on(table.tenantId),
+  index("idx_tasks_status").on(table.status),
+  index("idx_tasks_due_date").on(table.dueDate),
 ]);
 
 export const insertTaskSchema = createInsertSchema(tasks).omit({
@@ -386,8 +396,16 @@ export const programAccounts = pgTable("program_accounts", {
   graduationCriteria: text("graduation_criteria").default("any"), // 'any' or 'all' - meet any objective vs all
   graduatedAt: timestamp("graduated_at"), // When account was graduated
   graduationNotes: text("graduation_notes"), // Notes about graduation/success
+  // Graduation analytics (populated at graduation time)
+  graduationRevenue: numeric("graduation_revenue"), // Cumulative revenue during enrollment period
+  graduationPenetration: numeric("graduation_penetration"), // Category penetration % at graduation
+  icpCategoriesAtEnrollment: integer("icp_categories_at_enrollment"), // Number of ICP categories missing at enrollment
+  icpCategoriesAchieved: integer("icp_categories_achieved"), // Number of ICP categories successfully filled
+  enrollmentDurationDays: integer("enrollment_duration_days"), // Days from enrollment to graduation
+  incrementalRevenue: numeric("incremental_revenue"), // Revenue above pro-rated baseline (graduationRevenue - proRatedBaseline)
 }, (table) => [
   index("idx_program_accounts_tenant_id").on(table.tenantId),
+  index("idx_program_accounts_account_id").on(table.accountId),
 ]);
 
 export const insertProgramAccountSchema = createInsertSchema(programAccounts).omit({
@@ -632,3 +650,16 @@ export const insertSubscriptionEventSchema = createInsertSchema(subscriptionEven
 
 export type InsertSubscriptionEvent = z.infer<typeof insertSubscriptionEventSchema>;
 export type SubscriptionEvent = typeof subscriptionEvents.$inferSelect;
+
+export const stripeWebhookEvents = pgTable("stripe_webhook_events", {
+  id: serial("id").primaryKey(),
+  stripeEventId: text("stripe_event_id").notNull().unique(),
+  eventType: text("event_type").notNull(),
+  processedAt: timestamp("processed_at").defaultNow(),
+  appSlug: text("app_slug"),
+  result: text("result"),
+}, (table) => [
+  index("idx_stripe_webhook_events_event_id").on(table.stripeEventId),
+]);
+
+export type StripeWebhookEvent = typeof stripeWebhookEvents.$inferSelect;
