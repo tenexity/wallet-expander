@@ -17,7 +17,6 @@ import {
   FileSpreadsheet,
   HelpCircle,
   Database,
-  BarChart3,
   BarChart4,
 } from "lucide-react";
 import {
@@ -64,6 +63,7 @@ const mainNavItems = [
     title: "Program Performance",
     url: "/program-performance",
     icon: BarChart4,
+    tooltip: "Enrolled/graduated counts, rep leaderboard, and program health metrics",
     matchPattern: /^\/program-performance/,
   },
   {
@@ -83,12 +83,6 @@ const mainNavItems = [
     url: "/playbooks",
     icon: ClipboardList,
     tooltip: "Generate and manage AI-powered sales tasks with call scripts and emails",
-  },
-  {
-    title: "Program Performance",
-    url: "/program-performance",
-    icon: BarChart3,
-    tooltip: "Enrolled/graduated counts, rep leaderboard, and program health metrics",
   },
 ];
 
