@@ -651,6 +651,14 @@ Is there 10 minutes this week to reconnect?`;
       graduationCriteria: "any",
       graduatedAt,
       graduationNotes: pd.note,
+      ...(pd.state === "graduated" && pd.revenueEnd ? {
+        graduationRevenue: String(pd.revenueEnd),
+        incrementalRevenue: String(pd.revenueEnd - pd.revenueStart),
+        enrollmentDurationDays: pd.daysIn,
+        icpCategoriesAtEnrollment: 3,
+        icpCategoriesAchieved: 2,
+        graduationPenetration: "85"
+      } : {})
     };
   });
 
