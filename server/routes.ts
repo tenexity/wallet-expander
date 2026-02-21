@@ -145,8 +145,6 @@ export async function registerRoutes(
       // Calculate basic dashboard stats
       const totalAccounts = allAccounts.length;
       const enrolledAccounts = programAccounts.length;
-      const totalRevenue = 0; // Will be computed from metrics if needed
-      const incrementalRevenue = 0; // Will be computed from snapshots if needed
 
       // Get segment breakdown
       const segmentBreakdown = allAccounts.reduce((acc, account) => {
@@ -176,6 +174,23 @@ export async function registerRoutes(
         tenantStorage.getAccountMetricsBatch(allAccountIds),
         tenantStorage.getAccountCategoryGapsBatch(allAccountIds)
       ]);
+
+      // Calculate Revenue KPIs based on fetched metrics
+      const totalRevenue = allAccountIds.reduce((sum, id) => {
+        const metrics = metricsMap.get(id);
+        return sum + (metrics ? parseFloat(metrics.last12mRevenue || "0") : 0);
+      }, 0);
+
+      const incrementalRevenue = programAccounts.reduce((sum, pa) => {
+        if (pa.status === "graduated") {
+          return sum + Math.max(0, parseFloat(pa.graduationRevenue || "0") - parseFloat(pa.baselineRevenue || "0"));
+        } else {
+          const currentMetrics = metricsMap.get(pa.accountId);
+          const currentRev = currentMetrics ? parseFloat(currentMetrics.last12mRevenue || "0") : 0;
+          const baseline = parseFloat(pa.baselineRevenue || "0");
+          return sum + Math.max(0, currentRev - baseline);
+        }
+      }, 0);
 
       // Track which accounts are enrolled
       const enrolledAccountIds = new Set(programAccounts.map(p => p.accountId));

@@ -1616,8 +1616,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Agent Daily Briefing */}
-      <DailyBriefingCard onAccountClick={(id) => setDossierAccountId(id)} />
 
       {!allComplete && (
         <Card className="border-chart-1/20 bg-chart-1/5" data-testid="card-getting-started">
