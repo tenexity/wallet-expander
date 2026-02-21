@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Send, Copy, Lightbulb, CheckCircle } from "lucide-react";
+import { Send, Copy, Lightbulb, CheckCircle, ExternalLink } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -161,6 +161,21 @@ export function EmailComposerModal({
                         ) : (
                             <><Copy className="h-3.5 w-3.5 mr-1.5" />Copy to Clipboard</>
                         )}
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                            navigator.clipboard.writeText(`Subject: ${subject}\n\n${body}`).catch(() => {});
+                            const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                            window.open(mailto, "_blank");
+                            toast({ title: "Email content copied", description: "Your email client is opening with the draft pre-filled." });
+                        }}
+                        disabled={!subject.trim() || !body.trim()}
+                        data-testid="button-send-from-email"
+                    >
+                        <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                        Send from Email
                     </Button>
                     <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
                     <Button

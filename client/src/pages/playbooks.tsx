@@ -53,6 +53,7 @@ import {
   Target,
   BookOpen,
   Info,
+  ExternalLink,
 } from "lucide-react";
 import {
   Tooltip,
@@ -775,8 +776,31 @@ export default function Playbooks() {
                             </div>
                             {task.status !== "completed" && (
                               <div className="flex gap-2">
+                                {task.taskType === "email" && (task.script || task.description) && (
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const emailBody = task.script || task.description || "";
+                                      const subject = task.title || "";
+                                      navigator.clipboard.writeText(`Subject: ${subject}\n\n${emailBody}`).catch(() => {});
+                                      const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
+                                      window.open(mailto, "_blank");
+                                      toast({
+                                        title: "Email content copied",
+                                        description: "The email template has been copied to your clipboard and your email client is opening.",
+                                      });
+                                    }}
+                                    data-testid={`button-send-email-${task.id}`}
+                                  >
+                                    <ExternalLink className="mr-2 h-4 w-4" />
+                                    Send from Email
+                                  </Button>
+                                )}
                                 <Button
                                   size="sm"
+                                  variant={task.taskType === "email" ? "outline" : "default"}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleCompleteTask(task);
