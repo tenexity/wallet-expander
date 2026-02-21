@@ -3468,11 +3468,245 @@ KEY TALKING POINTS:
   });
 
   // ============================================================
-  // AGENT ROUTES — Phase 3: Disabled until schema tables are defined.
-  // The agent services import schema tables (accountMetrics, agentQueryLog, etc.)
-  // that have not been added to shared/schema.ts yet.
-  // Re-enable once the full agent schema migration is complete.
+  // AGENT ROUTES — Phase 0: Identity & Continuity
   // ============================================================
+  const { getCoreSystemPrompt, readAgentState } = await import("./services/agent-identity.js");
+
+  app.get("/api/agent/system-prompt", requireAuth, async (req, res) => {
+    try {
+      const content = await getCoreSystemPrompt();
+      res.json({ promptKey: "core_agent_identity", content });
+    } catch (error) {
+      handleRouteError(error, res, "Get agent system prompt");
+    }
+  });
+
+  app.get("/api/agent/state/:runType", requireAuth, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+      const state = await readAgentState(tenantId, req.params.runType);
+      if (!state) return res.status(404).json({ message: "No agent state found for this run type" });
+      res.json(state);
+    } catch (error) {
+      handleRouteError(error, res, "Get agent state");
+    }
+  });
+
+  app.get("/api/agent/learnings", requireAuth, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+      const { tradeType, playbookType, limit } = req.query;
+      const learnings = await storage.getAgentPlaybookLearnings(
+        tenantId,
+        tradeType as string | undefined,
+        playbookType as string | undefined,
+        limit ? parseInt(limit as string) : 5,
+      );
+      res.json(learnings);
+    } catch (error) {
+      handleRouteError(error, res, "Get agent learnings");
+    }
+  });
+
+  app.post("/api/agent/learnings", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+      const { learning, tradeType, playbookType, evidenceCount, successRate } = req.body;
+      if (!learning) return res.status(400).json({ message: "learning field is required" });
+      const created = await storage.createAgentPlaybookLearning({
+        tenantId,
+        learning,
+        tradeType: tradeType ?? null,
+        playbookType: playbookType ?? null,
+        evidenceCount: evidenceCount ?? 1,
+        successRate: successRate ?? null,
+        isActive: true,
+      });
+      res.status(201).json(created);
+    } catch (error) {
+      handleRouteError(error, res, "Create agent learning");
+    }
+  });
+
+  // ============================================================
+  // AGENT ROUTES — Phase 2: Intelligence Services
+  // ============================================================
+  const { assembleAccountContext } = await import("./services/account-context.js");
+  const { generateAccountEmbedding, findSimilarAccounts, refreshAllEmbeddings } = await import("./services/account-embedding.js");
+
+  app.get("/api/agent/account-context/:accountId", requireAuth, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+      const accountId = parseInt(req.params.accountId);
+      if (isNaN(accountId)) return res.status(400).json({ message: "Invalid account ID" });
+      const ctx = await assembleAccountContext(accountId, tenantId);
+      res.json(ctx);
+    } catch (error) {
+      handleRouteError(error, res, "Get account context");
+    }
+  });
+
+  app.post("/api/agent/generate-embedding/:accountId", requireAuth, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+      const accountId = parseInt(req.params.accountId);
+      if (isNaN(accountId)) return res.status(400).json({ message: "Invalid account ID" });
+      const vector = await generateAccountEmbedding(accountId, tenantId);
+      res.json({ accountId, dimensions: vector.length, message: "Embedding generated and stored." });
+    } catch (error) {
+      handleRouteError(error, res, "Generate account embedding");
+    }
+  });
+
+  app.post("/api/agent/find-similar/:accountId", requireAuth, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+      const accountId = parseInt(req.params.accountId);
+      if (isNaN(accountId)) return res.status(400).json({ message: "Invalid account ID" });
+      const topK = req.body?.topK ?? 5;
+      await findSimilarAccounts(accountId, tenantId, topK);
+      res.json({ message: `Similar account pairs computed and stored for account ${accountId}.` });
+    } catch (error) {
+      handleRouteError(error, res, "Find similar accounts");
+    }
+  });
+
+  app.post("/api/agent/refresh-embeddings", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+      refreshAllEmbeddings(tenantId).catch((err) =>
+        console.error("[refresh-embeddings] background error:", err)
+      );
+      res.json({ message: "Embedding refresh started in background." });
+    } catch (error) {
+      handleRouteError(error, res, "Refresh all embeddings");
+    }
+  });
+
+  // ============================================================
+  // AGENT ROUTES — Phase 3: Agent Loop Services
+  // ============================================================
+  const { generatePlaybook } = await import("./services/generate-playbook");
+  const { runDailyBriefing } = await import("./services/daily-briefing");
+  const { analyzeEmailIntelligence } = await import("./services/email-intelligence");
+  const { streamAskAnything } = await import("./services/ask-anything");
+  const { runWeeklyAccountReview } = await import("./services/weekly-account-review");
+  const { processCrmSyncQueue } = await import("./services/crm-sync-push");
+
+  app.post("/api/agent/generate-playbook", requireAuth, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+      const { accountId, playbookType } = req.body;
+      if (!accountId) return res.status(400).json({ message: "accountId is required" });
+      const result = await generatePlaybook(Number(accountId), tenantId, playbookType);
+      res.json(result);
+    } catch (error) {
+      handleRouteError(error, res, "Generate playbook");
+    }
+  });
+
+  app.post("/api/agent/daily-briefing", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+      runDailyBriefing(tenantId)
+        .then((r) => console.log("[daily-briefing] Done:", r))
+        .catch((err) => console.error("[daily-briefing] Error:", err));
+      res.json({ message: "Daily briefing started. Emails will be sent shortly." });
+    } catch (error) {
+      handleRouteError(error, res, "Daily briefing");
+    }
+  });
+
+  app.post("/api/agent/email-intelligence", requireAuth, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+      const { interactionId } = req.body;
+      if (!interactionId) return res.status(400).json({ message: "interactionId is required" });
+      const result = await analyzeEmailIntelligence(Number(interactionId), tenantId);
+      res.json(result);
+    } catch (error) {
+      handleRouteError(error, res, "Email intelligence");
+    }
+  });
+
+  app.get("/api/agent/ask-anything", requireAuth, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+      const { question, scope, scopeId } = req.query as Record<string, string>;
+      if (!question) return res.status(400).json({ message: "question is required" });
+      const validScope = (["account", "portfolio", "program"].includes(scope) ? scope : "portfolio") as "account" | "portfolio" | "program";
+      await streamAskAnything(question, validScope, scopeId ? Number(scopeId) : null, tenantId, res);
+    } catch (error) {
+      console.error("[ask-anything] Route error:", error);
+      res.end();
+    }
+  });
+
+  app.post("/api/agent/weekly-account-review", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+      runWeeklyAccountReview(tenantId)
+        .then((r) => console.log("[weekly-review] Done:", r))
+        .catch((err) => console.error("[weekly-review] Error:", err));
+      res.json({ message: "Weekly account review started in background." });
+    } catch (error) {
+      handleRouteError(error, res, "Weekly account review");
+    }
+  });
+
+  app.post("/api/agent/crm-sync-push", requireAdmin, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+      const result = await processCrmSyncQueue(tenantId);
+      res.json(result);
+    } catch (error) {
+      handleRouteError(error, res, "CRM sync push");
+    }
+  });
+
+  app.get("/api/agent/health-check", requireAuth, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext?.tenantId;
+      if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+
+      const runTypes = ["daily-briefing", "weekly-account-review", "email-intelligence", "generate-playbook", "synthesize-learnings"];
+      const stateRows = await Promise.all(
+        runTypes.map((rt) => storage.getAgentState(tenantId, rt))
+      );
+      const stateMap = Object.fromEntries(
+        runTypes.map((rt, i) => [rt, stateRows[i] ? {
+          lastRunAt: stateRows[i]!.lastRunAt,
+          lastRunSummary: stateRows[i]!.lastRunSummary,
+          currentFocus: stateRows[i]!.currentFocus,
+        } : null])
+      );
+
+      const openaiOk = !!(process.env.OPENAI_API_KEY);
+      const resendOk = !!(process.env.RESEND_API_KEY);
+
+      res.json({
+        status: "ok",
+        timestamp: new Date().toISOString(),
+        config: { openaiConfigured: openaiOk, resendConfigured: resendOk },
+        agentState: stateMap,
+      });
+    } catch (error) {
+      handleRouteError(error, res, "Health check");
+    }
+  });
 
   return httpServer;
 }

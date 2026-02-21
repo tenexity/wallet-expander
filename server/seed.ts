@@ -19,6 +19,7 @@ import {
   orderItems,
   revShareTiers,
   settings,
+  agentState,
 } from "@shared/schema";
 import { sql } from "drizzle-orm";
 
@@ -773,8 +774,47 @@ Is there 10 minutes this week to reconnect?`;
     },
   ]);
 
+  // ── Agent State (Daily Briefing demo data) ──────────────────────────────────
+  await db.delete(agentState).where(sql`tenant_id = ${TENANT_ID}`);
+
+  const agentRunTypes = [
+    {
+      agentRunType: "daily-briefing",
+      currentFocus: "Monitoring 11 enrolled accounts. 2 at-risk signals detected.",
+      lastRunSummary: `Scanned 20 accounts across 3 segments. Found 9 unenrolled accounts with opportunity scores above 80. Detected 2 at-risk signals: Coastal Mechanical (no growth in 90 days) and Palmetto Heating & Air (competitor mention in email). Top priority: Midwest Pipe & Supply — $53K opportunity with zero PVF spend.`,
+      pendingActions: JSON.stringify([
+        { account_name: accs[12].name, account_id: accs[12].id, action: `Call Mike Thornton — ${accs[12].name} has $27.5K in PVF leakage and $25.9K in Water Heaters. No outreach in 45 days.`, urgency: "immediate", why: "Score 84, $53K total opportunity. Highest-value unenrolled account." },
+        { account_name: accs[8].name, account_id: accs[8].id, action: "URGENT: Ferguson competitor quote detected in email. Call James Rivera to counter within 24 hours.", urgency: "immediate", why: "At-risk enrolled account. Competitor actively quoting $10.7K Controls gap." },
+        { account_name: accs[1].name, account_id: accs[1].id, action: `Follow up on PVF pricing sheet sent to ${accs[1].name}. $17.8K PVF gap still open.`, urgency: "this_week", why: "Enrolled account with active email task in progress." },
+      ]),
+      openQuestions: JSON.stringify([
+        { account_name: accs[8].name, account_id: accs[8].id, signal: "Ferguson competitor quote mentioned in recent email thread. Controls & Thermostats category at risk." },
+        { account_name: accs[4].name, account_id: accs[4].id, signal: "90 days enrolled with minimal revenue growth. Last order was 47 days ago. Possible churn risk." },
+      ]),
+    },
+    { agentRunType: "weekly-account-review", currentFocus: "Last review analyzed 20 accounts across 3 segments.", lastRunSummary: null, pendingActions: null, openQuestions: null },
+    { agentRunType: "email-intelligence", currentFocus: "Processed 47 email interactions this week.", lastRunSummary: null, pendingActions: null, openQuestions: null },
+    { agentRunType: "generate-playbook", currentFocus: "Generated 5 playbooks. Focus on PVF and Controls gaps.", lastRunSummary: null, pendingActions: null, openQuestions: null },
+    { agentRunType: "synthesize-learnings", currentFocus: "Active learnings: 5 patterns, avg success rate 71%.", lastRunSummary: null, pendingActions: null, openQuestions: null },
+  ];
+
+  for (const rt of agentRunTypes) {
+    await db.insert(agentState).values({
+      tenantId: TENANT_ID,
+      agentRunType: rt.agentRunType,
+      currentFocus: rt.currentFocus,
+      lastRunAt: rt.lastRunSummary ? new Date(now.getTime() - 5 * 60 * 60 * 1000) : null,
+      lastRunSummary: rt.lastRunSummary,
+      pendingActions: rt.pendingActions,
+      openQuestions: rt.openQuestions,
+      patternNotes: "",
+    });
+  }
+  console.log(`✓ ${agentRunTypes.length} agent state rows`);
+
   console.log("\n✅ ABC Supply Co. demo data seeded successfully.");
   console.log("   3 TMs · 20 accounts · 3 graduated · 6 enrolled · 2 at-risk");
+  console.log("   Agent state seeded for daily briefing demo.");
   console.log("   Run on Replit: npx tsx server/seed.ts");
 }
 
