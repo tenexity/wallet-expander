@@ -1,4 +1,4 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +51,9 @@ import {
   CreditCard,
   HelpCircle,
   Pencil,
+  Sparkles,
+  Clock,
+  Zap,
 } from "lucide-react";
 import type { Tenant, SubscriptionPlan } from "@shared/schema";
 
@@ -78,6 +81,167 @@ interface TenantUsageResponse {
   totalTenants: number;
 }
 
+function IntelligenceCenter() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: health, isLoading } = useQuery<{
+    status: string;
+    timestamp: string;
+    config: { openaiConfigured: boolean; resendConfigured: boolean };
+    stateMap: Record<string, { lastRunAt: string | null; lastRunSummary: string | null; currentFocus: string | null }>;
+  }>({
+    queryKey: ["/api/agent/health-check"],
+  });
+
+  const triggerMutation = useMutation({
+    mutationFn: async (type: "daily-briefing" | "weekly-account-review" | "synthesize-learnings") => {
+      return apiRequest("POST", `/api/agent/${type}`, {});
+    },
+    onSuccess: (_, variables) => {
+      toast({
+        title: "Agent Triggered",
+        description: `${variables.replace("-", " ")} has been started in the background. Status will update shortly.`,
+      });
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/agent/health-check"] });
+      }, 5000);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Trigger Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  const services = [
+    {
+      id: "daily-briefing",
+      name: "Daily Intelligence Briefing",
+      description: "Generates territory action plans and drafts priority emails.",
+      schedule: "Weekdays @ 7:00 AM EST",
+      icon: Clock,
+    },
+    {
+      id: "weekly-account-review",
+      name: "Weekly Account Review",
+      description: "Evaluates graduation readiness and playbook effectiveness.",
+      schedule: "Mondays @ 6:00 AM EST",
+      icon: Target,
+    },
+    {
+      id: "synthesize-learnings",
+      name: "AI Learning Synthesis",
+      description: "Distills winning patterns from past 90 days of interactions.",
+      schedule: "1st of Month @ 3:00 AM EST",
+      icon: Zap,
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <Card className="md:col-span-2 text-left">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-blue-600" />
+            Agentic Health & Connectivity
+          </CardTitle>
+          <CardDescription>
+            Monitoring the status of the autonomous relationship intelligence layer.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+              <div className={`h-2.5 w-2.5 rounded-full ${health?.config.openaiConfigured ? "bg-green-500" : "bg-red-500"}`} />
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Intelligence (OpenAI)</p>
+                <p className="text-sm font-medium">{health?.config.openaiConfigured ? "Connected" : "Not Configured"}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+              <div className={`h-2.5 w-2.5 rounded-full ${health?.config.resendConfigured ? "bg-green-500" : "bg-red-500"}`} />
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Delivery (Resend)</p>
+                <p className="text-sm font-medium">{health?.config.resendConfigured ? "Connected" : "Not Configured"}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+              <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Autonomous Loop</p>
+                <p className="text-sm font-medium">Active (node-cron)</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {services.map((service) => {
+        const state = health?.stateMap[service.id];
+        const lastRun = state?.lastRunAt ? new Date(state.lastRunAt) : null;
+        const Icon = service.icon;
+
+        return (
+          <Card key={service.id} className="flex flex-col text-left">
+            <CardHeader className="pb-3 text-left">
+              <div className="flex items-center justify-between">
+                <div className="h-10 w-10 rounded-lg bg-blue-50 flex items-center justify-center">
+                  <Icon className="h-5 w-5 text-blue-600" />
+                </div>
+                {lastRun && (
+                  <Badge variant="outline" className="text-[10px] font-mono">
+                    Last Run: {new Date(lastRun).toLocaleDateString()}
+                  </Badge>
+                )}
+              </div>
+              <CardTitle className="text-base mt-4">{service.name}</CardTitle>
+              <CardDescription>{service.description}</CardDescription>
+            </CardHeader>
+            <CardContent className="flex-1 text-left">
+              <div className="text-xs text-muted-foreground flex items-center gap-1.5 mb-4">
+                <Clock className="h-3 w-3" />
+                {service.schedule}
+              </div>
+              {state?.lastRunSummary && (
+                <div className="bg-muted/50 p-2.5 rounded-md text-[11px] text-muted-foreground border leading-relaxed mb-4">
+                  <p className="font-semibold text-[10px] uppercase tracking-wider mb-1">Latest Insight:</p>
+                  {state.lastRunSummary}
+                </div>
+              )}
+            </CardContent>
+            <div className="p-4 pt-0 mt-auto">
+              <Button
+                variant="outline"
+                className="w-full text-xs"
+                onClick={() => triggerMutation.mutate(service.id as any)}
+                disabled={triggerMutation.isPending}
+              >
+                {triggerMutation.isPending && triggerMutation.variables === service.id ? (
+                  <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3 w-3 mr-2" />
+                )}
+                Run Now
+              </Button>
+            </div>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function AppAdmin() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
@@ -96,9 +260,9 @@ export default function AppAdmin() {
 
   const updateTenantMutation = useMutation({
     mutationFn: async (data: { tenantId: number; planType: string; subscriptionStatus: string }) => {
-      return apiRequest("PATCH", `/api/app-admin/tenants/${data.tenantId}`, { 
-        planType: data.planType, 
-        subscriptionStatus: data.subscriptionStatus 
+      return apiRequest("PATCH", `/api/app-admin/tenants/${data.tenantId}`, {
+        planType: data.planType,
+        subscriptionStatus: data.subscriptionStatus
       });
     },
     onSuccess: () => {
@@ -119,7 +283,7 @@ export default function AppAdmin() {
   });
 
   const tenants = tenantsData?.tenants || [];
-  
+
   const filteredTenants = tenants.filter((tenant) =>
     tenant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     tenant.slug.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -212,6 +376,10 @@ export default function AppAdmin() {
             <CreditCard className="mr-2 h-4 w-4" />
             Stripe Configuration
           </TabsTrigger>
+          <TabsTrigger value="intelligence" data-testid="tab-intelligence">
+            <Sparkles className="mr-2 h-4 w-4" />
+            Intelligence Center
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="tenants" className="space-y-6">
@@ -227,216 +395,216 @@ export default function AppAdmin() {
             </Button>
           </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-md bg-primary/10">
-              <Building2 className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Tenants</p>
-              <p className="text-2xl font-bold" data-testid="text-total-tenants">
-                {tenantsData?.totalTenants ?? 0}
-              </p>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-md bg-primary/10">
+                  <Building2 className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Tenants</p>
+                  <p className="text-2xl font-bold" data-testid="text-total-tenants">
+                    {tenantsData?.totalTenants ?? 0}
+                  </p>
+                </div>
+              </div>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-md bg-blue-500/10">
+                  <Users className="h-5 w-5 text-blue-500" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Accounts</p>
+                  <p className="text-2xl font-bold" data-testid="text-total-accounts">
+                    {totalAccounts}
+                  </p>
+                </div>
+              </div>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-md bg-green-500/10">
+                  <FileText className="h-5 w-5 text-green-500" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Playbooks</p>
+                  <p className="text-2xl font-bold" data-testid="text-total-playbooks">
+                    {totalPlaybooks}
+                  </p>
+                </div>
+              </div>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-md bg-purple-500/10">
+                  <Target className="h-5 w-5 text-purple-500" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Total ICPs</p>
+                  <p className="text-2xl font-bold" data-testid="text-total-icps">
+                    {totalICPs}
+                  </p>
+                </div>
+              </div>
+            </Card>
           </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-md bg-blue-500/10">
-              <Users className="h-5 w-5 text-blue-500" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Accounts</p>
-              <p className="text-2xl font-bold" data-testid="text-total-accounts">
-                {totalAccounts}
-              </p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-md bg-green-500/10">
-              <FileText className="h-5 w-5 text-green-500" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Playbooks</p>
-              <p className="text-2xl font-bold" data-testid="text-total-playbooks">
-                {totalPlaybooks}
-              </p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-md bg-purple-500/10">
-              <Target className="h-5 w-5 text-purple-500" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total ICPs</p>
-              <p className="text-2xl font-bold" data-testid="text-total-icps">
-                {totalICPs}
-              </p>
-            </div>
-          </div>
-        </Card>
-      </div>
 
-      <Card className="p-4">
-        <div className="flex items-center gap-4 mb-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search tenants by name, slug, or email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-              data-testid="input-search-tenants"
-            />
-          </div>
-        </div>
+          <Card className="p-4">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search tenants by name, slug, or email..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-search-tenants"
+                />
+              </div>
+            </div>
 
-        {tenantsLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead
-                    className="cursor-pointer"
-                    onClick={() => handleSort("name")}
-                    data-testid="header-name"
-                  >
-                    <div className="flex items-center">
-                      Tenant
-                      <SortIcon field="name" />
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer"
-                    onClick={() => handleSort("planType")}
-                    data-testid="header-plan"
-                  >
-                    <div className="flex items-center">
-                      Plan
-                      <SortIcon field="planType" />
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer"
-                    onClick={() => handleSort("subscriptionStatus")}
-                    data-testid="header-status"
-                  >
-                    <div className="flex items-center">
-                      Status
-                      <SortIcon field="subscriptionStatus" />
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer text-right"
-                    onClick={() => handleSort("accountCount")}
-                    data-testid="header-accounts"
-                  >
-                    <div className="flex items-center justify-end">
-                      Accounts
-                      <SortIcon field="accountCount" />
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer text-right"
-                    onClick={() => handleSort("enrolledCount")}
-                    data-testid="header-enrolled"
-                  >
-                    <div className="flex items-center justify-end">
-                      Enrolled
-                      <SortIcon field="enrolledCount" />
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer text-right"
-                    onClick={() => handleSort("playbookCount")}
-                    data-testid="header-playbooks"
-                  >
-                    <div className="flex items-center justify-end">
-                      Playbooks
-                      <SortIcon field="playbookCount" />
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer text-right"
-                    onClick={() => handleSort("icpCount")}
-                    data-testid="header-icps"
-                  >
-                    <div className="flex items-center justify-end">
-                      ICPs
-                      <SortIcon field="icpCount" />
-                    </div>
-                  </TableHead>
-                  <TableHead className="w-[100px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedTenants.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
-                      {searchTerm ? "No tenants match your search" : "No tenants found"}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  sortedTenants.map((tenant) => (
-                    <TableRow key={tenant.id} data-testid={`row-tenant-${tenant.id}`}>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{tenant.name}</p>
-                          <p className="text-sm text-muted-foreground">{tenant.ownerEmail || tenant.slug}</p>
+            {tenantsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead
+                        className="cursor-pointer"
+                        onClick={() => handleSort("name")}
+                        data-testid="header-name"
+                      >
+                        <div className="flex items-center">
+                          Tenant
+                          <SortIcon field="name" />
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getPlanBadgeVariant(tenant.planType)}>
-                          {tenant.planType || "free"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getStatusBadgeVariant(tenant.subscriptionStatus)}>
-                          {tenant.subscriptionStatus || "none"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {tenant.accountCount}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {tenant.enrolledCount}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {tenant.playbookCount}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {tenant.icpCount}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => {
-                            setSelectedTenant(tenant);
-                            setEditDialogOpen(true);
-                          }}
-                          data-testid={`button-edit-tenant-${tenant.id}`}
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer"
+                        onClick={() => handleSort("planType")}
+                        data-testid="header-plan"
+                      >
+                        <div className="flex items-center">
+                          Plan
+                          <SortIcon field="planType" />
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer"
+                        onClick={() => handleSort("subscriptionStatus")}
+                        data-testid="header-status"
+                      >
+                        <div className="flex items-center">
+                          Status
+                          <SortIcon field="subscriptionStatus" />
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer text-right"
+                        onClick={() => handleSort("accountCount")}
+                        data-testid="header-accounts"
+                      >
+                        <div className="flex items-center justify-end">
+                          Accounts
+                          <SortIcon field="accountCount" />
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer text-right"
+                        onClick={() => handleSort("enrolledCount")}
+                        data-testid="header-enrolled"
+                      >
+                        <div className="flex items-center justify-end">
+                          Enrolled
+                          <SortIcon field="enrolledCount" />
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer text-right"
+                        onClick={() => handleSort("playbookCount")}
+                        data-testid="header-playbooks"
+                      >
+                        <div className="flex items-center justify-end">
+                          Playbooks
+                          <SortIcon field="playbookCount" />
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer text-right"
+                        onClick={() => handleSort("icpCount")}
+                        data-testid="header-icps"
+                      >
+                        <div className="flex items-center justify-end">
+                          ICPs
+                          <SortIcon field="icpCount" />
+                        </div>
+                      </TableHead>
+                      <TableHead className="w-[100px]">Actions</TableHead>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedTenants.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                          {searchTerm ? "No tenants match your search" : "No tenants found"}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      sortedTenants.map((tenant) => (
+                        <TableRow key={tenant.id} data-testid={`row-tenant-${tenant.id}`}>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium">{tenant.name}</p>
+                              <p className="text-sm text-muted-foreground">{tenant.ownerEmail || tenant.slug}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={getPlanBadgeVariant(tenant.planType)}>
+                              {tenant.planType || "free"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={getStatusBadgeVariant(tenant.subscriptionStatus)}>
+                              {tenant.subscriptionStatus || "none"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {tenant.accountCount}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {tenant.enrolledCount}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {tenant.playbookCount}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {tenant.icpCount}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                setSelectedTenant(tenant);
+                                setEditDialogOpen(true);
+                              }}
+                              data-testid={`button-edit-tenant-${tenant.id}`}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </Card>
 
           <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
             <DialogContent>
@@ -465,6 +633,10 @@ export default function AppAdmin() {
 
         <TabsContent value="stripe" className="space-y-6">
           <StripeConfigManager />
+        </TabsContent>
+
+        <TabsContent value="intelligence" className="space-y-6">
+          <IntelligenceCenter />
         </TabsContent>
       </Tabs>
     </div>
@@ -631,7 +803,7 @@ function StripeConfigManager() {
     });
   };
 
-  const webhookUrl = typeof window !== "undefined" 
+  const webhookUrl = typeof window !== "undefined"
     ? `${window.location.origin}/api/stripe/webhook`
     : "/api/stripe/webhook";
 
@@ -654,7 +826,7 @@ function StripeConfigManager() {
               Add this webhook URL to your Stripe Dashboard under Developers &gt; Webhooks:
             </p>
             <div className="flex items-center gap-2">
-              <Input 
+              <Input
                 value={webhookUrl}
                 readOnly
                 className="font-mono text-sm bg-background"
@@ -899,6 +1071,167 @@ function StripeConfigManager() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function IntelligenceCenter() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: health, isLoading } = useQuery<{
+    status: string;
+    timestamp: string;
+    config: { openaiConfigured: boolean; resendConfigured: boolean };
+    stateMap: Record<string, { lastRunAt: string | null; lastRunSummary: string | null; currentFocus: string | null }>;
+  }>({
+    queryKey: ["/api/agent/health-check"],
+  });
+
+  const triggerMutation = useMutation({
+    mutationFn: async (type: "daily-briefing" | "weekly-account-review" | "synthesize-learnings") => {
+      return apiRequest("POST", `/api/agent/${type}`, {});
+    },
+    onSuccess: (_, variables) => {
+      toast({
+        title: "Agent Triggered",
+        description: `${variables.replace("-", " ")} has been started in the background. Status will update shortly.`,
+      });
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/agent/health-check"] });
+      }, 5000);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Trigger Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  const services = [
+    {
+      id: "daily-briefing",
+      name: "Daily Intelligence Briefing",
+      description: "Generates territory action plans and drafts priority emails.",
+      schedule: "Weekdays @ 7:00 AM EST",
+      icon: Clock,
+    },
+    {
+      id: "weekly-account-review",
+      name: "Weekly Account Review",
+      description: "Evaluates graduation readiness and playbook effectiveness.",
+      schedule: "Mondays @ 6:00 AM EST",
+      icon: Target,
+    },
+    {
+      id: "synthesize-learnings",
+      name: "AI Learning Synthesis",
+      description: "Distills winning patterns from past 90 days of interactions.",
+      schedule: "1st of Month @ 3:00 AM EST",
+      icon: Zap,
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <Card className="md:col-span-2">
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-blue-600" />
+            Agentic Health & Connectivity
+          </CardTitle>
+          <CardDescription>
+            Monitoring the status of the autonomous relationship intelligence layer.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+              <div className={`h-2.5 w-2.5 rounded-full ${health?.config.openaiConfigured ? "bg-green-500" : "bg-red-500"}`} />
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Intelligence (OpenAI)</p>
+                <p className="text-sm font-medium">{health?.config.openaiConfigured ? "Connected" : "Not Configured"}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+              <div className={`h-2.5 w-2.5 rounded-full ${health?.config.resendConfigured ? "bg-green-500" : "bg-red-500"}`} />
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Delivery (Resend)</p>
+                <p className="text-sm font-medium">{health?.config.resendConfigured ? "Connected" : "Not Configured"}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+              <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Autonomous Loop</p>
+                <p className="text-sm font-medium">Active (node-cron)</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {services.map((service) => {
+        const state = health?.stateMap[service.id];
+        const lastRun = state?.lastRunAt ? new Date(state.lastRunAt) : null;
+        const Icon = service.icon;
+
+        return (
+          <Card key={service.id} className="flex flex-col">
+            <CardHeader className="pb-3 text-left">
+              <div className="flex items-center justify-between">
+                <div className="h-10 w-10 rounded-lg bg-blue-50 flex items-center justify-center">
+                  <Icon className="h-5 w-5 text-blue-600" />
+                </div>
+                {lastRun && (
+                  <Badge variant="outline" className="text-[10px] font-mono">
+                    Last Run: {lastRun.toLocaleDateString()} {lastRun.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </Badge>
+                )}
+              </div>
+              <CardTitle className="text-base mt-4">{service.name}</CardTitle>
+              <CardDescription>{service.description}</CardDescription>
+            </CardHeader>
+            <CardContent className="flex-1 text-left">
+              <div className="text-xs text-muted-foreground flex items-center gap-1.5 mb-4">
+                <Clock className="h-3 w-3" />
+                {service.schedule}
+              </div>
+              {state?.lastRunSummary && (
+                <div className="bg-muted/50 p-2.5 rounded-md text-[11px] text-muted-foreground border leading-relaxed mb-4">
+                  <p className="font-semibold text-[10px] uppercase tracking-wider mb-1">Latest Insight:</p>
+                  {state.lastRunSummary}
+                </div>
+              )}
+            </CardContent>
+            <div className="p-4 pt-0 mt-auto">
+              <Button
+                variant="outline"
+                className="w-full text-xs"
+                onClick={() => triggerMutation.mutate(service.id as any)}
+                disabled={triggerMutation.isPending}
+              >
+                {triggerMutation.isPending && triggerMutation.variables === service.id ? (
+                  <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3 w-3 mr-2" />
+                )}
+                Run Now
+              </Button>
+            </div>
+          </Card>
+        );
+      })}
     </div>
   );
 }

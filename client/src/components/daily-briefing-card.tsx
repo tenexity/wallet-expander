@@ -13,9 +13,9 @@
  *  - Trigger button for admin to fire a new briefing
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, ChevronUp, AlertTriangle, Zap, Sparkles, RefreshCw, ExternalLink } from "lucide-react";
+import { ChevronDown, ChevronUp, AlertTriangle, Zap, Sparkles, RefreshCw, ExternalLink, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
@@ -45,12 +45,30 @@ const urgencyBadge: Record<string, string> = {
 
 interface DailyBriefingCardProps {
     onAccountClick?: (accountId: number) => void;
+    showAdminControls?: boolean;
 }
 
-export function DailyBriefingCard({ onAccountClick }: DailyBriefingCardProps) {
+export function DailyBriefingCard({ onAccountClick, showAdminControls = false }: DailyBriefingCardProps) {
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const [atRiskExpanded, setAtRiskExpanded] = useState(false);
+    const [isDismissed, setIsDismissed] = useState(false);
+    const [isMounted, setIsMounted] = useState(false);
+
+    useEffect(() => {
+        setIsMounted(true);
+        const dismissedDate = localStorage.getItem("daily-briefing-dismissed");
+        const today = new Date().toDateString();
+        if (dismissedDate === today) {
+            setIsDismissed(true);
+        }
+    }, []);
+
+    const handleDismiss = () => {
+        const today = new Date().toDateString();
+        localStorage.setItem("daily-briefing-dismissed", today);
+        setIsDismissed(true);
+    };
 
     const { data: agentState, isLoading } = useQuery<AgentStateRow>({
         queryKey: ["/api/agent/state/daily-briefing"],
@@ -80,8 +98,12 @@ export function DailyBriefingCard({ onAccountClick }: DailyBriefingCardProps) {
         );
     }
 
+    if (!isMounted || isDismissed) return null;
+
     // No state yet = no briefing run
     if (!agentState?.lastRunSummary && !agentState?.currentFocus) {
+        if (!showAdminControls) return null; // Rep doesn't see empty state if no briefing ran
+
         return (
             <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 p-5 mb-6">
                 <div className="flex items-center justify-between">
@@ -90,7 +112,7 @@ export function DailyBriefingCard({ onAccountClick }: DailyBriefingCardProps) {
                             <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                         </div>
                         <div>
-                            <p className="font-semibold text-sm">Morning Intelligence Briefing</p>
+                            <p className="font-semibold text-sm">Daily Action Plan</p>
                             <p className="text-xs text-muted-foreground">Analyzes your territory, identifies missing revenue, and drafts action plans every morning at 7:00 AM.</p>
                         </div>
                     </div>
@@ -123,22 +145,34 @@ export function DailyBriefingCard({ onAccountClick }: DailyBriefingCardProps) {
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold">Morning Intelligence Briefing</span>
+                            <span className="text-sm font-semibold">Daily Action Plan</span>
                             <Badge variant="outline" className="text-[10px] uppercase tracking-wider h-4 px-1.5 bg-blue-50/50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300">Automated</Badge>
                         </div>
                         <p className="text-[10px] text-muted-foreground">Scheduled at 7:00 AM EST · Scans your territory for new gaps and signals</p>
                     </div>
                 </div>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs text-muted-foreground hover:text-primary transition-colors"
-                    onClick={() => triggerBriefingMutation.mutate()}
-                    disabled={triggerBriefingMutation.isPending}
-                >
-                    <RefreshCw className={`h-3 w-3 mr-1 ${triggerBriefingMutation.isPending ? "animate-spin" : ""}`} />
-                    {triggerBriefingMutation.isPending ? "Syncing..." : "Sync Latest Data"}
-                </Button>
+                <div className="flex items-center gap-2">
+                    {showAdminControls && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs text-muted-foreground hover:text-primary transition-colors"
+                            onClick={() => triggerBriefingMutation.mutate()}
+                            disabled={triggerBriefingMutation.isPending}
+                        >
+                            <RefreshCw className={`h-3 w-3 mr-1 ${triggerBriefingMutation.isPending ? "animate-spin" : ""}`} />
+                            {triggerBriefingMutation.isPending ? "Syncing..." : "Sync Latest Data"}
+                        </Button>
+                    )}
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                        onClick={handleDismiss}
+                    >
+                        <X className="h-3.5 w-3.5" />
+                    </Button>
+                </div>
             </div>
 
             <div className="px-5 py-4 space-y-4">
