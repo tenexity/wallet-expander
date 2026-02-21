@@ -759,6 +759,78 @@ export const agentContacts = pgTable("agent_contacts", {
 
 export type AgentContact = typeof agentContacts.$inferSelect;
 
+// ── Agent Account Category Spend ──────────────────────────────
+export const agentAccountCategorySpend = pgTable("agent_account_category_spend", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id"),
+  accountId: integer("account_id").notNull(),
+  categoryId: integer("category_id"),
+  currentSpend: numeric("current_spend"),
+  potentialSpend: numeric("potential_spend"),
+  gapPercentage: numeric("gap_percentage"),
+  gapDollars: numeric("gap_dollars"),
+  lastOrderDate: timestamp("last_order_date"),
+  daysSinceOrder: integer("days_since_order"),
+  trend: text("trend"), // growing, declining, stable, new_gap
+  monthlySpendHistory: jsonb("monthly_spend_history"), // [{month, spend}]
+});
+export type AgentAccountCategorySpend = typeof agentAccountCategorySpend.$inferSelect;
+
+// ── Agent Projects ────────────────────────────────────────────
+export const agentProjects = pgTable("agent_projects", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id"),
+  accountId: integer("account_id").notNull(),
+  name: text("name").notNull(),
+  projectType: text("project_type"),
+  status: text("status"), // active, bidding, complete, inferred
+  estimatedValue: numeric("estimated_value"),
+  inferredFrom: text("inferred_from"),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  expectedCategories: jsonb("expected_categories"), // [{category_name, expected_spend}]
+  actualSpendToDate: numeric("actual_spend_to_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export type AgentProject = typeof agentProjects.$inferSelect;
+
+// ── Agent Competitors ─────────────────────────────────────────
+export const agentCompetitors = pgTable("agent_competitors", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id"),
+  name: text("name").notNull(),
+  categoriesCompetingIn: jsonb("categories_competing_in"), // text array
+  winRateAgainst: numeric("win_rate_against"),
+  notes: text("notes"),
+});
+export type AgentCompetitor = typeof agentCompetitors.$inferSelect;
+
+// ── Agent Account Competitors ─────────────────────────────────
+export const agentAccountCompetitors = pgTable("agent_account_competitors", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id"),
+  accountId: integer("account_id").notNull(),
+  competitorId: integer("competitor_id").notNull(),
+  categoriesLost: jsonb("categories_lost"), // text array
+  detectedVia: text("detected_via"), // email_mention, rep_note, gap_analysis
+  confidence: text("confidence"), // confirmed, suspected
+  firstDetectedAt: timestamp("first_detected_at").defaultNow(),
+});
+export type AgentAccountCompetitor = typeof agentAccountCompetitors.$inferSelect;
+
+// ── Agent Similar Account Pairs ───────────────────────────────
+export const agentSimilarAccountPairs = pgTable("agent_similar_account_pairs", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id"),
+  accountIdA: integer("account_id_a").notNull(),
+  accountIdB: integer("account_id_b").notNull(),
+  similarityScore: numeric("similarity_score"),
+  similarityBasis: jsonb("similarity_basis"), // {dimensions}
+  accountBGraduated: boolean("account_b_graduated").default(false),
+  computedAt: timestamp("computed_at").defaultNow(),
+});
+export type AgentSimilarAccountPair = typeof agentSimilarAccountPairs.$inferSelect;
+
 // ── Agent Interactions ────────────────────────────────────────
 // Email/call/meeting history per account (source for email intelligence).
 export const agentInteractions = pgTable("agent_interactions", {

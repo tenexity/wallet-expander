@@ -13,7 +13,12 @@ import {
   GitBranch,
   CreditCard,
   ShieldCheck,
+  Trophy,
+  FileSpreadsheet,
+  HelpCircle,
+  Database,
   BarChart3,
+  BarChart4,
 } from "lucide-react";
 import {
   Sidebar,
@@ -54,6 +59,12 @@ const mainNavItems = [
     url: "/workflow-guide",
     icon: GitBranch,
     tooltip: "Visual guide showing setup, monthly, weekly, and daily workflows",
+  },
+  {
+    title: "Program Performance",
+    url: "/program-performance",
+    icon: BarChart4,
+    matchPattern: /^\/program-performance/,
   },
   {
     title: "Accounts",
