@@ -10,7 +10,7 @@
  */
 
 import { db } from "./db";
-import { agentSystemPrompts, agentState, agentPlaybookLearnings } from "@shared/schema";
+import { agentSystemPrompts, agentState, agentPlaybookLearnings, agentOrganizationSettings } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 const TENANT_ID = 1; // Default POC tenant
@@ -91,21 +91,25 @@ async function seedPhase0() {
 
     // ─── 1. Upsert core_agent_identity ────────────────────────────────────────
     console.log("  → Upserting core_agent_identity system prompt...");
-    const [promptRow] = await db
-        .insert(agentSystemPrompts)
-        .values({
+    const [existingPrompt] = await db
+        .select()
+        .from(agentSystemPrompts)
+        .where(eq(agentSystemPrompts.promptKey, "core_agent_identity"))
+        .limit(1);
+
+    let promptRow;
+    if (!existingPrompt) {
+        [promptRow] = await db.insert(agentSystemPrompts).values({
             promptKey: "core_agent_identity",
             content: CORE_AGENT_IDENTITY,
             isActive: true,
-        })
-        .onConflictDoUpdate({
-            target: agentSystemPrompts.promptKey,
-            set: {
-                content: CORE_AGENT_IDENTITY,
-                isActive: true,
-            },
-        })
-        .returning();
+        }).returning();
+    } else {
+        [promptRow] = await db.update(agentSystemPrompts).set({
+            content: CORE_AGENT_IDENTITY,
+            isActive: true,
+        }).where(eq(agentSystemPrompts.promptKey, "core_agent_identity")).returning();
+    }
     console.log(`     ✓ system_prompts: id=${promptRow.id}, key=${promptRow.promptKey}`);
 
     // ─── 2. Seed agent_state for each run_type ─────────────────────────────────
@@ -152,7 +156,29 @@ async function seedPhase0() {
         console.log(`     ✓ learning: id=${row.id}, evidence=${row.evidenceCount}`);
     }
 
-    console.log("\n✅ Phase 0 seed complete!\n");
+    console.log("\n  → Seeding agent_organization_settings...");
+    const [existingSettings] = await db
+        .select()
+        .from(agentOrganizationSettings)
+        .where(eq(agentOrganizationSettings.tenantId, TENANT_ID))
+        .limit(1);
+
+    let settingsRow;
+    if (!existingSettings) {
+        [settingsRow] = await db.insert(agentOrganizationSettings).values({
+            tenantId: TENANT_ID,
+            activeRepEmails: ["james.wilson@abcsupply.com", "mike.rodriguez@abcsupply.com", "sarah.chen@abcsupply.com"],
+            briefingEnabled: true,
+            briefingTime: "07:00",
+        }).returning();
+    } else {
+        [settingsRow] = await db.update(agentOrganizationSettings).set({
+            activeRepEmails: ["james.wilson@abcsupply.com", "mike.rodriguez@abcsupply.com", "sarah.chen@abcsupply.com"],
+        }).where(eq(agentOrganizationSettings.tenantId, TENANT_ID)).returning();
+    }
+    console.log(`     ✓ settings: id=${settingsRow.id}, reps=[${(settingsRow.activeRepEmails as string[]).join(", ")}]`);
+
+    console.log("\n✅ Phase 0 & Phase 1 Agent Data seed complete!\n");
     process.exit(0);
 }
 
