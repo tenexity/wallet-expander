@@ -20,6 +20,13 @@ import {
   revShareTiers,
   settings,
   agentState,
+  agentContacts,
+  agentAccountCategorySpend,
+  agentInteractions,
+  agentPlaybooks,
+  agentCompetitors,
+  agentAccountCompetitors,
+  agentPlaybookLearnings,
 } from "@shared/schema";
 import { sql } from "drizzle-orm";
 
@@ -773,6 +780,128 @@ Is there 10 minutes this week to reconnect?`;
       displayOrder: 4,
     },
   ]);
+
+  // ── Agent Detail Tables (contacts, spend, interactions, playbooks, competitors) ──
+  await db.delete(agentContacts).where(sql`tenant_id = ${TENANT_ID}`);
+  await db.delete(agentAccountCategorySpend).where(sql`tenant_id = ${TENANT_ID}`);
+  await db.delete(agentInteractions).where(sql`tenant_id = ${TENANT_ID}`);
+  await db.delete(agentPlaybooks).where(sql`tenant_id = ${TENANT_ID}`);
+  await db.delete(agentAccountCompetitors).where(sql`tenant_id = ${TENANT_ID}`);
+  await db.delete(agentCompetitors).where(sql`tenant_id = ${TENANT_ID}`);
+  await db.delete(agentPlaybookLearnings).where(sql`tenant_id = ${TENANT_ID}`);
+
+  // Contacts for priority accounts
+  await db.insert(agentContacts).values([
+    { tenantId: TENANT_ID, accountId: accs[12].id, name: "Mike Thornton", role: "purchasing_mgr", email: "mthornton@midwestpipe.com", isPrimary: true },
+    { tenantId: TENANT_ID, accountId: accs[12].id, name: "Sarah Chen", role: "coo", email: "schen@midwestpipe.com", isPrimary: false },
+    { tenantId: TENANT_ID, accountId: accs[8].id, name: "James Rivera", role: "owner", email: "jrivera@palmettoheating.com", isPrimary: true },
+    { tenantId: TENANT_ID, accountId: accs[8].id, name: "Tom Nguyen", role: "ap", email: "tnguyen@palmettoheating.com", isPrimary: false },
+    { tenantId: TENANT_ID, accountId: accs[1].id, name: "Dave Morrison", role: "purchasing_mgr", email: "dmorrison@alliedmech.com", isPrimary: true },
+    { tenantId: TENANT_ID, accountId: accs[1].id, name: "Linda Hayes", role: "owner", email: "lhayes@alliedmech.com", isPrimary: false },
+  ]);
+  console.log("✓ Agent contacts seeded");
+
+  // Category spend gaps for priority accounts
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000);
+  const sixtyDaysAgo = new Date(now.getTime() - 60 * 86400000);
+  await db.insert(agentAccountCategorySpend).values([
+    { tenantId: TENANT_ID, accountId: accs[12].id, categoryId: 1, currentSpend: "4200", potentialSpend: "31700", gapPercentage: "86.8", gapDollars: "27500", lastOrderDate: sixtyDaysAgo, daysSinceOrder: 60, trend: "new_gap" },
+    { tenantId: TENANT_ID, accountId: accs[12].id, categoryId: 3, currentSpend: "8100", potentialSpend: "34000", gapPercentage: "76.2", gapDollars: "25900", lastOrderDate: thirtyDaysAgo, daysSinceOrder: 30, trend: "declining" },
+    { tenantId: TENANT_ID, accountId: accs[12].id, categoryId: 2, currentSpend: "18500", potentialSpend: "22000", gapPercentage: "15.9", gapDollars: "3500", lastOrderDate: thirtyDaysAgo, daysSinceOrder: 30, trend: "stable" },
+    { tenantId: TENANT_ID, accountId: accs[8].id, categoryId: 4, currentSpend: "3200", potentialSpend: "13900", gapPercentage: "77", gapDollars: "10700", lastOrderDate: thirtyDaysAgo, daysSinceOrder: 30, trend: "declining" },
+    { tenantId: TENANT_ID, accountId: accs[8].id, categoryId: 1, currentSpend: "12800", potentialSpend: "18000", gapPercentage: "28.9", gapDollars: "5200", lastOrderDate: thirtyDaysAgo, daysSinceOrder: 30, trend: "stable" },
+    { tenantId: TENANT_ID, accountId: accs[1].id, categoryId: 1, currentSpend: "6200", potentialSpend: "24000", gapPercentage: "74.2", gapDollars: "17800", lastOrderDate: sixtyDaysAgo, daysSinceOrder: 60, trend: "new_gap" },
+    { tenantId: TENANT_ID, accountId: accs[1].id, categoryId: 2, currentSpend: "22400", potentialSpend: "28000", gapPercentage: "20", gapDollars: "5600", lastOrderDate: thirtyDaysAgo, daysSinceOrder: 30, trend: "growing" },
+  ]);
+  console.log("✓ Agent category spend seeded");
+
+  // Recent interactions
+  await db.insert(agentInteractions).values([
+    { tenantId: TENANT_ID, accountId: accs[12].id, interactionType: "email", direction: "outbound", subject: "PVF Pricing Sheet — Midwest Pipe", body: "Sent updated PVF pricing sheet with volume discounts.", occurredAt: new Date(now.getTime() - 3 * 86400000), sentimentSignal: "neutral" },
+    { tenantId: TENANT_ID, accountId: accs[12].id, interactionType: "call", direction: "outbound", subject: "Intro call — Mike Thornton", body: "Discussed current PVF sourcing. Currently buying from local distributor. Interested in seeing competitive pricing.", occurredAt: new Date(now.getTime() - 10 * 86400000), sentimentSignal: "positive" },
+    { tenantId: TENANT_ID, accountId: accs[8].id, interactionType: "email", direction: "inbound", subject: "RE: Controls Quote Follow-up", body: "James mentioned Ferguson sent a competitive quote for Controls & Thermostats. Needs response within the week.", occurredAt: new Date(now.getTime() - 1 * 86400000), sentimentSignal: "competitor_mention" },
+    { tenantId: TENANT_ID, accountId: accs[8].id, interactionType: "call", direction: "outbound", subject: "Quarterly review — Palmetto Heating", body: "Reviewed Q4 spend. Revenue flat. James satisfied with HVAC supply but exploring Controls options.", occurredAt: new Date(now.getTime() - 14 * 86400000), sentimentSignal: "neutral" },
+    { tenantId: TENANT_ID, accountId: accs[1].id, interactionType: "email", direction: "outbound", subject: "PVF Volume Discount Proposal", body: "Sent proposal for PVF volume discount program. $17.8K gap identified.", occurredAt: new Date(now.getTime() - 5 * 86400000), sentimentSignal: "positive" },
+    { tenantId: TENANT_ID, accountId: accs[1].id, interactionType: "call", direction: "inbound", subject: "Order inquiry — Allied Mechanical", body: "Dave called about lead times for copper fittings. Good engagement signal.", occurredAt: new Date(now.getTime() - 7 * 86400000), sentimentSignal: "positive" },
+  ]);
+  console.log("✓ Agent interactions seeded");
+
+  // Active playbooks
+  await db.insert(agentPlaybooks).values([
+    {
+      tenantId: TENANT_ID, accountId: accs[12].id, status: "active",
+      playbookJson: {
+        playbook_type: "gap_closure",
+        priority_action: "Schedule PVF demo with Mike Thornton. Show volume pricing vs current local distributor.",
+        urgency_level: "immediate",
+        email_subject: "ABC Supply PVF Solutions for Midwest Pipe",
+        email_draft: "Hi Mike,\n\nFollowing up on our conversation about your PVF sourcing. I've put together a custom pricing sheet that shows how we can save you up to 15% on your current PVF spend.\n\nWould you have 15 minutes this week to review? I can walk you through our volume discount program.\n\nBest,\nYour ABC Supply Rep",
+        talking_points: [
+          "Current PVF gap is $27.5K — largest single opportunity in territory",
+          "Volume discount tiers: 5% at $10K/mo, 10% at $20K/mo, 15% at $30K/mo",
+          "Same-day delivery from local warehouse vs 3-day from current distributor",
+          "Reference: Similar account (Summit Mechanical) closed $22K PVF gap in 45 days",
+        ],
+        call_script: "Hi Mike, this is [Rep Name] from ABC Supply. I wanted to follow up on the PVF pricing sheet I sent over. I noticed you're currently sourcing from a local distributor, and I think we can offer significantly better pricing with our volume discount program. Do you have a few minutes to discuss?",
+      },
+      focusCategories: ["PVF", "Water Heaters"],
+    },
+    {
+      tenantId: TENANT_ID, accountId: accs[8].id, status: "active",
+      playbookJson: {
+        playbook_type: "competitive_defense",
+        priority_action: "Counter Ferguson quote on Controls & Thermostats. Prepare competitive pricing within 24 hours.",
+        urgency_level: "immediate",
+        email_subject: "Updated Controls & Thermostats Pricing — Palmetto Heating",
+        email_draft: "Hi James,\n\nI heard you received a quote from another supplier for Controls & Thermostats. I want to make sure we're giving you the best value.\n\nI've prepared an updated pricing sheet that matches or beats any competitive offer, plus includes our same-day delivery guarantee and dedicated tech support line.\n\nCan we connect today to review?\n\nBest,\nYour ABC Supply Rep",
+        talking_points: [
+          "Ferguson quote likely doesn't include installation support or same-day delivery",
+          "$10.7K Controls gap — we can close this with competitive pricing",
+          "Existing relationship: Palmetto has been a loyal HVAC customer for 2+ years",
+          "Offer: Match Ferguson pricing + 5% loyalty discount on first order",
+        ],
+        call_script: "Hi James, this is [Rep Name] from ABC Supply. I understand you received a competitive quote for Controls & Thermostats. I want to make sure we earn your business — I've put together updated pricing that I think you'll find very competitive. Can we review it together?",
+      },
+      focusCategories: ["Controls & Thermostats"],
+    },
+    {
+      tenantId: TENANT_ID, accountId: accs[1].id, status: "active",
+      playbookJson: {
+        playbook_type: "gap_closure",
+        priority_action: "Follow up on PVF volume discount proposal sent to Dave Morrison.",
+        urgency_level: "this_week",
+        email_subject: "Following Up on PVF Proposal — Allied Mechanical",
+        email_draft: "Hi Dave,\n\nJust following up on the PVF volume discount proposal I sent last week. We identified a $17.8K opportunity where we can help you consolidate your PVF purchasing.\n\nHave you had a chance to review? Happy to answer any questions.\n\nBest,\nYour ABC Supply Rep",
+        talking_points: [
+          "$17.8K PVF gap — second largest opportunity in enrolled accounts",
+          "Dave showed interest in copper fittings — good engagement signal",
+          "Allied already growing in HVAC Equipment (+8% QoQ) — build on momentum",
+        ],
+        call_script: "Hi Dave, this is [Rep Name] from ABC Supply. I wanted to follow up on the PVF proposal I sent. I know you mentioned interest in copper fittings — our PVF program includes competitive pricing on all copper products. Do you have a few minutes?",
+      },
+      focusCategories: ["PVF"],
+    },
+  ]);
+  console.log("✓ Agent playbooks seeded");
+
+  // Competitors
+  const [fergusonComp] = await db.insert(agentCompetitors).values([
+    { tenantId: TENANT_ID, name: "Ferguson Enterprises", categoriesCompetingIn: ["Controls & Thermostats", "PVF", "Water Heaters"], winRateAgainst: "42", notes: "Primary competitor in Southeast region" },
+    { tenantId: TENANT_ID, name: "Winsupply", categoriesCompetingIn: ["PVF", "HVAC Equipment"], winRateAgainst: "58", notes: "Strong in PVF but weaker in HVAC" },
+  ]).returning();
+
+  await db.insert(agentAccountCompetitors).values([
+    { tenantId: TENANT_ID, accountId: accs[8].id, competitorId: fergusonComp.id, categoriesLost: ["Controls & Thermostats"], detectedVia: "email_mention", confidence: "confirmed" },
+  ]);
+  console.log("✓ Agent competitors seeded");
+
+  // Playbook learnings
+  await db.insert(agentPlaybookLearnings).values([
+    { tenantId: TENANT_ID, tradeType: "HVAC", playbookType: "gap_closure", learning: "PVF gap closure works best when paired with volume discount proposal + same-day delivery guarantee", evidenceCount: 8, successRate: "72", isActive: true },
+    { tenantId: TENANT_ID, tradeType: "Plumbing", playbookType: "competitive_defense", learning: "When Ferguson is quoting, respond within 24 hours with match + loyalty discount. Win rate jumps from 42% to 67%", evidenceCount: 5, successRate: "67", isActive: true },
+    { tenantId: TENANT_ID, tradeType: "HVAC", playbookType: "gap_closure", learning: "Accounts with score >80 convert to enrollment 3x faster when approached with category-specific pricing sheets", evidenceCount: 12, successRate: "78", isActive: true },
+  ]);
+  console.log("✓ Agent playbook learnings seeded");
 
   // ── Agent State (Daily Briefing demo data) ──────────────────────────────────
   await db.delete(agentState).where(sql`tenant_id = ${TENANT_ID}`);

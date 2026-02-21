@@ -139,12 +139,11 @@ export async function assembleAccountContext(
         db.select().from(accountMetrics).where(and(eq(accountMetrics.accountId, accountId), eq(accountMetrics.tenantId, tenantId))).limit(1),
         db.select().from(agentContacts).where(and(eq(agentContacts.accountId, accountId), eq(agentContacts.tenantId, tenantId))),
         db.select().from(agentAccountCategorySpend)
-            .where(and(eq(agentAccountCategorySpend.accountId, accountId), eq(agentAccountCategorySpend.tenantId, tenantId), gte(agentAccountCategorySpend.periodStart, twelveMonthsAgo)))
-            .orderBy(desc(agentAccountCategorySpend.periodStart))
+            .where(and(eq(agentAccountCategorySpend.accountId, accountId), eq(agentAccountCategorySpend.tenantId, tenantId)))
             .limit(24),
         db.select().from(agentInteractions)
             .where(and(eq(agentInteractions.accountId, accountId), eq(agentInteractions.tenantId, tenantId)))
-            .orderBy(desc(agentInteractions.interactionDate))
+            .orderBy(desc(agentInteractions.occurredAt))
             .limit(10),
         db.select().from(agentPlaybooks)
             .where(and(eq(agentPlaybooks.accountId, accountId), eq(agentPlaybooks.tenantId, tenantId), eq(agentPlaybooks.status, "active")))
@@ -158,7 +157,6 @@ export async function assembleAccountContext(
             .limit(3),
         db.select({
             name: agentCompetitors.name,
-            estimatedSpendPct: agentAccountCompetitors.estimatedSpendPct,
         })
             .from(agentAccountCompetitors)
             .innerJoin(agentCompetitors, eq(agentCompetitors.id, agentAccountCompetitors.competitorId))
@@ -209,29 +207,29 @@ export async function assembleAccountContext(
             isPrimary: c.isPrimary,
         })),
         categorySpend: spendRows.map((s) => ({
-            categoryId: s.categoryId,
-            periodStart: s.periodStart,
-            spendAmount: s.spendAmount,
-            spendPct: s.spendPct,
+            categoryId: s.categoryId ?? 0,
+            periodStart: s.lastOrderDate ?? new Date(),
+            spendAmount: s.currentSpend ?? "0",
+            spendPct: null,
             gapDollars: s.gapDollars,
-            gapPct: s.gapPct,
+            gapPct: s.gapPercentage,
         })),
         recentInteractions: interactionRows.map((i) => ({
             interactionType: i.interactionType,
             subject: i.subject,
-            sentiment: i.sentiment,
-            urgency: i.urgency,
-            buyingSignal: i.buyingSignal,
-            competitorMentioned: i.competitorMentioned,
-            projectMentioned: i.projectMentioned,
-            interactionDate: i.interactionDate,
+            sentiment: i.sentimentSignal,
+            urgency: null,
+            buyingSignal: null,
+            competitorMentioned: null,
+            projectMentioned: null,
+            interactionDate: i.occurredAt,
         })),
         activePlaybook: activePlaybookRow[0]
             ? {
-                playbookType: activePlaybookRow[0].playbookType,
-                priorityAction: activePlaybookRow[0].priorityAction,
-                urgencyLevel: activePlaybookRow[0].urgencyLevel,
-                aiGeneratedContent: activePlaybookRow[0].aiGeneratedContent,
+                playbookType: ((activePlaybookRow[0].playbookJson as any)?.playbook_type) ?? "general",
+                priorityAction: ((activePlaybookRow[0].playbookJson as any)?.priority_action) ?? null,
+                urgencyLevel: ((activePlaybookRow[0].playbookJson as any)?.urgency_level) ?? null,
+                aiGeneratedContent: (activePlaybookRow[0].playbookJson as any) ?? null,
             }
             : null,
         projects: projectRows.map((p) => ({
@@ -242,16 +240,16 @@ export async function assembleAccountContext(
         })),
         similarGraduatedAccounts: similarRows.map((s) => ({
             accountIdB: s.accountIdB,
-            similarityScore: s.similarityScore,
-            sharedSegment: s.sharedSegment,
-            accountBGraduationRevenue: s.accountBGraduationRevenue,
+            similarityScore: s.similarityScore ?? "0",
+            sharedSegment: ((s.similarityBasis as any)?.shared_segment) ?? null,
+            accountBGraduationRevenue: ((s.similarityBasis as any)?.graduation_revenue) ?? null,
         })),
         competitors: competitorJoinRows.map((c) => ({
             name: c.name,
-            estimatedSpendPct: c.estimatedSpendPct,
+            estimatedSpendPct: null,
         })),
         applicableLearnings: learningRows.map((l) => ({
-            learning: l.learning,
+            learning: l.learning ?? "",
             evidenceCount: l.evidenceCount,
             successRate: l.successRate,
         })),
