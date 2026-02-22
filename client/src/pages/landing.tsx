@@ -8,6 +8,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { SubscriptionPlan } from "@shared/schema";
 import walletExpanderLogo from "@assets/WalletExpander_logo_1769615587162.png";
+import heroSalesRep from "@assets/hero-sales-rep.png";
 import {
   TrendingUp,
   Target,
@@ -310,59 +311,84 @@ export default function Landing() {
           </div>
         </div>
       </header>
-      <section className="relative overflow-hidden py-20 md:py-32">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/10" />
+      <section className="relative overflow-hidden py-16 md:py-24 lg:py-32 min-h-[600px]" data-testid="section-hero">
+        <div className="absolute top-20 right-[35%] w-[400px] h-[400px] rounded-full bg-primary/5 blur-3xl pointer-events-none" />
+        <div className="absolute bottom-10 left-[10%] w-[200px] h-[200px] rounded-full bg-chart-2/10 blur-2xl pointer-events-none" />
+
         <div className="container mx-auto px-4 relative">
-          <div className="max-w-4xl mx-auto text-center">
-            <Badge variant="secondary" className="mb-6" data-testid="badge-hero">
-              Agentic AI That Thinks, Plans, and Reminds
-            </Badge>
-            <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6" data-testid="text-hero-headline">
-              Recover Lost Revenue from{" "}
-              <span className="text-primary">Existing Customers</span>
-            </h1>
-            <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto" data-testid="text-hero-description">
-              Identify wallet share leakage and prioritize your highest-potential accounts.
-              Enroll them in a proven growth program, then let your AI agent monitor every account overnight,
-              send your reps a personalized daily briefing each morning, and automatically flag risk
-              before you lose revenue.
-            </p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+            <div className="order-2 lg:order-1">
+              <Badge variant="secondary" className="mb-6" data-testid="badge-hero">
+                Agentic AI That Thinks, Plans, and Reminds
+              </Badge>
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 leading-[1.1]" data-testid="text-hero-headline">
+                Sell smarter,{" "}
+                <span className="relative inline-block">
+                  <span className="relative z-10">grow</span>
+                  <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 200 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M2 8C40 2 80 2 100 5C120 8 160 10 198 4" stroke="hsl(var(--primary))" strokeWidth="3" strokeLinecap="round" strokeOpacity="0.5" />
+                    <path d="M2 10C50 3 90 3 110 6C130 9 170 8 198 6" stroke="hsl(var(--primary))" strokeWidth="2" strokeLinecap="round" strokeOpacity="0.3" />
+                  </svg>
+                </span>
+                {" "}every account
+              </h1>
+              <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-xl" data-testid="text-hero-description">
+                Identify wallet share leakage and prioritize your highest-potential accounts.
+                Let your AI agent monitor overnight, brief your reps each morning,
+                and flag risk before you lose revenue.
+              </p>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-              <Button
-                size="lg"
-                onClick={() => scrollToSection("pricing")}
-                data-testid="button-hero-demo"
-              >
-                Start Free Trial
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={() => scrollToSection("features")}
-                data-testid="button-hero-learn"
-              >
-                <Play className="mr-2 h-4 w-4" />
-                See How It Works
-              </Button>
+              <div className="flex flex-col sm:flex-row flex-wrap gap-4 mb-12">
+                <Button
+                  size="lg"
+                  onClick={() => scrollToSection("pricing")}
+                  data-testid="button-hero-demo"
+                >
+                  Start Free Trial
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => scrollToSection("features")}
+                  data-testid="button-hero-learn"
+                >
+                  <Play className="mr-2 h-4 w-4 fill-current" />
+                  See How It Works
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-8 border-t">
+                {stats.map((stat, index) => (
+                  <div key={index} data-testid={`stat-${index}`}>
+                    <div className="text-2xl md:text-3xl font-bold text-primary mb-1" data-testid={`stat-value-${index}`}>
+                      {stat.value}
+                    </div>
+                    <div className="text-xs text-muted-foreground" data-testid={`stat-label-${index}`}>
+                      {stat.label}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground/60 mt-4" data-testid="text-stats-disclaimer">
+                *Results based on enrolled accounts following recommended engagement practices
+              </p>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 pt-8 border-t">
-              {stats.map((stat, index) => (
-                <div key={index} className="text-center" data-testid={`stat-${index}`}>
-                  <div className="text-3xl md:text-4xl font-bold text-primary mb-1" data-testid={`stat-value-${index}`}>
-                    {stat.value}
-                  </div>
-                  <div className="text-sm text-muted-foreground" data-testid={`stat-label-${index}`}>
-                    {stat.label}
-                  </div>
-                </div>
-              ))}
+            <div className="order-1 lg:order-2 relative flex justify-center lg:justify-end" data-testid="hero-image-container">
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] md:w-[420px] md:h-[420px] rounded-full bg-primary/8 pointer-events-none" />
+              <div className="absolute top-[15%] right-[5%] w-[60px] h-[60px] md:w-[80px] md:h-[80px] rounded-full bg-chart-2/15 pointer-events-none animate-pulse" />
+              <div className="absolute bottom-[20%] left-[5%] w-[40px] h-[40px] md:w-[50px] md:h-[50px] rounded-full bg-primary/10 pointer-events-none" />
+              <div className="absolute top-[8%] left-[15%] w-3 h-3 rounded-full bg-primary/40 pointer-events-none" />
+              <div className="absolute bottom-[30%] right-[10%] w-2 h-2 rounded-full bg-chart-2/40 pointer-events-none" />
+
+              <img
+                src={heroSalesRep}
+                alt="Sales representative at a construction site smiling with phone in hand"
+                className="relative z-10 w-[280px] md:w-[380px] lg:w-[440px] h-auto object-contain drop-shadow-2xl"
+                data-testid="img-hero-sales-rep"
+              />
             </div>
-            <p className="text-xs text-muted-foreground/60 mt-6 text-center" data-testid="text-stats-disclaimer">
-              *Results based on enrolled accounts following recommended engagement practices
-            </p>
           </div>
         </div>
       </section>
