@@ -2586,13 +2586,13 @@ Output a structured profile with category expectations.`}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 rounded-md border bg-muted/30" data-testid="integration-eclipse">
+              <div className="flex items-center justify-between p-4 rounded-md border bg-muted/30" data-testid="integration-epicor-eclipse">
                 <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-md bg-blue-600 flex items-center justify-center text-white font-bold text-xs">
+                  <div className="h-9 w-9 rounded-md bg-orange-700 flex items-center justify-center text-white font-bold text-xs">
                     ECL
                   </div>
                   <div>
-                    <p className="font-medium">Infor Eclipse</p>
+                    <p className="font-medium">Epicor Eclipse</p>
                     <p className="text-sm text-muted-foreground">
                       Sync distributor accounts, order history, and product catalogs from Eclipse ERP
                     </p>
@@ -2620,15 +2620,32 @@ Output a structured profile with category expectations.`}
                 </Badge>
               </div>
 
-              <div className="flex items-center justify-between p-4 rounded-md border bg-muted/30" data-testid="integration-epicor-eclipse">
+              <div className="flex items-center justify-between p-4 rounded-md border bg-muted/30" data-testid="integration-epicor-kinetic">
                 <div className="flex items-center gap-3">
                   <div className="h-9 w-9 rounded-md bg-orange-500 flex items-center justify-center text-white font-bold text-xs">
                     EPC
                   </div>
                   <div>
-                    <p className="font-medium">Epicor ERP</p>
+                    <p className="font-medium">Epicor Kinetic</p>
                     <p className="text-sm text-muted-foreground">
                       Connect Epicor Kinetic / ERP for real-time order and account synchronization
+                    </p>
+                  </div>
+                </div>
+                <Badge variant="outline" className="text-muted-foreground whitespace-nowrap">
+                  Coming Soon
+                </Badge>
+              </div>
+
+              <div className="flex items-center justify-between p-4 rounded-md border bg-muted/30" data-testid="integration-infor-csd">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-md bg-blue-600 flex items-center justify-center text-white font-bold text-xs">
+                    CSD
+                  </div>
+                  <div>
+                    <p className="font-medium">Infor CSD</p>
+                    <p className="text-sm text-muted-foreground">
+                      Sync customer accounts, orders, and distribution data from Infor CSD
                     </p>
                   </div>
                 </div>
