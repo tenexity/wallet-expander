@@ -28,6 +28,10 @@ import {
   agentAccountCompetitors,
   agentPlaybookLearnings,
   agentProjects,
+  contacts,
+  projects,
+  orderSignals,
+  competitorMentions,
 } from "@shared/schema";
 import { sql } from "drizzle-orm";
 
@@ -38,6 +42,10 @@ export async function seed() {
   console.log("🌱 Seeding ABC Supply Co. demo data...");
 
   // ── Clear in FK-safe order ────────────────────────────────────────────────
+  await db.delete(competitorMentions);
+  await db.delete(orderSignals);
+  await db.delete(projects);
+  await db.delete(contacts);
   await db.delete(programRevenueSnapshots);
   await db.delete(programAccounts);
   await db.delete(accountCategoryGaps);
@@ -959,8 +967,187 @@ Is there 10 minutes this week to reconnect?`;
   }
   console.log(`✓ ${agentRunTypes.length} agent state rows`);
 
+  // ── CRM Intelligence: Contacts ──────────────────────────────────────────────
+  const crmNow = new Date();
+  const daysAgo = (d: number) => new Date(crmNow.getTime() - d * 86400000);
+  const daysFromNow = (d: number) => new Date(crmNow.getTime() + d * 86400000);
+
+  const acctId = (index: number) => accs[index].id;
+
+  const contactRows = await db.insert(contacts).values([
+    // Metro HVAC Solutions [0]
+    { tenantId: TENANT_ID, accountId: acctId(0), firstName: "Frank", lastName: "Moretti", email: "fmoretti@metrohvac.com", phone: "201-555-0142", title: "VP of Purchasing", role: "decision_maker", department: "Procurement", isPrimary: true, lastContactedAt: daysAgo(2), notes: "Key relationship — approves all orders over $25K. Prefers email communication. Mentioned expansion plans for Q3.", source: "email_sync" },
+    { tenantId: TENANT_ID, accountId: acctId(0), firstName: "Lisa", lastName: "Park", email: "lpark@metrohvac.com", phone: "201-555-0188", title: "Purchasing Manager", role: "purchaser", department: "Procurement", isPrimary: false, lastContactedAt: daysAgo(5), notes: "Handles day-to-day orders. Very responsive. Prefers phone calls.", source: "email_sync" },
+    { tenantId: TENANT_ID, accountId: acctId(0), firstName: "Dennis", lastName: "Kowalski", email: "dkowalski@metrohvac.com", title: "Estimator", role: "estimator", department: "Operations", isPrimary: false, lastContactedAt: daysAgo(14), source: "email_sync" },
+
+    // Allied Mechanical Group [1]
+    { tenantId: TENANT_ID, accountId: acctId(1), firstName: "Robert", lastName: "Chang", email: "rchang@alliedmech.com", phone: "215-555-0233", title: "Owner / President", role: "owner", department: "Executive", isPrimary: true, lastContactedAt: daysAgo(45), notes: "Founded the company in 2008. Very loyal but exploring competitors on PVF pricing. Need to re-engage.", source: "email_sync" },
+    { tenantId: TENANT_ID, accountId: acctId(1), firstName: "Angela", lastName: "Russo", email: "arusso@alliedmech.com", phone: "215-555-0241", title: "Office Manager", role: "gatekeeper", department: "Admin", isPrimary: false, lastContactedAt: daysAgo(12), source: "email_sync" },
+
+    // Northeast Heating & Cooling [2]
+    { tenantId: TENANT_ID, accountId: acctId(2), firstName: "Tom", lastName: "Brennan", email: "tbrennan@northeasthvac.com", phone: "617-555-0311", title: "General Manager", role: "decision_maker", department: "Management", isPrimary: true, lastContactedAt: daysAgo(1), notes: "Very active account. Just awarded major school district project. Wants competitive pricing on Carrier equipment.", source: "email_sync" },
+    { tenantId: TENANT_ID, accountId: acctId(2), firstName: "Sarah", lastName: "Whitfield", email: "swhitfield@northeasthvac.com", title: "Project Coordinator", role: "project_manager", department: "Operations", isPrimary: false, lastContactedAt: daysAgo(3), source: "email_sync" },
+
+    // Premier Plumbing NJ [3]
+    { tenantId: TENANT_ID, accountId: acctId(3), firstName: "Mike", lastName: "DeSantis", email: "mdesantis@premierplumbingnj.com", phone: "609-555-0422", title: "Owner", role: "owner", department: "Executive", isPrimary: true, lastContactedAt: daysAgo(8), notes: "Family business, 3rd generation. Price-sensitive but values reliability. Currently comparing our water heater pricing with Ferguson.", source: "email_sync" },
+
+    // Sunshine HVAC Florida [5]
+    { tenantId: TENANT_ID, accountId: acctId(5), firstName: "Carlos", lastName: "Mendez", email: "cmendez@sunshinehvac.com", phone: "813-555-0501", title: "CEO", role: "decision_maker", department: "Executive", isPrimary: true, lastContactedAt: daysAgo(3), notes: "Aggressive growth — opening 2 new service areas. Major opportunity for equipment + supplies bundle.", source: "email_sync" },
+    { tenantId: TENANT_ID, accountId: acctId(5), firstName: "Diane", lastName: "Torres", email: "dtorres@sunshinehvac.com", phone: "813-555-0509", title: "Purchasing Director", role: "purchaser", department: "Procurement", isPrimary: false, lastContactedAt: daysAgo(1), notes: "Very organized, sends weekly POs. Currently evaluating our pricing vs. Winsupply on refrigerant.", source: "email_sync" },
+    { tenantId: TENANT_ID, accountId: acctId(5), firstName: "Ray", lastName: "Nguyen", email: "rnguyen@sunshinehvac.com", title: "Lead Estimator", role: "estimator", department: "Operations", isPrimary: false, lastContactedAt: daysAgo(7), source: "email_sync" },
+
+    // Gulf Coast Plumbing [6]
+    { tenantId: TENANT_ID, accountId: acctId(6), firstName: "Jim", lastName: "Crawford", email: "jcrawford@gulfcoastplumbing.com", phone: "504-555-0612", title: "Operations Manager", role: "decision_maker", department: "Operations", isPrimary: true, lastContactedAt: daysAgo(20), notes: "Handles both purchasing and operations. Frustrated with recent delivery delays — need to address.", source: "email_sync" },
+
+    // Tampa Bay Mechanical [7]
+    { tenantId: TENANT_ID, accountId: acctId(7), firstName: "Patricia", lastName: "Vega", email: "pvega@tampabaymech.com", phone: "727-555-0744", title: "Controller", role: "decision_maker", department: "Finance", isPrimary: true, lastContactedAt: daysAgo(6), notes: "Controls budget. Very data-driven — responds well to ROI arguments. Interested in volume discount tiers.", source: "email_sync" },
+    { tenantId: TENANT_ID, accountId: acctId(7), firstName: "Kevin", lastName: "O'Brien", email: "kobrien@tampabaymech.com", title: "Field Supervisor", role: "influencer", department: "Field", isPrimary: false, lastContactedAt: daysAgo(30), source: "email_sync" },
+
+    // Great Lakes Heating [11]
+    { tenantId: TENANT_ID, accountId: acctId(11), firstName: "David", lastName: "Kowalczyk", email: "dkowalczyk@greatlakesheating.com", phone: "312-555-0811", title: "President", role: "owner", department: "Executive", isPrimary: true, lastContactedAt: daysAgo(4), notes: "Largest HVAC account in Great Lakes. Considering switching from Lennox to Carrier for commercial line. Huge opportunity.", source: "email_sync" },
+    { tenantId: TENANT_ID, accountId: acctId(11), firstName: "Amy", lastName: "Richardson", email: "arichardson@greatlakesheating.com", phone: "312-555-0819", title: "Purchasing Coordinator", role: "purchaser", department: "Procurement", isPrimary: false, lastContactedAt: daysAgo(2), source: "email_sync" },
+
+    // Midwest Pipe & Supply [12]
+    { tenantId: TENANT_ID, accountId: acctId(12), firstName: "Greg", lastName: "Hoffmann", email: "ghoffmann@midwestpipe.com", phone: "314-555-0901", title: "VP of Operations", role: "decision_maker", department: "Operations", isPrimary: true, lastContactedAt: daysAgo(11), notes: "Concerned about PVF lead times. Comparing us to HD Supply. Need to demonstrate reliability advantage.", source: "email_sync" },
+
+    // Chicago Comfort Systems [14]
+    { tenantId: TENANT_ID, accountId: acctId(14), firstName: "Sandra", lastName: "Chen", email: "schen@chicagocomfort.com", phone: "773-555-1001", title: "General Manager", role: "decision_maker", department: "Management", isPrimary: true, lastContactedAt: daysAgo(15), notes: "Managing 3 large commercial retrofit projects. Needs competitive pricing on controls & thermostats package.", source: "email_sync" },
+
+    // Carolina Climate Control [10]
+    { tenantId: TENANT_ID, accountId: acctId(10), firstName: "William", lastName: "Hayes", email: "whayes@carolinaclimate.com", phone: "704-555-1102", title: "Procurement Manager", role: "purchaser", department: "Procurement", isPrimary: true, lastContactedAt: daysAgo(60), notes: "Haven't spoken in 2 months. Account showing declining order frequency. At risk of losing to local competitor.", source: "email_sync" },
+
+    // Palmetto Heating & Air [8]
+    { tenantId: TENANT_ID, accountId: acctId(8), firstName: "Nicole", lastName: "Washington", email: "nwashington@palmettoheat.com", phone: "843-555-1211", title: "Owner", role: "owner", department: "Executive", isPrimary: true, lastContactedAt: daysAgo(9), notes: "Growing fast — just hired 5 new techs. Needs to expand their product range. Perfect candidate for insulation + ductwork cross-sell.", source: "email_sync" },
+
+    // Detroit Climate Pro [16]
+    { tenantId: TENANT_ID, accountId: acctId(16), firstName: "Marcus", lastName: "Johnson", email: "mjohnson@detroitclimate.com", phone: "313-555-1301", title: "Chief Estimator", role: "estimator", department: "Estimating", isPrimary: true, lastContactedAt: daysAgo(7), notes: "Key influence on equipment selection. Prefers Trane but open to Carrier if pricing is right.", source: "email_sync" },
+
+    // Buckeye Mechanical [18]
+    { tenantId: TENANT_ID, accountId: acctId(18), firstName: "Jennifer", lastName: "Adams", email: "jadams@buckeyemech.com", phone: "614-555-1411", title: "Director of Purchasing", role: "decision_maker", department: "Procurement", isPrimary: true, lastContactedAt: daysAgo(3), notes: "Just consolidated 3 branch locations. Wants single-source supply agreement. High-value opportunity.", source: "email_sync" },
+    { tenantId: TENANT_ID, accountId: acctId(18), firstName: "Brian", lastName: "Mueller", email: "bmueller@buckeyemech.com", title: "Project Manager", role: "project_manager", department: "Projects", isPrimary: false, lastContactedAt: daysAgo(18), source: "email_sync" },
+
+    // Coastal Mechanical [4]
+    { tenantId: TENANT_ID, accountId: acctId(4), firstName: "Tony", lastName: "Mancini", email: "tmancini@coastalmech.com", phone: "203-555-1522", title: "Purchasing Agent", role: "purchaser", department: "Procurement", isPrimary: true, lastContactedAt: daysAgo(10), notes: "Reliable account. Looking for better terms on drainage systems. Mentioned competitor quote from Ferguson.", source: "email_sync" },
+
+    // Indiana Plumbing Services [19]
+    { tenantId: TENANT_ID, accountId: acctId(19), firstName: "Steve", lastName: "Patel", email: "spatel@indianaplumbing.com", phone: "317-555-1601", title: "Operations Director", role: "decision_maker", department: "Operations", isPrimary: true, lastContactedAt: daysAgo(22), notes: "Expanding into commercial plumbing. Needs fixtures and PVF at volume pricing. Currently buying some categories from HD Supply.", source: "email_sync" },
+  ]).returning();
+  console.log(`✓ ${contactRows.length} CRM contacts`);
+
+  // ── CRM Intelligence: Projects ──────────────────────────────────────────────
+  const projectRows = await db.insert(projects).values([
+    // Metro HVAC — awarded large hospital project
+    { tenantId: TENANT_ID, accountId: acctId(0), name: "St. Mary's Hospital HVAC Renovation", location: "Newark, NJ", projectType: "renovation", estimatedValue: "485000", stage: "awarded", startDate: daysFromNow(30), bidDeadline: daysAgo(15), generalContractor: "Turner Construction", unitCount: null, squareFootage: 125000, productCategories: JSON.stringify(["HVAC Equipment", "Controls & Thermostats", "Ductwork & Fittings", "Insulation Materials"]), competitorsInvolved: JSON.stringify(["Ferguson", "Winsupply"]), notes: "Won against Ferguson. Key differentiator was our Carrier pricing and delivery commitment. 4-phase installation over 18 months.", source: "email_sync" },
+    { tenantId: TENANT_ID, accountId: acctId(0), name: "Liberty Park Office Complex", location: "Jersey City, NJ", projectType: "new_construction", estimatedValue: "320000", stage: "bidding", bidDeadline: daysFromNow(12), generalContractor: "Skanska", squareFootage: 85000, productCategories: JSON.stringify(["HVAC Equipment", "Ductwork & Fittings", "Controls & Thermostats"]), competitorsInvolved: JSON.stringify(["HD Supply", "Johnstone Supply"]), notes: "Competitive bid — need to be aggressive on controls pricing. GC has existing relationship with HD Supply.", source: "email_sync" },
+
+    // Northeast Heating — school district
+    { tenantId: TENANT_ID, accountId: acctId(2), name: "Westfield School District HVAC Upgrade", location: "Westfield, MA", projectType: "retrofit", estimatedValue: "275000", stage: "awarded", startDate: daysFromNow(45), generalContractor: "Gilbane Building Co", squareFootage: 95000, productCategories: JSON.stringify(["HVAC Equipment", "Controls & Thermostats", "Insulation Materials"]), competitorsInvolved: JSON.stringify(["Ferguson"]), notes: "District-wide upgrade across 4 schools. Phased delivery required. Energy efficiency specs favor our Carrier VRF line.", source: "email_sync" },
+
+    // Sunshine HVAC — multiple Florida projects
+    { tenantId: TENANT_ID, accountId: acctId(5), name: "Bayshore Condos Phase II", location: "Tampa, FL", projectType: "new_construction", estimatedValue: "520000", stage: "in_progress", startDate: daysAgo(60), endDate: daysFromNow(120), generalContractor: "Suffolk Construction", unitCount: 180, squareFootage: 220000, productCategories: JSON.stringify(["HVAC Equipment", "Refrigerant & Supplies", "Ductwork & Fittings", "Controls & Thermostats", "Insulation Materials"]), competitorsInvolved: JSON.stringify(["Winsupply", "Baker Distributing"]), notes: "Largest active project. Phase I delivered on time. Currently supplying 60% of materials — opportunity to capture remaining 40% from Winsupply.", source: "email_sync" },
+    { tenantId: TENANT_ID, accountId: acctId(5), name: "Riverwalk Medical Office", location: "St. Petersburg, FL", projectType: "new_construction", estimatedValue: "185000", stage: "bidding", bidDeadline: daysFromNow(8), generalContractor: "Brasfield & Gorrie", squareFootage: 42000, productCategories: JSON.stringify(["HVAC Equipment", "Controls & Thermostats", "Plumbing Fixtures"]), competitorsInvolved: JSON.stringify(["Ferguson", "Baker Distributing"]), notes: "Medical-grade HVAC requirements. Our Carrier Puron units meet spec. Bid deadline approaching — need pricing finalized this week.", source: "email_sync" },
+
+    // Great Lakes Heating — commercial retrofit
+    { tenantId: TENANT_ID, accountId: acctId(11), name: "Lakeview Plaza Commercial Retrofit", location: "Chicago, IL", projectType: "retrofit", estimatedValue: "410000", stage: "bidding", bidDeadline: daysFromNow(18), generalContractor: "Pepper Construction", squareFootage: 110000, productCategories: JSON.stringify(["HVAC Equipment", "Controls & Thermostats", "Ductwork & Fittings", "Electrical Components"]), competitorsInvolved: JSON.stringify(["HD Supply", "Johnstone Supply"]), notes: "Customer considering Lennox-to-Carrier switch. If we win this, it could shift their entire commercial line to us. High strategic value.", source: "email_sync" },
+
+    // Gulf Coast Plumbing — hotel renovation
+    { tenantId: TENANT_ID, accountId: acctId(6), name: "Grand Pelican Resort Plumbing Overhaul", location: "Biloxi, MS", projectType: "renovation", estimatedValue: "290000", stage: "awarded", startDate: daysFromNow(15), generalContractor: "Yates Construction", unitCount: 320, productCategories: JSON.stringify(["Plumbing Fixtures", "PVF (Pipe, Valves, Fittings)", "Water Heaters", "Drainage Systems"]), competitorsInvolved: JSON.stringify(["Ferguson"]), notes: "320-room hotel renovation. Won on plumbing fixtures pricing. Need to finalize water heater selection — customer comparing Rheem vs A.O. Smith.", source: "email_sync" },
+
+    // Midwest Pipe & Supply — warehouse complex
+    { tenantId: TENANT_ID, accountId: acctId(12), name: "Gateway Logistics Center", location: "St. Louis, MO", projectType: "new_construction", estimatedValue: "195000", stage: "identified", generalContractor: "Alberici Constructors", squareFootage: 250000, productCategories: JSON.stringify(["PVF (Pipe, Valves, Fittings)", "Drainage Systems", "Pipe & Fittings"]), notes: "Early stage — customer mentioned this project in recent email. Large warehouse needing fire suppression and drainage. Need to get on bid list.", source: "email_sync" },
+
+    // Chicago Comfort — multi-building retrofit
+    { tenantId: TENANT_ID, accountId: acctId(14), name: "Michigan Ave Office Park Controls Upgrade", location: "Chicago, IL", projectType: "retrofit", estimatedValue: "155000", stage: "in_progress", startDate: daysAgo(30), endDate: daysFromNow(90), productCategories: JSON.stringify(["Controls & Thermostats", "Electrical Components"]), notes: "Smart building conversion. Installing Honeywell BMS across 3 buildings. Steady weekly orders for controls & sensors.", source: "email_sync" },
+
+    // Tampa Bay Mechanical — tenant improvement
+    { tenantId: TENANT_ID, accountId: acctId(7), name: "Crossroads Shopping Center TI", location: "Tampa, FL", projectType: "tenant_improvement", estimatedValue: "92000", stage: "in_progress", startDate: daysAgo(14), endDate: daysFromNow(45), generalContractor: "Hensel Phelps", squareFootage: 35000, productCategories: JSON.stringify(["HVAC Equipment", "Ductwork & Fittings", "Plumbing Fixtures"]), notes: "Tenant improvement for 4 new retail spaces. Quick turnaround needed. Good margin opportunity on ductwork.", source: "email_sync" },
+
+    // Buckeye Mechanical — consolidated supply opportunity
+    { tenantId: TENANT_ID, accountId: acctId(18), name: "Columbus Data Center Build-Out", location: "Columbus, OH", projectType: "new_construction", estimatedValue: "680000", stage: "bidding", bidDeadline: daysFromNow(25), generalContractor: "Whiting-Turner", squareFootage: 75000, productCategories: JSON.stringify(["HVAC Equipment", "Controls & Thermostats", "Electrical Components", "Insulation Materials", "PVF (Pipe, Valves, Fittings)"]), competitorsInvolved: JSON.stringify(["HD Supply", "Ferguson", "Winsupply"]), notes: "Massive opportunity — precision cooling requirements. Customer wants single-source supplier. Our breadth of categories is key differentiator.", source: "email_sync" },
+
+    // Palmetto Heating — maintenance contract
+    { tenantId: TENANT_ID, accountId: acctId(8), name: "Palmetto Regional Hospital HVAC Maintenance", location: "Charleston, SC", projectType: "maintenance", estimatedValue: "78000", stage: "awarded", startDate: daysAgo(90), endDate: daysFromNow(275), productCategories: JSON.stringify(["Refrigerant & Supplies", "Controls & Thermostats", "Tools & Safety"]), notes: "Annual maintenance contract. Steady recurring revenue. Cross-sell opportunity for insulation and ductwork when replacements needed.", source: "email_sync" },
+
+    // Allied Mechanical — competitive situation
+    { tenantId: TENANT_ID, accountId: acctId(1), name: "Philadelphia Airport Terminal B Renovation", location: "Philadelphia, PA", projectType: "renovation", estimatedValue: "750000", stage: "bidding", bidDeadline: daysFromNow(35), generalContractor: "Clark Construction", squareFootage: 200000, productCategories: JSON.stringify(["HVAC Equipment", "PVF (Pipe, Valves, Fittings)", "Controls & Thermostats", "Insulation Materials", "Electrical Components"]), competitorsInvolved: JSON.stringify(["Ferguson", "HD Supply", "Winsupply"]), notes: "Largest bid opportunity this quarter. Airport authority requires prevailing wage. Customer relationship strained — need to rebuild trust. Owner Robert Chang is key.", source: "email_sync" },
+
+    // Indiana Plumbing — commercial expansion
+    { tenantId: TENANT_ID, accountId: acctId(19), name: "Carmel Town Center Mixed-Use", location: "Carmel, IN", projectType: "new_construction", estimatedValue: "230000", stage: "identified", generalContractor: "Shiel Sexton", unitCount: 96, squareFootage: 145000, productCategories: JSON.stringify(["Plumbing Fixtures", "PVF (Pipe, Valves, Fittings)", "Water Heaters", "Drainage Systems"]), notes: "Customer's first major commercial project. Needs support on spec and pricing. Opportunity to become their go-to commercial supplier.", source: "email_sync" },
+
+    // Lake Shore Plumbing — renovation
+    { tenantId: TENANT_ID, accountId: acctId(15), name: "Navy Pier Restaurant Row Plumbing", location: "Chicago, IL", projectType: "renovation", estimatedValue: "145000", stage: "awarded", startDate: daysFromNow(10), generalContractor: "Power Construction", productCategories: JSON.stringify(["Plumbing Fixtures", "Pipe & Fittings", "Drainage Systems", "Water Heaters"]), competitorsInvolved: JSON.stringify(["Ferguson"]), notes: "Won competitive bid. 6 restaurant buildouts requiring commercial-grade plumbing. Tight timeline — delivery reliability critical.", source: "email_sync" },
+  ]).returning();
+  console.log(`✓ ${projectRows.length} CRM projects`);
+
+  // ── CRM Intelligence: Order Signals ─────────────────────────────────────────
+  const signalRows = await db.insert(orderSignals).values([
+    // Immediate urgency signals
+    { tenantId: TENANT_ID, accountId: acctId(0), projectId: projectRows[0].id, signalType: "quote_request", productCategory: "HVAC Equipment", productDetails: "Carrier 50XC rooftop units, 15-ton, qty 8 for hospital renovation", estimatedQuantity: "8 units", estimatedValue: "124000", urgency: "immediate", pricingMentioned: true, competitorPriceMentioned: true, notes: "Ferguson quoted $14,800/unit. We need to beat or match. Delivery needed within 6 weeks.", status: "quoted" },
+    { tenantId: TENANT_ID, accountId: acctId(5), projectId: projectRows[3].id, signalType: "delivery_request", productCategory: "Refrigerant & Supplies", productDetails: "R-410A refrigerant, 50 cylinders for Bayshore Phase II", estimatedQuantity: "50 cylinders", estimatedValue: "18500", urgency: "immediate", notes: "Running low on-site. Need delivery by Friday or project delays. Diane Torres handling.", status: "new" },
+    { tenantId: TENANT_ID, accountId: acctId(2), signalType: "purchase_intent", productCategory: "Controls & Thermostats", productDetails: "Honeywell T6 Pro thermostats and zone controllers for school district", estimatedQuantity: "120 units", estimatedValue: "32000", urgency: "immediate", pricingMentioned: true, notes: "Tom Brennan wants pricing today. Schools need installation during spring break window.", status: "new" },
+
+    // This week urgency
+    { tenantId: TENANT_ID, accountId: acctId(11), projectId: projectRows[5].id, signalType: "quote_request", productCategory: "HVAC Equipment", productDetails: "Carrier WeatherExpert rooftop units, mixed tonnage (5-20 ton)", estimatedQuantity: "12 units", estimatedValue: "186000", urgency: "this_week", pricingMentioned: true, competitorPriceMentioned: true, notes: "David Kowalczyk comparing Lennox vs Carrier pricing. If we win this quote, likely converts entire commercial line. Strategic importance.", status: "new" },
+    { tenantId: TENANT_ID, accountId: acctId(6), projectId: projectRows[6].id, signalType: "quote_request", productCategory: "Water Heaters", productDetails: "Commercial tankless water heaters — Navien NPE-2 or equivalent, qty 24", estimatedQuantity: "24 units", estimatedValue: "67000", urgency: "this_week", pricingMentioned: true, notes: "Grand Pelican Resort needs water heater selection finalized. Customer comparing Rheem vs Navien. Our Navien pricing is competitive.", status: "contacted" },
+    { tenantId: TENANT_ID, accountId: acctId(18), projectId: projectRows[10].id, signalType: "pricing_inquiry", productCategory: "Controls & Thermostats", productDetails: "Building automation controllers, sensors, and actuators for data center", estimatedQuantity: "Bulk lot", estimatedValue: "95000", urgency: "this_week", pricingMentioned: true, competitorPriceMentioned: true, notes: "Jennifer Adams wants consolidated pricing. HD Supply quoted controls separately — we can beat them on a package deal.", status: "new" },
+
+    // This month
+    { tenantId: TENANT_ID, accountId: acctId(5), projectId: projectRows[4].id, signalType: "quote_request", productCategory: "HVAC Equipment", productDetails: "Carrier Puron 50HC units for medical office, with HEPA filtration", estimatedQuantity: "6 units", estimatedValue: "78000", urgency: "this_month", pricingMentioned: true, notes: "Medical-grade specs. Bid deadline in 8 days. Need to finalize pricing with manufacturer rep.", status: "new" },
+    { tenantId: TENANT_ID, accountId: acctId(14), signalType: "reorder", productCategory: "Controls & Thermostats", productDetails: "Honeywell smart sensors and zone controllers — weekly standing order", estimatedQuantity: "25 units/week", estimatedValue: "8500", urgency: "this_month", notes: "Steady recurring orders for Michigan Ave retrofit. Customer very satisfied with quality. Upsell opportunity for wireless sensors.", status: "won" },
+    { tenantId: TENANT_ID, accountId: acctId(8), signalType: "product_inquiry", productCategory: "Insulation Materials", productDetails: "Owens Corning commercial duct wrap and pipe insulation", estimatedQuantity: "2,000 linear feet", estimatedValue: "12000", urgency: "this_month", notes: "Nicole Washington expanding into insulation installation. First-time buyer in this category — cross-sell success!", status: "new" },
+    { tenantId: TENANT_ID, accountId: acctId(12), signalType: "pricing_inquiry", productCategory: "PVF (Pipe, Valves, Fittings)", productDetails: "Copper pipe (types L & M), brass valves, various fittings", estimatedValue: "45000", urgency: "this_month", pricingMentioned: true, competitorPriceMentioned: true, notes: "Greg Hoffmann comparing us to HD Supply on PVF pricing. Need to demonstrate lead time advantage — we're 2 weeks faster.", status: "contacted" },
+
+    // Next quarter
+    { tenantId: TENANT_ID, accountId: acctId(1), projectId: projectRows[12].id, signalType: "quote_request", productCategory: "HVAC Equipment", productDetails: "Large-scale HVAC package for airport terminal renovation", estimatedQuantity: "Full package", estimatedValue: "385000", urgency: "next_quarter", pricingMentioned: true, notes: "Preliminary pricing request for airport project. Bid not due for 5 weeks. Need to rebuild relationship with Robert Chang first.", status: "new" },
+    { tenantId: TENANT_ID, accountId: acctId(18), projectId: projectRows[10].id, signalType: "purchase_intent", productCategory: "Insulation Materials", productDetails: "Spray foam and rigid board insulation for data center walls", estimatedQuantity: "Full facility", estimatedValue: "42000", urgency: "next_quarter", notes: "Data center requires R-30+ insulation throughout. Spec review in progress.", status: "new" },
+
+    // Exploring
+    { tenantId: TENANT_ID, accountId: acctId(19), signalType: "product_inquiry", productCategory: "Plumbing Fixtures", productDetails: "Commercial-grade fixtures — Kohler Triton Bowe and similar", estimatedQuantity: "96 units (residential), 12 commercial", estimatedValue: "58000", urgency: "exploring", notes: "Steve Patel exploring commercial fixture lines for first time. Needs education on specs and pricing tiers. Great relationship-building opportunity.", status: "new" },
+    { tenantId: TENANT_ID, accountId: acctId(3), signalType: "pricing_inquiry", productCategory: "Water Heaters", productDetails: "A.O. Smith commercial water heaters — comparing to Ferguson pricing", estimatedValue: "22000", urgency: "this_week", pricingMentioned: true, competitorPriceMentioned: true, notes: "Mike DeSantis got a Ferguson quote at $1,850/unit. Our current price is $1,920. Need to match or justify the premium.", status: "contacted" },
+
+    // Won signals showing success
+    { tenantId: TENANT_ID, accountId: acctId(0), signalType: "reorder", productCategory: "Ductwork & Fittings", productDetails: "Spiral ductwork and flex connectors — monthly standing order", estimatedValue: "15000", urgency: "this_month", notes: "Consistent monthly reorder. Relationship strong. Recently increased order size by 20%.", status: "won" },
+    { tenantId: TENANT_ID, accountId: acctId(7), signalType: "purchase_intent", productCategory: "HVAC Equipment", productDetails: "Mini-split systems for retail tenant improvement", estimatedQuantity: "16 units", estimatedValue: "28000", urgency: "this_week", notes: "Patricia Vega approved budget. Quick win — need to get PO processed this week.", status: "won" },
+    { tenantId: TENANT_ID, accountId: acctId(15), projectId: projectRows[14].id, signalType: "quote_request", productCategory: "Plumbing Fixtures", productDetails: "Commercial kitchen plumbing packages for 6 restaurant buildouts", estimatedQuantity: "6 packages", estimatedValue: "54000", urgency: "this_week", pricingMentioned: true, notes: "Navy Pier project — quote accepted. Delivery schedule confirmed. First shipment next week.", status: "won" },
+
+    // Lost signal for learning
+    { tenantId: TENANT_ID, accountId: acctId(10), signalType: "quote_request", productCategory: "HVAC Equipment", productDetails: "Residential heat pump systems — bulk order", estimatedValue: "35000", urgency: "this_month", competitorPriceMentioned: true, notes: "Lost to local competitor on price. William Hayes hasn't responded to follow-up. Account at risk.", status: "lost" },
+  ]).returning();
+  console.log(`✓ ${signalRows.length} CRM order signals`);
+
+  // ── CRM Intelligence: Competitor Mentions ──────────────────────────────────
+  const threatRows = await db.insert(competitorMentions).values([
+    // Critical threats
+    { tenantId: TENANT_ID, accountId: acctId(1), projectId: projectRows[12].id, competitorName: "Ferguson", mentionType: "switch_threat", productCategory: "PVF (Pipe, Valves, Fittings)", competitorPrice: "$12.50/ft copper L", ourPrice: "$13.10/ft copper L", details: "Robert Chang mentioned Ferguson is offering a 15% volume discount on PVF for the airport project. Also offering free jobsite delivery. Owner has been shopping around — relationship cooling. Need immediate outreach with competitive counter-offer.", threatLevel: "critical", responseNeeded: true, notes: "Longest-standing account in Mid-Atlantic. Losing this would be a $200K+ annual revenue hit." },
+    { tenantId: TENANT_ID, accountId: acctId(10), competitorName: "Local Competitor (Carolina Supply)", mentionType: "switch_threat", productCategory: "HVAC Equipment", details: "William Hayes stopped returning calls after we lost the heat pump bid. Carolina Supply offering same-day delivery from local warehouse. They're cherry-picking our best categories. Account has gone silent for 60 days.", threatLevel: "critical", responseNeeded: true, notes: "Account showing classic defection pattern: declining orders → competitor mentions → silence. Need win-back strategy." },
+
+    // High threats
+    { tenantId: TENANT_ID, accountId: acctId(11), projectId: projectRows[5].id, competitorName: "HD Supply", mentionType: "pricing", productCategory: "Controls & Thermostats", competitorPrice: "$2,850 per BAS controller", ourPrice: "$3,100 per BAS controller", details: "David Kowalczyk received HD Supply quote for Lakeview Plaza controls package. Their per-unit pricing is 8% lower. However, they can't match our delivery timeline. Need to emphasize total cost of ownership and installation support.", threatLevel: "high", responseNeeded: true },
+    { tenantId: TENANT_ID, accountId: acctId(12), competitorName: "HD Supply", mentionType: "quote", productCategory: "PVF (Pipe, Valves, Fittings)", competitorPrice: "Bulk lot: $38,000", ourPrice: "Bulk lot: $42,500", details: "Greg Hoffmann shared HD Supply's PVF package pricing. They're 10% lower on the bulk lot. Greg values our lead times (2 weeks vs their 4-6 weeks) but price gap is significant. Consider volume discount or payment terms to close the gap.", threatLevel: "high", responseNeeded: true },
+    { tenantId: TENANT_ID, accountId: acctId(3), competitorName: "Ferguson", mentionType: "pricing", productCategory: "Water Heaters", competitorPrice: "$1,850/unit (A.O. Smith)", ourPrice: "$1,920/unit (A.O. Smith)", details: "Mike DeSantis got competitive pricing from Ferguson on commercial water heaters. 3.6% price gap. Ferguson also offering 90-day payment terms vs our 30-day. Need to either match price or offer extended terms.", threatLevel: "high", responseNeeded: true, notes: "Price-sensitive account. Small margin for negotiation." },
+
+    // Medium threats
+    { tenantId: TENANT_ID, accountId: acctId(5), projectId: projectRows[3].id, competitorName: "Winsupply", mentionType: "product_comparison", productCategory: "Refrigerant & Supplies", competitorPrice: "$385/cylinder R-410A", ourPrice: "$410/cylinder R-410A", details: "Diane Torres comparing refrigerant pricing for Bayshore project. Winsupply is 6% cheaper per cylinder. However, they had a recent delivery failure that cost Sunshine HVAC a day of lost labor. Our reliability record is key selling point.", threatLevel: "medium", responseNeeded: false, respondedAt: daysAgo(5), notes: "Addressed in last call. Diane agreed reliability matters more but asked us to 'sharpen our pencils' on next quote." },
+    { tenantId: TENANT_ID, accountId: acctId(5), projectId: projectRows[4].id, competitorName: "Baker Distributing", mentionType: "quote", productCategory: "HVAC Equipment", competitorPrice: "$11,200/unit (competing brand)", ourPrice: "$12,800/unit (Carrier Puron)", details: "Baker Distributing quoting Daikin units as Carrier alternative for medical office. Daikin units are 12% cheaper but don't have medical-grade HEPA option. Our spec advantage should hold.", threatLevel: "medium", responseNeeded: false, respondedAt: daysAgo(2), notes: "Spec review shows Carrier is the only option meeting medical-grade requirements. Baker's quote likely won't pass plan review." },
+    { tenantId: TENANT_ID, accountId: acctId(18), projectId: projectRows[10].id, competitorName: "HD Supply", mentionType: "pricing", productCategory: "Electrical Components", competitorPrice: "Package: $28,000", ourPrice: "Package: $31,500", details: "Jennifer Adams received electrical components quote from HD Supply for data center project. Their pricing is competitive but they can't bundle with HVAC + controls. Our single-source advantage is key.", threatLevel: "medium", responseNeeded: true },
+    { tenantId: TENANT_ID, accountId: acctId(4), competitorName: "Ferguson", mentionType: "quote", productCategory: "Drainage Systems", competitorPrice: "$8,500 for drainage package", ourPrice: "$9,200 for drainage package", details: "Tony Mancini mentioned Ferguson quoted drainage systems package 8% lower. Longtime customer but price pressure increasing. Consider loyalty discount.", threatLevel: "medium", responseNeeded: true },
+
+    // Low threats — informational
+    { tenantId: TENANT_ID, accountId: acctId(0), competitorName: "Johnstone Supply", mentionType: "positive_mention", productCategory: "Tools & Safety", details: "Frank Moretti mentioned Johnstone Supply has a good selection of specialty HVAC tools. Not a threat to our core categories but worth monitoring if they expand into equipment.", threatLevel: "low", responseNeeded: false, notes: "Johnstone is a regional player. Unlikely to compete on our core lines." },
+    { tenantId: TENANT_ID, accountId: acctId(7), competitorName: "Winsupply", mentionType: "negative_mention", productCategory: "Ductwork & Fittings", details: "Kevin O'Brien (field supervisor) complained about Winsupply's ductwork quality on a recent job. Said he prefers our product. Good competitive intel — Winsupply having quality issues.", threatLevel: "low", responseNeeded: false, respondedAt: daysAgo(1), notes: "Positive competitive intel. Our ductwork quality is a differentiator. Worth mentioning in next account review." },
+    { tenantId: TENANT_ID, accountId: acctId(14), competitorName: "Johnstone Supply", mentionType: "pricing", productCategory: "Refrigerant & Supplies", competitorPrice: "$375/cylinder R-410A", ourPrice: "$410/cylinder R-410A", details: "Sandra Chen saw Johnstone pricing in a trade publication. Hasn't actively shopped around but asked if we can be more competitive. Informational inquiry, not an active threat.", threatLevel: "low", responseNeeded: false },
+
+    // Competitor with pricing advantage we've already addressed
+    { tenantId: TENANT_ID, accountId: acctId(11), competitorName: "Johnstone Supply", mentionType: "quote", productCategory: "Refrigerant & Supplies", competitorPrice: "$365/cylinder R-410A", ourPrice: "$395/cylinder R-410A", details: "Amy Richardson mentioned Johnstone offered lower refrigerant pricing. We countered with a volume commitment discount bringing our price to $380. Customer accepted.", threatLevel: "low", responseNeeded: false, respondedAt: daysAgo(8), notes: "Successfully defended with volume discount. Customer stayed." },
+
+    // Competitive win
+    { tenantId: TENANT_ID, accountId: acctId(15), projectId: projectRows[14].id, competitorName: "Ferguson", mentionType: "quote", productCategory: "Plumbing Fixtures", competitorPrice: "$7,800/restaurant package", ourPrice: "$7,200/restaurant package", details: "Won against Ferguson on Navy Pier restaurant buildout. Our commercial kitchen plumbing packages were 8% cheaper with faster delivery. Ferguson couldn't match our bundled pricing.", threatLevel: "low", responseNeeded: false, respondedAt: daysAgo(4), notes: "Competitive win! Our bundled approach beats Ferguson's à la carte pricing." },
+  ]).returning();
+  console.log(`✓ ${threatRows.length} CRM competitor mentions`);
+
   console.log("\n✅ ABC Supply Co. demo data seeded successfully.");
   console.log("   3 TMs · 20 accounts · 3 graduated · 6 enrolled · 2 at-risk");
+  console.log(`   ${contactRows.length} contacts · ${projectRows.length} projects · ${signalRows.length} order signals · ${threatRows.length} competitor mentions`);
   console.log("   Agent state seeded for daily briefing demo.");
   console.log("   Run on Replit: npx tsx server/seed.ts");
 }
