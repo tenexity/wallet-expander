@@ -1775,20 +1775,44 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <CardTitle className="text-lg">Graduation Success</CardTitle>
-                  <p className="text-xs text-muted-foreground">
-                    Wallet share captured from graduated accounts
-                  </p>
+                  {collapsedBlocks.has("graduation-success") && (
+                    <p className="text-xs text-muted-foreground">
+                      {graduationAnalytics.totalGraduated} graduated · {formatCurrency(graduationAnalytics.cumulativeRevenueGrowth)} captured
+                    </p>
+                  )}
+                  {!collapsedBlocks.has("graduation-success") && (
+                    <p className="text-xs text-muted-foreground">
+                      Wallet share captured from graduated accounts
+                    </p>
+                  )}
                 </div>
               </div>
-              <Link href="/revenue">
-                <Button variant="outline" size="sm" data-testid="button-view-graduates">
-                  View All Graduates
-                  <ChevronRight className="h-4 w-4 ml-1" />
+              <div className="flex items-center gap-2">
+                {!collapsedBlocks.has("graduation-success") && (
+                  <Link href="/revenue">
+                    <Button variant="outline" size="sm" data-testid="button-view-graduates">
+                      View All Graduates
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </Link>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => toggleCollapsed("graduation-success")}
+                  data-testid="button-toggle-graduation-success"
+                >
+                  {collapsedBlocks.has("graduation-success") ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronUp className="h-4 w-4" />
+                  )}
                 </Button>
-              </Link>
+              </div>
             </div>
           </CardHeader>
-          <CardContent>
+          {!collapsedBlocks.has("graduation-success") && <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
               <div className="text-center p-3 rounded-lg bg-background/50">
                 <p className="text-2xl font-bold text-chart-3" data-testid="stat-graduated-count">
@@ -1894,7 +1918,7 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
-          </CardContent>
+          </CardContent>}
         </Card>
       )}
 
