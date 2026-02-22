@@ -3,13 +3,12 @@ import { storage } from './storage';
 import type { Task, TerritoryManager, Account } from '@shared/schema';
 import { withRetry } from './utils/retry';
 
-let resendClient: Resend | null = null;
-
 function getResendClient(): Resend | null {
-  if (!resendClient && process.env.RESEND_API_KEY) {
-    resendClient = new Resend(process.env.RESEND_API_KEY);
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    return null;
   }
-  return resendClient;
+  return new Resend(apiKey);
 }
 
 export interface EmailSettings {
