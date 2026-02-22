@@ -269,7 +269,7 @@ export default function Landing() {
               alt="Wallet Share Expander"
               className="h-10 w-auto"
             />
-            <span className="text-xl font-bold">Wallet Share Expander</span>
+            <span className="text-xl font-bold">Wallet Share</span>
           </div>
 
           <nav className="hidden md:flex items-center gap-6">
