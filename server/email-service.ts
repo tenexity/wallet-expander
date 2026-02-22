@@ -2,6 +2,7 @@ import { Resend } from 'resend';
 import { storage } from './storage';
 import type { Task, TerritoryManager, Account } from '@shared/schema';
 import { withRetry } from './utils/retry';
+import { getTenantStorage } from './storage/tenantStorage';
 
 function getResendClient(): Resend | null {
   const apiKey = process.env.RESEND_API_KEY;
@@ -216,4 +217,138 @@ export async function sendHighPriorityNotification(
     `[URGENT] ${task.title} - ${account.name}`, 
     htmlContent
   );
+}
+
+export async function sendDailyDigest(tenantId: number): Promise<{ sent: number; errors: number }> {
+  const settings = await getEmailSettings();
+
+  if (!settings.enabled || !settings.dailyDigest) {
+    return { sent: 0, errors: 0 };
+  }
+
+  const tenantStorage = getTenantStorage(tenantId);
+  const allTasks = await tenantStorage.getAllTasks();
+  const pendingTasks = allTasks.filter(t => t.status === 'pending' || t.status === 'in_progress');
+
+  if (pendingTasks.length === 0) {
+    return { sent: 0, errors: 0 };
+  }
+
+  const territoryManagers = await tenantStorage.getTerritoryManagers();
+  if (territoryManagers.length === 0) {
+    return { sent: 0, errors: 0 };
+  }
+
+  const tasksByTm = new Map<number, Task[]>();
+  for (const task of pendingTasks) {
+    if (task.assignedTmId) {
+      const existing = tasksByTm.get(task.assignedTmId) || [];
+      existing.push(task);
+      tasksByTm.set(task.assignedTmId, existing);
+    }
+  }
+
+  const accounts = await tenantStorage.getAccounts();
+  const accountMap = new Map(accounts.map(a => [a.id, a]));
+
+  const taskTypeLabels: Record<string, string> = {
+    call: 'Phone Call',
+    email: 'Email Outreach',
+    visit: 'Site Visit',
+  };
+
+  const today = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  let sent = 0;
+  let errors = 0;
+
+  for (const tm of territoryManagers) {
+    const tmTasks = tasksByTm.get(tm.id) || [];
+    if (tmTasks.length === 0) continue;
+
+    const overdueTasks = tmTasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date());
+    const urgentTasks = tmTasks.filter(t => /urgent/i.test(t.title));
+
+    const taskRows = tmTasks
+      .sort((a, b) => {
+        const aOverdue = a.dueDate && new Date(a.dueDate) < new Date() ? 0 : 1;
+        const bOverdue = b.dueDate && new Date(b.dueDate) < new Date() ? 0 : 1;
+        return aOverdue - bOverdue;
+      })
+      .slice(0, 20)
+      .map(t => {
+        const account = accountMap.get(t.accountId);
+        const isOverdue = t.dueDate && new Date(t.dueDate) < new Date();
+        return `
+          <tr style="${isOverdue ? 'background: #fff5f5;' : ''}">
+            <td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">${t.title}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">${account?.name || 'Unknown'}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">${taskTypeLabels[t.taskType] || t.taskType}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #e2e8f0;">
+              ${t.dueDate
+                ? `<span style="${isOverdue ? 'color: #c53030; font-weight: bold;' : ''}">${new Date(t.dueDate).toLocaleDateString()}</span>`
+                : '—'}
+            </td>
+          </tr>`;
+      })
+      .join('');
+
+    const htmlContent = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 700px; margin: 0 auto;">
+        <h2 style="color: #1a365d;">Daily Task Digest</h2>
+        <p style="color: #718096;">${today}</p>
+        <p>Hi ${tm.name},</p>
+        <p>Here's your daily summary of pending tasks:</p>
+
+        <div style="display: flex; gap: 16px; margin: 16px 0;">
+          <div style="background: #ebf8ff; padding: 12px 16px; border-radius: 8px; flex: 1; text-align: center;">
+            <div style="font-size: 24px; font-weight: bold; color: #2b6cb0;">${tmTasks.length}</div>
+            <div style="color: #4a5568; font-size: 13px;">Pending Tasks</div>
+          </div>
+          ${overdueTasks.length > 0 ? `
+          <div style="background: #fff5f5; padding: 12px 16px; border-radius: 8px; flex: 1; text-align: center;">
+            <div style="font-size: 24px; font-weight: bold; color: #c53030;">${overdueTasks.length}</div>
+            <div style="color: #4a5568; font-size: 13px;">Overdue</div>
+          </div>` : ''}
+          ${urgentTasks.length > 0 ? `
+          <div style="background: #fffbeb; padding: 12px 16px; border-radius: 8px; flex: 1; text-align: center;">
+            <div style="font-size: 24px; font-weight: bold; color: #d69e2e;">${urgentTasks.length}</div>
+            <div style="color: #4a5568; font-size: 13px;">Urgent</div>
+          </div>` : ''}
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+          <thead>
+            <tr style="background: #f7fafc;">
+              <th style="padding: 8px; text-align: left; border-bottom: 2px solid #e2e8f0; color: #4a5568;">Task</th>
+              <th style="padding: 8px; text-align: left; border-bottom: 2px solid #e2e8f0; color: #4a5568;">Account</th>
+              <th style="padding: 8px; text-align: left; border-bottom: 2px solid #e2e8f0; color: #4a5568;">Type</th>
+              <th style="padding: 8px; text-align: left; border-bottom: 2px solid #e2e8f0; color: #4a5568;">Due Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${taskRows}
+          </tbody>
+        </table>
+        ${tmTasks.length > 20 ? `<p style="color: #718096; font-style: italic;">...and ${tmTasks.length - 20} more tasks</p>` : ''}
+
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
+        <p style="color: #718096; font-size: 12px;">This is an automated daily digest from the AI VP Dashboard.</p>
+      </div>
+    `;
+
+    const result = await sendEmail(tm.email, `Daily Task Digest — ${tmTasks.length} pending tasks`, htmlContent);
+    if (result.success) {
+      sent++;
+    } else {
+      errors++;
+    }
+  }
+
+  return { sent, errors };
 }

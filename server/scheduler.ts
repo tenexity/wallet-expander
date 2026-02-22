@@ -39,6 +39,11 @@ async function getCrmSyncService() {
     return processCrmSyncQueue;
 }
 
+async function getDailyDigestService() {
+    const { sendDailyDigest } = await import("./email-service.js");
+    return sendDailyDigest;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function safeRun(label: string, fn: () => Promise<unknown>): void {
@@ -208,7 +213,17 @@ export function startScheduler(tenantId: number): void {
         { timezone: "America/New_York", name: "refresh-similar-pairs" },
     );
 
-    // ── 6. CRM Sync Retry — every 4 hours ──────────────────────────────────────
+    // ── 6. Daily Digest — weekdays at 7:30am EST ──────────────────────────────
+    cron.schedule(
+        "30 7 * * 1-5",
+        async () => {
+            const sendDailyDigest = await getDailyDigestService();
+            safeRun("daily-digest", () => sendDailyDigest(tenantId));
+        },
+        { timezone: "America/New_York", name: "daily-digest" },
+    );
+
+    // ── 7. CRM Sync Retry — every 4 hours ──────────────────────────────────────
     cron.schedule(
         "0 */4 * * *",
         async () => {

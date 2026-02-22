@@ -72,7 +72,7 @@ export function EmailComposerModal({
     });
 
     function handleCopy() {
-        navigator.clipboard.writeText(`Subject: ${subject}\n\n${body}`);
+        navigator.clipboard.writeText(body);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
         toast({ title: "Copied to clipboard!" });
@@ -167,7 +167,7 @@ export function EmailComposerModal({
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                            navigator.clipboard.writeText(`Subject: ${subject}\n\n${body}`).catch(() => {});
+                            navigator.clipboard.writeText(body).catch(() => {});
                             const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
                             window.open(mailto, "_blank");
                             toast({ title: "Email content copied", description: "Your email client is opening with the draft pre-filled." });

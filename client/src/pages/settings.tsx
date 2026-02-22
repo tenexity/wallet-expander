@@ -1128,11 +1128,10 @@ function EmailSettingsManager() {
                 />
               </div>
 
-              <div className="flex items-center justify-between opacity-60">
+              <div className="flex items-center justify-between">
                 <div>
-                  <Label htmlFor="notify-high-priority" className="flex items-center gap-2">
+                  <Label htmlFor="notify-high-priority">
                     High Priority Alerts
-                    <Badge variant="outline" className="text-xs">Coming Soon</Badge>
                   </Label>
                   <p className="text-sm text-muted-foreground">Send urgent notifications for high-priority tasks</p>
                 </div>
@@ -1140,16 +1139,15 @@ function EmailSettingsManager() {
                   id="notify-high-priority"
                   checked={emailSettings?.notifyOnHighPriority || false}
                   onCheckedChange={(checked) => handleToggle("notifyOnHighPriority", checked)}
-                  disabled={true}
+                  disabled={!emailSettings?.enabled}
                   data-testid="switch-notify-high-priority"
                 />
               </div>
 
-              <div className="flex items-center justify-between opacity-60">
+              <div className="flex items-center justify-between">
                 <div>
-                  <Label htmlFor="daily-digest" className="flex items-center gap-2">
+                  <Label htmlFor="daily-digest">
                     Daily Digest
-                    <Badge variant="outline" className="text-xs">Coming Soon</Badge>
                   </Label>
                   <p className="text-sm text-muted-foreground">Send a daily summary of pending tasks</p>
                 </div>
@@ -1157,7 +1155,7 @@ function EmailSettingsManager() {
                   id="daily-digest"
                   checked={emailSettings?.dailyDigest || false}
                   onCheckedChange={(checked) => handleToggle("dailyDigest", checked)}
-                  disabled={true}
+                  disabled={!emailSettings?.enabled}
                   data-testid="switch-daily-digest"
                 />
               </div>

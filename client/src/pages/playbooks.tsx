@@ -784,7 +784,7 @@ export default function Playbooks() {
                                       e.stopPropagation();
                                       const emailBody = task.script || task.description || "";
                                       const subject = task.title || "";
-                                      navigator.clipboard.writeText(`Subject: ${subject}\n\n${emailBody}`).catch(() => {});
+                                      navigator.clipboard.writeText(emailBody).catch(() => {});
                                       const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
                                       window.open(mailto, "_blank");
                                       toast({

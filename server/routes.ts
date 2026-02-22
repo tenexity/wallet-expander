@@ -53,6 +53,7 @@ import {
   saveEmailSettings,
   sendTestEmail,
   sendTaskNotification,
+  sendHighPriorityNotification,
   isEmailConfigured,
   DEFAULT_EMAIL_SETTINGS,
 } from "./email-service";
@@ -1166,10 +1167,16 @@ KEY TALKING POINTS:
         const territoryManager = await tenantStorage.getTerritoryManager(task.assignedTmId);
         const account = await tenantStorage.getAccount(task.accountId);
         if (territoryManager && account) {
-          // Fire and forget - don't block the response
-          sendTaskNotification(task, account, territoryManager).catch(err => {
-            console.error("Failed to send task notification:", err);
-          });
+          const isHighPriority = /urgent/i.test(task.title);
+          if (isHighPriority) {
+            sendHighPriorityNotification(task, account, territoryManager).catch(err => {
+              console.error("Failed to send high-priority notification:", err);
+            });
+          } else {
+            sendTaskNotification(task, account, territoryManager).catch(err => {
+              console.error("Failed to send task notification:", err);
+            });
+          }
         }
       }
 
