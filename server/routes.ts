@@ -2148,6 +2148,17 @@ KEY TALKING POINTS:
     }
   });
 
+  // ============ Reset Demo Data ============
+  app.post("/api/admin/reset-seed", requireAdmin, async (req, res) => {
+    try {
+      const { seed } = await import("./seed");
+      await seed();
+      res.json({ success: true, message: "Demo data has been reset successfully." });
+    } catch (error) {
+      handleRouteError(error, res, "Reset seed data");
+    }
+  });
+
   // ============ Categories ============
   app.get("/api/categories", requireAuth, async (req, res) => {
     try {

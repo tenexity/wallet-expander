@@ -1472,6 +1472,108 @@ function CategoriesManager() {
   );
 }
 
+function ResetDemoDataCard() {
+  const { toast } = useToast();
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+
+  const resetMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/admin/reset-seed", {}),
+    onSuccess: () => {
+      toast({
+        title: "Demo data reset",
+        description: "All data has been restored to the original demo state. Refreshing...",
+      });
+      setIsResetDialogOpen(false);
+      setConfirmText("");
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Reset failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  return (
+    <Card className="border-red-200 dark:border-red-900/50">
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <RotateCcw className="h-4 w-4 text-red-500" />
+          Reset Demo Data
+        </CardTitle>
+        <CardDescription>
+          Restore all accounts, orders, tasks, enrollments, and AI briefings back to the original demo state. Useful after running a demo or presentation.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Button
+          variant="outline"
+          className="border-red-200 text-red-600 dark:border-red-900 dark:text-red-400"
+          onClick={() => setIsResetDialogOpen(true)}
+          data-testid="button-open-reset-dialog"
+        >
+          <RotateCcw className="h-4 w-4 mr-2" />
+          Reset to Demo Defaults
+        </Button>
+
+        <Dialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-red-500" />
+                Reset All Demo Data?
+              </DialogTitle>
+              <DialogDescription>
+                This will delete all current data and restore it to the original demo state. This includes accounts, orders, tasks, playbooks, enrollments, territory managers, and AI briefings. This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-2">
+              <Label>Type <span className="font-mono font-bold">RESET</span> to confirm</Label>
+              <Input
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder="Type RESET"
+                data-testid="input-reset-confirm"
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => { setIsResetDialogOpen(false); setConfirmText(""); }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={confirmText !== "RESET" || resetMutation.isPending}
+                onClick={() => resetMutation.mutate()}
+                data-testid="button-confirm-reset"
+              >
+                {resetMutation.isPending ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Resetting...
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Reset Everything
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
@@ -1957,6 +2059,8 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+
+          <ResetDemoDataCard />
         </TabsContent>
 
         <TabsContent value="territory-managers" className="space-y-6">

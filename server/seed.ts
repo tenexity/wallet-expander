@@ -34,7 +34,7 @@ import { sql } from "drizzle-orm";
 // ─── TENANT ────────────────────────────────────────────────────────────────────
 const TENANT_ID = 8; // Graham's demo tenant
 
-async function seed() {
+export async function seed() {
   console.log("🌱 Seeding ABC Supply Co. demo data...");
 
   // ── Clear in FK-safe order ────────────────────────────────────────────────
@@ -965,9 +965,12 @@ Is there 10 minutes this week to reconnect?`;
   console.log("   Run on Replit: npx tsx server/seed.ts");
 }
 
-seed()
-  .then(() => process.exit(0))
-  .catch((err) => {
-    console.error("Seed error:", err);
-    process.exit(1);
-  });
+const isDirectRun = process.argv[1]?.endsWith("seed.ts") || process.argv[1]?.endsWith("seed.js");
+if (isDirectRun) {
+  seed()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error("Seed error:", err);
+      process.exit(1);
+    });
+}
