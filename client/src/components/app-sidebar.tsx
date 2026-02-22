@@ -187,11 +187,11 @@ export function AppSidebar() {
       <SidebarHeader className="p-4 group-data-[collapsible=icon]:p-2">
         <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
           {companyLogo ? (
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md overflow-hidden bg-sidebar-primary group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md overflow-hidden bg-white group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8">
               <img
                 src={companyLogo}
                 alt="Company logo"
-                className="h-full w-full object-cover"
+                className="h-full w-full object-contain p-1"
               />
             </div>
           ) : (
