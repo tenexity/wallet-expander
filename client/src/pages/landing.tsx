@@ -48,6 +48,8 @@ import {
   MockupEmailIntelligence,
 } from "@/components/feature-mockups";
 
+import Tenexity_Official_Logo_BW_Cirlce from "@assets/Tenexity Official Logo BW Cirlce.png";
+
 const showcaseFeatures = [
   {
     id: "enrollment",
@@ -265,7 +267,7 @@ export default function Landing() {
         <div className="container mx-auto flex h-16 items-center justify-between gap-4 px-4">
           <div className="flex items-center gap-2" data-testid="logo-brand">
             <img
-              src={walletExpanderLogo}
+              src={Tenexity_Official_Logo_BW_Cirlce}
               alt="Wallet Share Expander"
               className="h-10 w-auto"
             />
