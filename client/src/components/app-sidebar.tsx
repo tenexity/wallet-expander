@@ -18,6 +18,9 @@ import {
   HelpCircle,
   Database,
   BarChart4,
+  Contact,
+  FolderKanban,
+  Zap,
 } from "lucide-react";
 import {
   Sidebar,
@@ -77,6 +80,27 @@ const mainNavItems = [
     url: "/playbooks",
     icon: ClipboardList,
     tooltip: "Generate and manage AI-powered sales tasks with call scripts and emails",
+  },
+];
+
+const intelligenceNavItems = [
+  {
+    title: "Contacts",
+    url: "/crm/contacts",
+    icon: Contact,
+    tooltip: "Contact directory with roles, influence levels, and outreach tracking",
+  },
+  {
+    title: "Projects",
+    url: "/crm/projects",
+    icon: FolderKanban,
+    tooltip: "Construction project pipeline detected from email intelligence",
+  },
+  {
+    title: "Signals & Threats",
+    url: "/crm/signals",
+    icon: Zap,
+    tooltip: "Order signals and competitor intelligence from customer emails",
   },
 ];
 
@@ -215,6 +239,26 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {mainNavItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    isActive={location === item.url}
+                    onClick={() => navigate(item.url)}
+                    tooltip={{ children: item.tooltip, side: "right" }}
+                    data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    <span>{item.title}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Intelligence</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {intelligenceNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     isActive={location === item.url}

@@ -28,6 +28,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Search,
   Filter,
@@ -47,7 +48,19 @@ import {
   Mail,
   MapPin,
   Loader2,
+  Crown,
+  Building2,
+  Shield,
+  Briefcase,
+  Eye,
+  Clock,
+  Swords,
+  Zap,
+  Package,
+  FolderKanban,
+  Contact,
 } from "lucide-react";
+import type { Contact as ContactType, Project, OrderSignal, CompetitorMention } from "@shared/schema";
 import { Link, useLocation, useSearch } from "wouter";
 import {
   Tooltip,
@@ -76,6 +89,260 @@ interface AccountWithMetrics {
     estimatedValue: number;
   }>;
   enrolled: boolean;
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  decision_maker: "Decision Maker",
+  owner: "Owner",
+  purchaser: "Purchaser",
+  project_manager: "Project Mgr",
+  estimator: "Estimator",
+  influencer: "Influencer",
+  gatekeeper: "Gatekeeper",
+  unknown: "Unknown",
+};
+
+function AccountContactsTab({ accountId }: { accountId: number }) {
+  const { data: contacts, isLoading } = useQuery<ContactType[]>({
+    queryKey: [`/api/crm/contacts?accountId=${accountId}`],
+  });
+
+  if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+
+  if (!contacts?.length) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        <Contact className="h-8 w-8 mx-auto mb-2 opacity-50" />
+        <p className="text-sm">No contacts found for this account</p>
+        <p className="text-xs mt-1">Connect your email inbox in Settings to auto-detect contacts</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 pt-2" data-testid="section-account-contacts">
+      {contacts.map((c) => {
+        const isKeyPerson = c.role === "decision_maker" || c.role === "owner";
+        return (
+          <div key={c.id} className="flex items-center justify-between p-3 rounded-md border" data-testid={`account-contact-${c.id}`}>
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary shrink-0">
+                <span className="text-xs font-semibold" data-testid={`text-contact-initials-${c.id}`}>{c.firstName?.[0]}{(c.lastName || "")[0]}</span>
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-sm truncate" data-testid={`text-contact-name-${c.id}`}>{c.firstName} {c.lastName || ""}</span>
+                  {isKeyPerson && <Crown className="h-3 w-3 text-amber-500 shrink-0" data-testid={`badge-key-person-${c.id}`} />}
+                </div>
+                <p className="text-xs text-muted-foreground truncate">
+                  {c.title && <span data-testid={`text-contact-title-${c.id}`}>{c.title}</span>}
+                  {c.title && c.role && <span> · </span>}
+                  {c.role && <span data-testid={`text-contact-role-${c.id}`}>{ROLE_LABELS[c.role] || c.role}</span>}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {c.email && (
+                <Button variant="ghost" size="icon" onClick={() => window.open(`mailto:${c.email}`)} data-testid={`button-email-contact-${c.id}`}>
+                  <Mail className="h-4 w-4" />
+                </Button>
+              )}
+              {c.phone && (
+                <Button variant="ghost" size="icon" onClick={() => window.open(`tel:${c.phone}`)} data-testid={`button-phone-contact-${c.id}`}>
+                  <Phone className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+        );
+      })}
+      <Link href="/crm/contacts">
+        <Button variant="link" size="sm" className="w-full mt-2" data-testid="link-view-all-contacts">
+          View all contacts <ChevronRight className="h-3 w-3 ml-1" />
+        </Button>
+      </Link>
+    </div>
+  );
+}
+
+function AccountProjectsTab({ accountId }: { accountId: number }) {
+  const { data: projects, isLoading } = useQuery<Project[]>({
+    queryKey: [`/api/crm/projects?accountId=${accountId}`],
+  });
+
+  if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+
+  if (!projects?.length) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        <FolderKanban className="h-8 w-8 mx-auto mb-2 opacity-50" />
+        <p className="text-sm">No projects found for this account</p>
+        <p className="text-xs mt-1">Projects are detected automatically from email conversations</p>
+      </div>
+    );
+  }
+
+  const STAGE_COLORS: Record<string, string> = {
+    identified: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+    bidding: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+    awarded: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+    in_progress: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
+    completed: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300",
+    lost: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
+  };
+
+  const STAGE_LABELS: Record<string, string> = {
+    identified: "Identified", bidding: "Bidding", awarded: "Awarded",
+    in_progress: "In Progress", completed: "Completed", lost: "Lost",
+  };
+
+  return (
+    <div className="space-y-2 pt-2" data-testid="section-account-projects">
+      {projects.map((p) => {
+        const categories = (p.productCategories as string[] | null) || [];
+        return (
+          <div key={p.id} className="p-3 rounded-md border" data-testid={`account-project-${p.id}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="font-medium text-sm truncate" data-testid={`text-project-name-${p.id}`}>{p.name}</span>
+                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${STAGE_COLORS[p.stage || "identified"] || STAGE_COLORS.identified}`} data-testid={`badge-project-stage-${p.id}`}>
+                  {STAGE_LABELS[p.stage || "identified"] || p.stage}
+                </span>
+              </div>
+              {p.estimatedValue && (
+                <span className="font-semibold text-sm shrink-0" data-testid={`text-project-value-${p.id}`}>
+                  ${parseFloat(p.estimatedValue as string).toLocaleString()}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+              {p.location && <span className="inline-flex items-center gap-1" data-testid={`text-project-location-${p.id}`}><MapPin className="h-3 w-3" />{p.location}</span>}
+              {p.generalContractor && <span data-testid={`text-project-gc-${p.id}`}>{p.generalContractor}</span>}
+            </div>
+            {categories.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2" data-testid={`section-project-categories-${p.id}`}>
+                {categories.slice(0, 3).map((cat, i) => (
+                  <Badge key={i} variant="secondary" className="text-[10px] px-1.5 py-0" data-testid={`badge-category-${cat}-${p.id}`}>{cat}</Badge>
+                ))}
+                {categories.length > 3 && <span className="text-[10px] text-muted-foreground">+{categories.length - 3}</span>}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      <Link href="/crm/projects">
+        <Button variant="link" size="sm" className="w-full mt-2" data-testid="link-view-all-projects">
+          View all projects <ChevronRight className="h-3 w-3 ml-1" />
+        </Button>
+      </Link>
+    </div>
+  );
+}
+
+function AccountActivityTab({ accountId }: { accountId: number }) {
+  const { data: signals, isLoading: loadingSignals } = useQuery<OrderSignal[]>({
+    queryKey: [`/api/crm/order-signals?accountId=${accountId}`],
+  });
+
+  const { data: threats, isLoading: loadingThreats } = useQuery<CompetitorMention[]>({
+    queryKey: [`/api/crm/competitor-mentions?accountId=${accountId}`],
+  });
+
+  const isLoading = loadingSignals || loadingThreats;
+  if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+
+  const hasData = (signals?.length || 0) > 0 || (threats?.length || 0) > 0;
+
+  if (!hasData) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        <Zap className="h-8 w-8 mx-auto mb-2 opacity-50" />
+        <p className="text-sm">No activity signals for this account</p>
+        <p className="text-xs mt-1">Order signals and competitor mentions appear here when detected from emails</p>
+      </div>
+    );
+  }
+
+  const URGENCY_COLORS: Record<string, string> = {
+    immediate: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
+    this_week: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
+    this_month: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
+    next_quarter: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+    exploring: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+    normal: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+  };
+
+  const THREAT_COLORS: Record<string, string> = {
+    critical: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
+    high: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
+    medium: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
+    low: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+  };
+
+  return (
+    <div className="space-y-4 pt-2" data-testid="section-account-activity">
+      {(signals?.length || 0) > 0 && (
+        <div data-testid="section-order-signals">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5" data-testid="heading-order-signals">
+            <Zap className="h-3 w-3" /> Order Signals ({signals!.length})
+          </h4>
+          <div className="space-y-2">
+            {signals!.slice(0, 5).map((s) => (
+              <div key={s.id} className="flex items-center justify-between p-2.5 rounded-md border text-sm" data-testid={`account-signal-${s.id}`}>
+                <div className="flex items-center gap-2 min-w-0">
+                  <Package className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="truncate" data-testid={`text-signal-category-${s.id}`}>{s.productCategory || s.signalType}</span>
+                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${URGENCY_COLORS[s.urgency || "normal"]}`} data-testid={`badge-signal-urgency-${s.id}`}>
+                    {s.urgency || "normal"}
+                  </span>
+                  {s.competitorPriceMentioned && (
+                    <Badge variant="destructive" className="text-[10px] px-1 py-0" data-testid={`badge-competitor-pricing-${s.id}`}>Competitor $</Badge>
+                  )}
+                </div>
+                {s.estimatedValue && (
+                  <span className="font-medium shrink-0 ml-2" data-testid={`text-signal-value-${s.id}`}>${parseFloat(s.estimatedValue as string).toLocaleString()}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(threats?.length || 0) > 0 && (
+        <div data-testid="section-competitor-threats">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5" data-testid="heading-competitor-threats">
+            <Swords className="h-3 w-3" /> Competitor Threats ({threats!.length})
+          </h4>
+          <div className="space-y-2">
+            {threats!.slice(0, 5).map((t) => (
+              <div key={t.id} className="flex items-center justify-between p-2.5 rounded-md border text-sm" data-testid={`account-threat-${t.id}`}>
+                <div className="flex items-center gap-2 min-w-0">
+                  <Swords className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="font-medium truncate" data-testid={`text-threat-competitor-${t.id}`}>{t.competitorName}</span>
+                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${THREAT_COLORS[t.threatLevel || "medium"]}`} data-testid={`badge-threat-level-${t.id}`}>
+                    {t.threatLevel || "medium"}
+                  </span>
+                  {t.productCategory && <span className="text-xs text-muted-foreground truncate" data-testid={`text-threat-category-${t.id}`}>{t.productCategory}</span>}
+                </div>
+                {(t.competitorPrice || t.ourPrice) && (
+                  <div className="text-right text-xs shrink-0 ml-2">
+                    {t.competitorPrice && <div className="text-red-600" data-testid={`text-competitor-price-${t.id}`}>Them: {t.competitorPrice}</div>}
+                    {t.ourPrice && <div className="text-green-600" data-testid={`text-our-price-${t.id}`}>Us: {t.ourPrice}</div>}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <Link href="/crm/signals">
+        <Button variant="link" size="sm" className="w-full" data-testid="link-view-all-signals">
+          View all signals & threats <ChevronRight className="h-3 w-3 ml-1" />
+        </Button>
+      </Link>
+    </div>
+  );
 }
 
 export default function Accounts() {
@@ -678,7 +945,7 @@ export default function Accounts() {
       </Card>
 
       <Dialog open={!!selectedAccount} onOpenChange={() => setSelectedAccount(null)}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           {selectedAccount && (
             <>
               <DialogHeader>
@@ -689,216 +956,240 @@ export default function Accounts() {
                   </Badge>
                 </DialogTitle>
               </DialogHeader>
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Segment</p>
-                    <p className="font-medium">{selectedAccount.segment}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Region</p>
-                    <p className="font-medium">{selectedAccount.region}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Assigned TM</p>
-                    <p className="font-medium">{selectedAccount.assignedTm}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Revenue (12M)</p>
-                    <p className="font-medium">
-                      {formatCurrency(selectedAccount.last12mRevenue)}
-                    </p>
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <Card>
-                    <CardContent className="pt-4 flex items-center justify-between">
+              <Tabs defaultValue="overview" data-testid="account-detail-tabs">
+                <TabsList className="w-full" data-testid="account-tabs-list">
+                  <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
+                  <TabsTrigger value="contacts" data-testid="tab-contacts">Contacts</TabsTrigger>
+                  <TabsTrigger value="projects" data-testid="tab-projects">Projects</TabsTrigger>
+                  <TabsTrigger value="activity" data-testid="tab-activity">Activity</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="overview">
+                  <div className="space-y-6 pt-2">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div>
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm text-muted-foreground">Category Penetration</p>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button className="text-muted-foreground hover:text-foreground transition-colors" data-testid="tooltip-category-penetration">
-                                <HelpCircle className="h-3 w-3" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-xs" side="top">
-                              <p className="text-sm font-medium mb-2">How Category Penetration is Calculated</p>
-                              <div className="text-xs space-y-2">
-                                <p>Category Penetration measures how many of the ICP (Ideal Customer Profile) categories this account is actively purchasing from.</p>
-                                <div className="bg-muted/50 p-2 rounded">
-                                  <p className="font-medium">Formula:</p>
-                                  <p className="font-mono text-xs">(Categories with purchases / Total ICP categories) x 100</p>
-                                </div>
-                                <p>A higher percentage means the account is buying across more expected categories. A lower percentage indicates opportunities to expand their product mix.</p>
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                        <p className="text-2xl font-bold">
-                          {selectedAccount.categoryPenetration}%
+                        <p className="text-sm text-muted-foreground">Segment</p>
+                        <p className="font-medium">{selectedAccount.segment}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Region</p>
+                        <p className="font-medium">{selectedAccount.region}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Assigned TM</p>
+                        <p className="font-medium">{selectedAccount.assignedTm}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Revenue (12M)</p>
+                        <p className="font-medium">
+                          {formatCurrency(selectedAccount.last12mRevenue)}
                         </p>
                       </div>
-                      <ProgressRing
-                        value={selectedAccount.categoryPenetration}
-                        size={60}
-                        strokeWidth={6}
-                      />
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="pt-4 flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm text-muted-foreground">Opportunity Score</p>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <button className="text-muted-foreground hover:text-foreground transition-colors" data-testid="tooltip-opportunity-score">
-                                <HelpCircle className="h-3 w-3" />
-                              </button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-80" side="top">
-                              <p className="text-sm font-medium mb-2">How Opportunity Score is Calculated</p>
-                              <div className="text-xs space-y-2">
-                                <p>The Opportunity Score is a weighted composite that identifies accounts with the highest potential for wallet share capture.</p>
-                                <div className="bg-muted/50 p-2 rounded space-y-1">
-                                  <p className="font-medium">Current Weighting:</p>
-                                  <div className="grid grid-cols-2 gap-1">
-                                    <span>Gap Size (% below ICP):</span>
-                                    <span className="font-semibold">{weights.gapSizeWeight}%</span>
-                                    <span>Revenue Potential:</span>
-                                    <span className="font-semibold">{weights.revenuePotentialWeight}%</span>
-                                    <span>Category Count:</span>
-                                    <span className="font-semibold">{weights.categoryCountWeight}%</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <Card>
+                        <CardContent className="pt-4 flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm text-muted-foreground">Category Penetration</p>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button className="text-muted-foreground hover:text-foreground transition-colors" data-testid="tooltip-category-penetration">
+                                    <HelpCircle className="h-3 w-3" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs" side="top">
+                                  <p className="text-sm font-medium mb-2">How Category Penetration is Calculated</p>
+                                  <div className="text-xs space-y-2">
+                                    <p>Category Penetration measures how many of the ICP (Ideal Customer Profile) categories this account is actively purchasing from.</p>
+                                    <div className="bg-muted/50 p-2 rounded">
+                                      <p className="font-medium">Formula:</p>
+                                      <p className="font-mono text-xs">(Categories with purchases / Total ICP categories) x 100</p>
+                                    </div>
+                                    <p>A higher percentage means the account is buying across more expected categories. A lower percentage indicates opportunities to expand their product mix.</p>
                                   </div>
-                                </div>
-                                <p>Higher scores indicate greater opportunity for incremental revenue if enrolled.</p>
-                                <Link href="/settings" data-testid="link-settings">
-                                  <Button variant="ghost" size="sm" className="gap-1">
-                                    <Settings className="h-3 w-3" />
-                                    Adjust weights in Settings
-                                    <ExternalLink className="h-3 w-3" />
-                                  </Button>
-                                </Link>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
+                            <p className="text-2xl font-bold">
+                              {selectedAccount.categoryPenetration}%
+                            </p>
+                          </div>
+                          <ProgressRing
+                            value={selectedAccount.categoryPenetration}
+                            size={60}
+                            strokeWidth={6}
+                          />
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-4 flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm text-muted-foreground">Opportunity Score</p>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="text-muted-foreground hover:text-foreground transition-colors" data-testid="tooltip-opportunity-score">
+                                    <HelpCircle className="h-3 w-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-80" side="top">
+                                  <p className="text-sm font-medium mb-2">How Opportunity Score is Calculated</p>
+                                  <div className="text-xs space-y-2">
+                                    <p>The Opportunity Score is a weighted composite that identifies accounts with the highest potential for wallet share capture.</p>
+                                    <div className="bg-muted/50 p-2 rounded space-y-1">
+                                      <p className="font-medium">Current Weighting:</p>
+                                      <div className="grid grid-cols-2 gap-1">
+                                        <span>Gap Size (% below ICP):</span>
+                                        <span className="font-semibold">{weights.gapSizeWeight}%</span>
+                                        <span>Revenue Potential:</span>
+                                        <span className="font-semibold">{weights.revenuePotentialWeight}%</span>
+                                        <span>Category Count:</span>
+                                        <span className="font-semibold">{weights.categoryCountWeight}%</span>
+                                      </div>
+                                    </div>
+                                    <p>Higher scores indicate greater opportunity for incremental revenue if enrolled.</p>
+                                    <Link href="/settings" data-testid="link-settings">
+                                      <Button variant="ghost" size="sm" className="gap-1">
+                                        <Settings className="h-3 w-3" />
+                                        Adjust weights in Settings
+                                        <ExternalLink className="h-3 w-3" />
+                                      </Button>
+                                    </Link>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                            <p className="text-2xl font-bold">
+                              {selectedAccount.opportunityScore}
+                            </p>
+                          </div>
+                          <ScoreBadge
+                            score={selectedAccount.opportunityScore}
+                            size="default"
+                          />
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm font-semibold mb-3">Gap Categories</h3>
+                      <div className="space-y-3">
+                        {selectedAccount.gapCategories.map((gap) => (
+                          <div
+                            key={gap.name}
+                            className="flex items-center justify-between p-3 rounded-md bg-muted/50"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="h-2 w-2 rounded-full bg-chart-5" />
+                              <span className="font-medium">{gap.name}</span>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div className="text-right">
+                                <p className="text-sm font-medium text-chart-5">
+                                  -{gap.gapPct}%
+                                </p>
+                                <p className="text-xs text-muted-foreground">gap</p>
                               </div>
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                        <p className="text-2xl font-bold">
-                          {selectedAccount.opportunityScore}
-                        </p>
-                      </div>
-                      <ScoreBadge
-                        score={selectedAccount.opportunityScore}
-                        size="default"
-                      />
-                    </CardContent>
-                  </Card>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-semibold mb-3">Gap Categories</h3>
-                  <div className="space-y-3">
-                    {selectedAccount.gapCategories.map((gap) => (
-                      <div
-                        key={gap.name}
-                        className="flex items-center justify-between p-3 rounded-md bg-muted/50"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="h-2 w-2 rounded-full bg-chart-5" />
-                          <span className="font-medium">{gap.name}</span>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <p className="text-sm font-medium text-chart-5">
-                              -{gap.gapPct}%
-                            </p>
-                            <p className="text-xs text-muted-foreground">gap</p>
+                              <div className="text-right">
+                                <p className="text-sm font-semibold text-chart-2">
+                                  {formatCurrency(gap.estimatedValue)}
+                                </p>
+                                <p className="text-xs text-muted-foreground">opportunity</p>
+                              </div>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <p className="text-sm font-semibold text-chart-2">
-                              {formatCurrency(gap.estimatedValue)}
-                            </p>
-                            <p className="text-xs text-muted-foreground">opportunity</p>
-                          </div>
-                        </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    </div>
 
-                <div className="flex gap-3 flex-wrap">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button 
-                        className="flex-1" 
-                        onClick={openCreateTaskDialog}
-                        data-testid="button-create-task"
-                      >
-                        <TrendingUp className="mr-2 h-4 w-4" />
-                        Create Task
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs" side="top">
-                      <p className="text-sm font-medium mb-1">Create a Follow-up Task</p>
-                      <p className="text-xs">Schedule a call, email, or visit for this account to track your outreach activities and follow up on sales opportunities.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                  {selectedAccount.opportunityScore >= 70 && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span>
-                          <Button variant="default" asChild data-testid="button-generate-playbook">
-                            <Link href={`/playbooks?segment=${selectedAccount.segment}`}>
-                              <Sparkles className="mr-2 h-4 w-4" />
-                              Generate Playbook
-                            </Link>
+                    <div className="flex gap-3 flex-wrap">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            className="flex-1" 
+                            onClick={openCreateTaskDialog}
+                            data-testid="button-create-task"
+                          >
+                            <TrendingUp className="mr-2 h-4 w-4" />
+                            Create Task
                           </Button>
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs" side="top">
-                        <p className="text-sm font-medium mb-1">High-Value Opportunity</p>
-                        <p className="text-xs">This account has a high opportunity score ({selectedAccount.opportunityScore}). Generate a playbook to create AI-powered call scripts and emails targeting their gap categories.</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  )}
-                  {!selectedAccount.enrolled && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          data-testid="button-enroll-account"
-                          onClick={handleEnrollAccount}
-                          disabled={isEnrolling}
-                        >
-                          {isEnrolling ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Enrolling...
-                            </>
-                          ) : (
-                            <>
-                              <Target className="mr-2 h-4 w-4" />
-                              Enroll in Program
-                            </>
-                          )}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs" side="top">
-                        <p className="text-sm font-medium mb-1">What does enrollment do?</p>
-                        <ul className="text-xs space-y-1 list-disc list-inside">
-                          <li>Adds this account to the revenue growth program</li>
-                          <li>Tracks incremental revenue from targeted categories</li>
-                          <li>Calculates rev-share fees based on captured wallet share</li>
-                          <li>Enables performance monitoring on the Revenue tab</li>
-                          <li>Automatically generates an AI-powered sales playbook</li>
-                        </ul>
-                      </TooltipContent>
-                    </Tooltip>
-                  )}
-                </div>
-              </div>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs" side="top">
+                          <p className="text-sm font-medium mb-1">Create a Follow-up Task</p>
+                          <p className="text-xs">Schedule a call, email, or visit for this account to track your outreach activities and follow up on sales opportunities.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      {selectedAccount.opportunityScore >= 70 && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span>
+                              <Button variant="default" asChild data-testid="button-generate-playbook">
+                                <Link href={`/playbooks?segment=${selectedAccount.segment}`}>
+                                  <Sparkles className="mr-2 h-4 w-4" />
+                                  Generate Playbook
+                                </Link>
+                              </Button>
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs" side="top">
+                            <p className="text-sm font-medium mb-1">High-Value Opportunity</p>
+                            <p className="text-xs">This account has a high opportunity score ({selectedAccount.opportunityScore}). Generate a playbook to create AI-powered call scripts and emails targeting their gap categories.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      {!selectedAccount.enrolled && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              data-testid="button-enroll-account"
+                              onClick={handleEnrollAccount}
+                              disabled={isEnrolling}
+                            >
+                              {isEnrolling ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Enrolling...
+                                </>
+                              ) : (
+                                <>
+                                  <Target className="mr-2 h-4 w-4" />
+                                  Enroll in Program
+                                </>
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs" side="top">
+                            <p className="text-sm font-medium mb-1">What does enrollment do?</p>
+                            <ul className="text-xs space-y-1 list-disc list-inside">
+                              <li>Adds this account to the revenue growth program</li>
+                              <li>Tracks incremental revenue from targeted categories</li>
+                              <li>Calculates rev-share fees based on captured wallet share</li>
+                              <li>Enables performance monitoring on the Revenue tab</li>
+                              <li>Automatically generates an AI-powered sales playbook</li>
+                            </ul>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="contacts">
+                  <AccountContactsTab accountId={selectedAccount.id} />
+                </TabsContent>
+
+                <TabsContent value="projects">
+                  <AccountProjectsTab accountId={selectedAccount.id} />
+                </TabsContent>
+
+                <TabsContent value="activity">
+                  <AccountActivityTab accountId={selectedAccount.id} />
+                </TabsContent>
+              </Tabs>
             </>
           )}
         </DialogContent>

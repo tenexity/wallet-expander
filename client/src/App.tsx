@@ -22,6 +22,9 @@ import Subscription from "@/pages/subscription";
 import AppAdmin from "@/pages/app-admin";
 import Landing from "@/pages/landing";
 import ProgramPerformance from "@/pages/program-performance";
+import CRMContacts from "@/pages/crm-contacts";
+import CRMProjects from "@/pages/crm-projects";
+import CRMSignals from "@/pages/crm-signals";
 import { AskAnythingBar } from "@/components/ask-anything-bar";
 
 function AuthenticatedRouter() {
@@ -39,6 +42,9 @@ function AuthenticatedRouter() {
       <Route path="/subscription" component={Subscription} />
       <Route path="/app-admin" component={AppAdmin} />
       <Route path="/program-performance" component={ProgramPerformance} />
+      <Route path="/crm/contacts" component={CRMContacts} />
+      <Route path="/crm/projects" component={CRMProjects} />
+      <Route path="/crm/signals" component={CRMSignals} />
       <Route component={NotFound} />
     </Switch>
   );
