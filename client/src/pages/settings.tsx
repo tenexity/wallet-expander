@@ -1888,10 +1888,6 @@ export default function SettingsPage() {
             <FileText className="mr-2 h-4 w-4" />
             Categories
           </TabsTrigger>
-          <TabsTrigger value="revenue-tracking" data-testid="tab-revenue-tracking">
-            <DollarSign className="mr-2 h-4 w-4" />
-            Revenue Tracking
-          </TabsTrigger>
           <TabsTrigger value="email" data-testid="tab-email">
             <Mail className="mr-2 h-4 w-4" />
             Email
@@ -1938,12 +1934,12 @@ export default function SettingsPage() {
                   Upload your company logo to replace the default icon in the sidebar. Recommended size: 80x80 pixels.
                 </p>
                 <div className="flex items-start gap-4">
-                  <div className="flex h-20 w-20 items-center justify-center rounded-md border-2 border-dashed border-muted-foreground/25 bg-muted/50">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-md border-2 border-dashed border-muted-foreground/25 bg-white">
                     {companyLogo ? (
                       <img 
                         src={companyLogo} 
                         alt="Company logo" 
-                        className="h-full w-full object-cover rounded-md"
+                        className="h-full w-full object-contain rounded-md p-1"
                       />
                     ) : (
                       <Image className="h-8 w-8 text-muted-foreground/50" />
@@ -2586,9 +2582,6 @@ Output a structured profile with category expectations.`}
           <CategoriesManager />
         </TabsContent>
 
-        <TabsContent value="revenue-tracking" className="space-y-6">
-          <RevenueTrackingManager />
-        </TabsContent>
 
         <TabsContent value="email" className="space-y-6">
           <EmailSettingsManager />
