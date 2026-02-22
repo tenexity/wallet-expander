@@ -125,10 +125,10 @@ function UserProfile() {
     : displayName.slice(0, 2).toUpperCase();
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-2">
       <SidebarMenuButton asChild className="flex-1 h-auto py-1" data-testid="link-profile">
         <Link href="/profile">
-          <Avatar className="h-8 w-8">
+          <Avatar className="h-8 w-8 shrink-0">
             {user?.profileImageUrl && (
               <AvatarImage src={user.profileImageUrl} alt={displayName} />
             )}
@@ -136,13 +136,13 @@ function UserProfile() {
               {initials}
             </AvatarFallback>
           </Avatar>
-          <div className="flex flex-col flex-1 min-w-0">
+          <div className="flex flex-col flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
             <span className="text-sm font-medium truncate">{displayName}</span>
             <span className="text-xs opacity-60">My Profile</span>
           </div>
         </Link>
       </SidebarMenuButton>
-      <SidebarMenuButton asChild size="sm" className="h-8 w-8 p-0 shrink-0" data-testid="button-logout">
+      <SidebarMenuButton asChild size="sm" className="h-8 w-8 p-0 shrink-0 group-data-[collapsible=icon]:hidden" data-testid="button-logout">
         <a href="/api/logout">
           <LogOut className="h-4 w-4" />
         </a>
@@ -183,11 +183,11 @@ export function AppSidebar() {
   });
 
   return (
-    <Sidebar>
-      <SidebarHeader className="p-4">
-        <div className="flex items-center gap-3">
+    <Sidebar collapsible="icon">
+      <SidebarHeader className="p-4 group-data-[collapsible=icon]:p-2">
+        <div className="flex items-center gap-3 group-data-[collapsible=icon]:justify-center">
           {companyLogo ? (
-            <div className="flex h-10 w-10 items-center justify-center rounded-md overflow-hidden bg-sidebar-primary">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md overflow-hidden bg-sidebar-primary group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8">
               <img
                 src={companyLogo}
                 alt="Company logo"
@@ -195,7 +195,7 @@ export function AppSidebar() {
               />
             </div>
           ) : (
-            <div className="flex h-10 w-10 items-center justify-center rounded-md overflow-hidden">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md overflow-hidden group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8">
               <img
                 src={appLogo}
                 alt="Wallet Share Expander"
@@ -203,7 +203,7 @@ export function AppSidebar() {
               />
             </div>
           )}
-          <div className="flex flex-col">
+          <div className="flex flex-col group-data-[collapsible=icon]:hidden">
             <span className="text-sm font-semibold text-sidebar-foreground">{appTitle}</span>
             <span className="text-xs text-sidebar-foreground/60">{companyName}</span>
           </div>
@@ -251,9 +251,9 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="p-4 space-y-4">
+      <SidebarFooter className="p-4 space-y-4 group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:space-y-2">
         <UserProfile />
-        <div className="border-t border-sidebar-border pt-3">
+        <div className="border-t border-sidebar-border pt-3 group-data-[collapsible=icon]:hidden">
           <div className="flex items-center justify-center gap-2 text-xs text-sidebar-foreground/50">
             <span>Created with care by</span>
             <img
