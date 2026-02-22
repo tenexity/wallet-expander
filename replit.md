@@ -88,3 +88,7 @@ The application follows a client-server architecture.
 - **@hello-pangea/dnd:** Library used for drag-and-drop functionality on the dashboard.
 - **Resend:** Email delivery service for sending task notifications to Territory Managers.
 - **Tenexity:** Acknowledged in the sidebar footer with logo.
+
+## Roadmap
+
+- **PHASE-B.md:** CRM evolution roadmap documenting planned features — Contact Management, Activity Timeline, Notes, full OAuth Email Integration (Gmail/Outlook) with AI analysis pipeline, and Advanced Search. Status: Planning.
