@@ -46,6 +46,7 @@ import {
   MockupDailyBriefing,
   MockupAskAnything,
   MockupEmailIntelligence,
+  MockupCRMIntelligence,
 } from "@/components/feature-mockups";
 
 import Tenexity_Official_Logo_BW_Cirlce from "@assets/Tenexity Official Logo BW Cirlce.png";
@@ -166,6 +167,20 @@ const showcaseFeatures = [
       "Competitor mentions auto-flagged and tracked over time",
       "At-risk alerts fired to the rep when urgency is detected",
       "Each interaction makes playbooks more personalized",
+    ],
+  },
+  {
+    id: "crm-intelligence",
+    badge: "Agentic CRM Intelligence",
+    title: "Your CRM Fills Itself While Your Team Sells",
+    description: "This is the breakthrough. While your reps focus on relationships, AI agents work behind the scenes — extracting contacts from email signatures, detecting order signals from conversations, and flagging competitive threats the moment they appear. Every email becomes actionable intelligence, automatically organized and ready for your team.",
+    MockupComponent: MockupCRMIntelligence,
+    featured: true,
+    benefits: [
+      "Competitor threats detected and escalated in real time with price gap analysis",
+      "Order signals extracted from emails with dollar values and urgency scoring",
+      "Decision-maker contacts auto-discovered and linked to accounts",
+      "Zero manual data entry — your CRM evolves with every conversation",
     ],
   },
 ];
@@ -444,45 +459,63 @@ export default function Landing() {
           <div className="space-y-24">
             {showcaseFeatures.map((feature, index) => {
               const isEven = index % 2 === 0;
+              const isFeatured = 'featured' in feature && feature.featured;
               return (
-                <div
-                  key={feature.id}
-                  className={`flex flex-col ${isEven ? 'lg:flex-row' : 'lg:flex-row-reverse'} gap-8 lg:gap-16 items-center`}
-                  data-testid={`feature-showcase-${feature.id}`}
-                >
-                  <div className="w-full lg:w-1/2">
-                    <div className="relative group" data-testid={`mockup-${feature.id}`}>
-                      <div className="absolute -inset-1 bg-gradient-to-r from-primary/20 to-primary/5 rounded-lg blur-sm opacity-75 group-hover:opacity-100 transition duration-300" />
-                      <div className="relative rounded-lg overflow-hidden shadow-xl border border-border/50">
-                        <feature.MockupComponent />
+                <div key={feature.id}>
+                  {isFeatured && (
+                    <div className="text-center mb-12" data-testid="crm-intelligence-header">
+                      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-red-600/10 via-primary/10 to-red-600/10 dark:from-red-500/15 dark:via-primary/15 dark:to-red-500/15 border border-red-500/20 dark:border-red-400/20 mb-4">
+                        <Sparkles className="w-4 h-4 text-red-600 dark:text-red-400" />
+                        <span className="text-sm font-semibold text-red-700 dark:text-red-300">The Competitive Edge That Changes Everything</span>
+                        <Sparkles className="w-4 h-4 text-red-600 dark:text-red-400" />
                       </div>
                     </div>
-                  </div>
+                  )}
+                  <div
+                    className={`flex flex-col ${isEven ? 'lg:flex-row' : 'lg:flex-row-reverse'} gap-8 lg:gap-16 items-center ${isFeatured ? 'relative rounded-2xl p-8 lg:p-12 border-2 border-red-500/20 dark:border-red-400/20 bg-gradient-to-br from-red-50/50 via-background to-primary/5 dark:from-red-950/20 dark:via-background dark:to-primary/10' : ''}`}
+                    data-testid={`feature-showcase-${feature.id}`}
+                  >
+                    {isFeatured && (
+                      <div className="absolute -top-px left-0 right-0 h-1 rounded-t-2xl bg-gradient-to-r from-red-600 via-primary to-red-600" />
+                    )}
+                    <div className="w-full lg:w-1/2">
+                      <div className="relative group" data-testid={`mockup-${feature.id}`}>
+                        <div className={`absolute -inset-1 rounded-lg blur-sm opacity-75 group-hover:opacity-100 transition duration-300 ${isFeatured ? 'bg-gradient-to-r from-red-500/30 via-primary/20 to-red-500/30' : 'bg-gradient-to-r from-primary/20 to-primary/5'}`} />
+                        <div className={`relative rounded-lg overflow-hidden shadow-xl border ${isFeatured ? 'border-red-500/30 dark:border-red-400/30 shadow-red-500/10' : 'border-border/50'}`}>
+                          <feature.MockupComponent />
+                        </div>
+                      </div>
+                    </div>
 
-                  <div className="w-full lg:w-1/2 space-y-6">
-                    <Badge variant="outline" className="text-xs font-medium" data-testid={`badge-${feature.id}`}>
-                      {feature.badge}
-                    </Badge>
-                    <h3 className="text-2xl md:text-3xl font-bold leading-tight" data-testid={`title-${feature.id}`}>
-                      {feature.title}
-                    </h3>
-                    <p className="text-muted-foreground text-lg leading-relaxed" data-testid={`description-${feature.id}`}>
-                      {feature.description}
-                    </p>
-                    <ul className="space-y-3">
-                      {feature.benefits.map((benefit, benefitIndex) => (
-                        <li
-                          key={benefitIndex}
-                          className="flex items-start gap-3"
-                          data-testid={`benefit-${feature.id}-${benefitIndex}`}
-                        >
-                          <div className="flex-shrink-0 w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center mt-0.5">
-                            <Check className="w-3 h-3 text-primary" />
-                          </div>
-                          <span className="text-sm text-muted-foreground">{benefit}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="w-full lg:w-1/2 space-y-6">
+                      <Badge
+                        variant={isFeatured ? "default" : "outline"}
+                        className={`text-xs font-medium ${isFeatured ? 'bg-red-600 dark:bg-red-700 text-white border-red-600 dark:border-red-700' : ''}`}
+                        data-testid={`badge-${feature.id}`}
+                      >
+                        {feature.badge}
+                      </Badge>
+                      <h3 className="text-2xl md:text-3xl font-bold leading-tight" data-testid={`title-${feature.id}`}>
+                        {feature.title}
+                      </h3>
+                      <p className="text-muted-foreground text-lg leading-relaxed" data-testid={`description-${feature.id}`}>
+                        {feature.description}
+                      </p>
+                      <ul className="space-y-3">
+                        {feature.benefits.map((benefit, benefitIndex) => (
+                          <li
+                            key={benefitIndex}
+                            className="flex items-start gap-3"
+                            data-testid={`benefit-${feature.id}-${benefitIndex}`}
+                          >
+                            <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5 ${isFeatured ? 'bg-red-600/10 dark:bg-red-500/20' : 'bg-primary/10'}`}>
+                              <Check className={`w-3 h-3 ${isFeatured ? 'text-red-600 dark:text-red-400' : 'text-primary'}`} />
+                            </div>
+                            <span className="text-sm text-muted-foreground">{benefit}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                 </div>
               );

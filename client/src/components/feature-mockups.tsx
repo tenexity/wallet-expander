@@ -631,6 +631,168 @@ export function MockupAskAnything() {
   );
 }
 
+// ─── Agentic CRM Intelligence Mockup ──────────────────────────────────────────
+export function MockupCRMIntelligence() {
+  const threats = [
+    { competitor: "Ferguson", account: "Allied Mechanical", category: "PVF", level: "critical" as const, detail: "15% volume discount offered on airport project", priceGap: "-4.6%" },
+    { competitor: "HD Supply", account: "Great Lakes Heating", category: "Controls", level: "high" as const, detail: "8% lower on BAS controllers for Lakeview Plaza", priceGap: "-8.1%" },
+    { competitor: "Winsupply", account: "Sunshine HVAC", category: "Refrigerant", level: "medium" as const, detail: "Comparing R-410A pricing. Delivery failure noted.", priceGap: "-6.1%" },
+  ];
+
+  const signals = [
+    { account: "Metro HVAC", type: "Quote Request", product: "Carrier 50XC Rooftop Units", value: "$124K", urgency: "immediate" as const },
+    { account: "Northeast H&C", type: "Purchase Intent", product: "Honeywell T6 Pro Thermostats", value: "$32K", urgency: "immediate" as const },
+    { account: "Buckeye Mechanical", type: "Pricing Inquiry", product: "Data Center Controls Package", value: "$95K", urgency: "this_week" as const },
+  ];
+
+  const contacts = [
+    { name: "Jennifer Adams", title: "Dir. of Purchasing", account: "Buckeye Mechanical", role: "Decision Maker", lastContact: "3d ago", action: true },
+    { name: "Robert Chang", title: "Owner / President", account: "Allied Mechanical", role: "Decision Maker", lastContact: "45d ago", action: true },
+  ];
+
+  const threatBadge = (level: "critical" | "high" | "medium") => {
+    const styles = {
+      critical: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 border-red-200 dark:border-red-800",
+      high: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400 border-orange-200 dark:border-orange-800",
+      medium: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 border-amber-200 dark:border-amber-800",
+    };
+    return styles[level];
+  };
+
+  const urgencyBadge = (urgency: "immediate" | "this_week") => {
+    const styles = {
+      immediate: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 border-red-200 dark:border-red-800",
+      this_week: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400 border-blue-200 dark:border-blue-800",
+    };
+    return styles[urgency];
+  };
+
+  return (
+    <div className="bg-background rounded-lg p-4 space-y-3 text-sm border shadow-sm">
+      <div className="flex items-center justify-between border-b pb-3">
+        <div className="flex items-center gap-2">
+          <div className="h-6 w-6 rounded bg-red-600 dark:bg-red-700 flex items-center justify-center">
+            <Radar className="h-3.5 w-3.5 text-white" />
+          </div>
+          <div>
+            <span className="font-semibold text-sm">CRM Intelligence</span>
+            <p className="text-[10px] text-muted-foreground">Auto-populated by AI agents</p>
+          </div>
+        </div>
+        <Badge variant="secondary" className="text-[10px]">Live</Badge>
+      </div>
+
+      <div className="grid grid-cols-4 gap-2">
+        <Card className="p-2 text-center">
+          <p className="text-base font-bold text-red-600 dark:text-red-400">2</p>
+          <p className="text-[9px] text-muted-foreground">Critical Threats</p>
+        </Card>
+        <Card className="p-2 text-center">
+          <p className="text-base font-bold text-amber-600 dark:text-amber-400">18</p>
+          <p className="text-[9px] text-muted-foreground">Active Signals</p>
+        </Card>
+        <Card className="p-2 text-center">
+          <p className="text-base font-bold">25</p>
+          <p className="text-[9px] text-muted-foreground">Contacts Tracked</p>
+        </Card>
+        <Card className="p-2 text-center">
+          <p className="text-base font-bold text-green-600 dark:text-green-400">$1.2M</p>
+          <p className="text-[9px] text-muted-foreground">Pipeline Value</p>
+        </Card>
+      </div>
+
+      <div>
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <ShieldAlert className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+          <p className="text-[10px] font-semibold uppercase tracking-wide">Competitor Threats</p>
+        </div>
+        <div className="space-y-1.5">
+          {threats.map((t, i) => (
+            <Card key={i} className={`p-2 ${i === 0 ? 'border-red-300 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20' : ''}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold border ${threatBadge(t.level)}`}>
+                      {t.level === "critical" && <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />}
+                      {t.level.toUpperCase()}
+                    </span>
+                    <span className="text-[10px] font-semibold">{t.competitor}</span>
+                    <span className="text-[10px] text-muted-foreground">vs us</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground truncate">{t.account} - {t.detail}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-[10px] font-bold text-red-600 dark:text-red-400">{t.priceGap}</p>
+                  <p className="text-[9px] text-muted-foreground">{t.category}</p>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <Zap className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+          <p className="text-[10px] font-semibold uppercase tracking-wide">Order Signals Detected</p>
+        </div>
+        <div className="space-y-1.5">
+          {signals.map((s, i) => (
+            <div key={i} className="flex items-center gap-2 p-1.5 rounded border bg-background">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-semibold">{s.account}</span>
+                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold border ${urgencyBadge(s.urgency)}`}>
+                    {s.urgency === "immediate" ? "NOW" : "THIS WEEK"}
+                  </span>
+                </div>
+                <p className="text-[10px] text-muted-foreground truncate">{s.type}: {s.product}</p>
+              </div>
+              <span className="text-[10px] font-bold shrink-0">{s.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <UserCheck className="h-3.5 w-3.5 text-primary" />
+          <p className="text-[10px] font-semibold uppercase tracking-wide">Key Contacts to Engage</p>
+        </div>
+        <div className="space-y-1.5">
+          {contacts.map((c, i) => (
+            <div key={i} className="flex items-center justify-between p-1.5 rounded border bg-background">
+              <div className="flex items-center gap-2">
+                <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Users className="h-3 w-3 text-primary" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-semibold">{c.name}</p>
+                  <p className="text-[9px] text-muted-foreground">{c.title} - {c.account}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] text-muted-foreground">{c.lastContact}</span>
+                {c.action && (
+                  <Badge variant="outline" className="text-[9px] border-primary/50 text-primary">Action Needed</Badge>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between pt-1 border-t text-[10px] text-muted-foreground">
+        <div className="flex items-center gap-1">
+          <Sparkles className="h-3 w-3 text-primary" />
+          <span>All data auto-populated from email analysis</span>
+        </div>
+        <span className="text-primary font-medium cursor-pointer">View Full CRM</span>
+      </div>
+    </div>
+  );
+}
+
 // ─── NEW: Email Intelligence Mockup ───────────────────────────────────────────
 export function MockupEmailIntelligence() {
   return (
