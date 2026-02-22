@@ -1014,3 +1014,165 @@ export const insertSyncedEmailSchema = createInsertSchema(syncedEmails).omit({
 
 export type SyncedEmail = typeof syncedEmails.$inferSelect;
 export type InsertSyncedEmail = z.infer<typeof insertSyncedEmailSchema>;
+
+// ============ CRM: CONTACTS ============
+export const contacts = pgTable("contacts", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  accountId: integer("account_id"),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name"),
+  email: text("email"),
+  phone: text("phone"),
+  title: text("title"),
+  role: text("role"), // purchaser, project_manager, estimator, owner, decision_maker, influencer, gatekeeper
+  department: text("department"),
+  isPrimary: boolean("is_primary").default(false),
+  lastContactedAt: timestamp("last_contacted_at"),
+  notes: text("notes"),
+  source: text("source").default("email_sync"), // email_sync, manual, csv_import
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  index("idx_contacts_tenant").on(t.tenantId),
+  index("idx_contacts_account").on(t.accountId),
+  index("idx_contacts_email").on(t.email),
+]);
+
+export const insertContactSchema = createInsertSchema(contacts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type Contact = typeof contacts.$inferSelect;
+export type InsertContact = z.infer<typeof insertContactSchema>;
+
+// ============ CRM: PROJECTS ============
+export const projects = pgTable("projects", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  accountId: integer("account_id"),
+  name: text("name").notNull(),
+  location: text("location"),
+  projectType: text("project_type"), // new_construction, renovation, retrofit, maintenance, tenant_improvement
+  estimatedValue: numeric("estimated_value"),
+  stage: text("stage").default("identified"), // identified, bidding, awarded, in_progress, completed, lost
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  bidDeadline: timestamp("bid_deadline"),
+  generalContractor: text("general_contractor"),
+  unitCount: integer("unit_count"),
+  squareFootage: integer("square_footage"),
+  productCategories: jsonb("product_categories"), // Array of category names relevant to this project
+  competitorsInvolved: jsonb("competitors_involved"), // Array of competitor names bidding
+  notes: text("notes"),
+  source: text("source").default("email_sync"), // email_sync, manual
+  sourceEmailId: integer("source_email_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  index("idx_projects_tenant").on(t.tenantId),
+  index("idx_projects_account").on(t.accountId),
+  index("idx_projects_stage").on(t.stage),
+]);
+
+export const insertProjectSchema = createInsertSchema(projects).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type Project = typeof projects.$inferSelect;
+export type InsertProject = z.infer<typeof insertProjectSchema>;
+
+// ============ CRM: EMAIL INTERACTIONS ============
+export const emailInteractions = pgTable("email_interactions", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  emailId: integer("email_id").notNull(),
+  contactId: integer("contact_id").notNull(),
+  role: text("role").default("participant"), // sender, recipient, cc, participant
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("idx_email_interactions_tenant").on(t.tenantId),
+  index("idx_email_interactions_email").on(t.emailId),
+  index("idx_email_interactions_contact").on(t.contactId),
+]);
+
+export const insertEmailInteractionSchema = createInsertSchema(emailInteractions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type EmailInteraction = typeof emailInteractions.$inferSelect;
+export type InsertEmailInteraction = z.infer<typeof insertEmailInteractionSchema>;
+
+// ============ CRM: ORDER SIGNALS ============
+export const orderSignals = pgTable("order_signals", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  accountId: integer("account_id"),
+  projectId: integer("project_id"),
+  sourceEmailId: integer("source_email_id"),
+  signalType: text("signal_type").notNull(), // quote_request, reorder, pricing_inquiry, product_inquiry, purchase_intent, delivery_request
+  productCategory: text("product_category"),
+  productDetails: text("product_details"),
+  estimatedQuantity: text("estimated_quantity"),
+  estimatedValue: numeric("estimated_value"),
+  requestedDeliveryDate: timestamp("requested_delivery_date"),
+  urgency: text("urgency").default("normal"), // immediate, this_week, this_month, next_quarter, exploring
+  pricingMentioned: boolean("pricing_mentioned").default(false),
+  competitorPriceMentioned: boolean("competitor_price_mentioned").default(false),
+  notes: text("notes"),
+  status: text("status").default("new"), // new, contacted, quoted, won, lost
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  index("idx_order_signals_tenant").on(t.tenantId),
+  index("idx_order_signals_account").on(t.accountId),
+  index("idx_order_signals_project").on(t.projectId),
+  index("idx_order_signals_type").on(t.signalType),
+]);
+
+export const insertOrderSignalSchema = createInsertSchema(orderSignals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type OrderSignal = typeof orderSignals.$inferSelect;
+export type InsertOrderSignal = z.infer<typeof insertOrderSignalSchema>;
+
+// ============ CRM: COMPETITOR MENTIONS ============
+export const competitorMentions = pgTable("competitor_mentions", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  accountId: integer("account_id"),
+  projectId: integer("project_id"),
+  sourceEmailId: integer("source_email_id"),
+  competitorName: text("competitor_name").notNull(),
+  mentionType: text("mention_type").notNull(), // quote, pricing, product_comparison, switch_threat, positive_mention, negative_mention
+  productCategory: text("product_category"),
+  competitorPrice: text("competitor_price"),
+  ourPrice: text("our_price"),
+  details: text("details"),
+  threatLevel: text("threat_level").default("medium"), // low, medium, high, critical
+  responseNeeded: boolean("response_needed").default(false),
+  respondedAt: timestamp("responded_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("idx_competitor_mentions_tenant").on(t.tenantId),
+  index("idx_competitor_mentions_account").on(t.accountId),
+  index("idx_competitor_mentions_competitor").on(t.competitorName),
+  index("idx_competitor_mentions_threat").on(t.threatLevel),
+]);
+
+export const insertCompetitorMentionSchema = createInsertSchema(competitorMentions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type CompetitorMention = typeof competitorMentions.$inferSelect;
+export type InsertCompetitorMention = z.infer<typeof insertCompetitorMentionSchema>;

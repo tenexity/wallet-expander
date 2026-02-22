@@ -3672,6 +3672,190 @@ KEY TALKING POINTS:
   });
 
   // ============================================================
+  // CRM ROUTES — Contacts, Projects, Order Signals, Competitors
+  // ============================================================
+  const { insertContactSchema, insertProjectSchema } = await import("@shared/schema");
+
+  app.get("/api/crm/contacts", requireSubscription, async (req, res) => {
+    try {
+      const storage = getTenantStorage(req.tenantContext!.tenantId);
+      const accountId = req.query.accountId ? parseInt(req.query.accountId as string) : undefined;
+      res.json(await storage.getContacts(accountId));
+    } catch (error) {
+      handleRouteError(error, res, "Get contacts");
+    }
+  });
+
+  app.get("/api/crm/contacts/:id", requireSubscription, async (req, res) => {
+    try {
+      const storage = getTenantStorage(req.tenantContext!.tenantId);
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid contact ID" });
+      const contact = await storage.getContact(id);
+      if (!contact) return res.status(404).json({ message: "Contact not found" });
+      res.json(contact);
+    } catch (error) {
+      handleRouteError(error, res, "Get contact");
+    }
+  });
+
+  app.post("/api/crm/contacts", requireWrite, async (req, res) => {
+    try {
+      const storage = getTenantStorage(req.tenantContext!.tenantId);
+      const data = insertContactSchema.parse({ ...req.body, tenantId: req.tenantContext!.tenantId, source: "manual" });
+      const contact = await storage.createContact(data);
+      res.status(201).json(contact);
+    } catch (error) {
+      handleRouteError(error, res, "Create contact");
+    }
+  });
+
+  app.patch("/api/crm/contacts/:id", requireWrite, async (req, res) => {
+    try {
+      const storage = getTenantStorage(req.tenantContext!.tenantId);
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid contact ID" });
+      const updated = await storage.updateContact(id, req.body);
+      if (!updated) return res.status(404).json({ message: "Contact not found" });
+      res.json(updated);
+    } catch (error) {
+      handleRouteError(error, res, "Update contact");
+    }
+  });
+
+  app.delete("/api/crm/contacts/:id", requireWrite, async (req, res) => {
+    try {
+      const storage = getTenantStorage(req.tenantContext!.tenantId);
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid contact ID" });
+      await storage.deleteContact(id);
+      res.json({ message: "Contact deleted" });
+    } catch (error) {
+      handleRouteError(error, res, "Delete contact");
+    }
+  });
+
+  app.get("/api/crm/projects", requireSubscription, async (req, res) => {
+    try {
+      const storage = getTenantStorage(req.tenantContext!.tenantId);
+      const accountId = req.query.accountId ? parseInt(req.query.accountId as string) : undefined;
+      const stage = req.query.stage as string | undefined;
+      res.json(await storage.getProjects(accountId, stage));
+    } catch (error) {
+      handleRouteError(error, res, "Get projects");
+    }
+  });
+
+  app.get("/api/crm/projects/:id", requireSubscription, async (req, res) => {
+    try {
+      const storage = getTenantStorage(req.tenantContext!.tenantId);
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+      const project = await storage.getProject(id);
+      if (!project) return res.status(404).json({ message: "Project not found" });
+      res.json(project);
+    } catch (error) {
+      handleRouteError(error, res, "Get project");
+    }
+  });
+
+  app.post("/api/crm/projects", requireWrite, async (req, res) => {
+    try {
+      const storage = getTenantStorage(req.tenantContext!.tenantId);
+      const data = insertProjectSchema.parse({ ...req.body, tenantId: req.tenantContext!.tenantId, source: "manual" });
+      const project = await storage.createProject(data);
+      res.status(201).json(project);
+    } catch (error) {
+      handleRouteError(error, res, "Create project");
+    }
+  });
+
+  app.patch("/api/crm/projects/:id", requireWrite, async (req, res) => {
+    try {
+      const storage = getTenantStorage(req.tenantContext!.tenantId);
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+      const updated = await storage.updateProject(id, req.body);
+      if (!updated) return res.status(404).json({ message: "Project not found" });
+      res.json(updated);
+    } catch (error) {
+      handleRouteError(error, res, "Update project");
+    }
+  });
+
+  app.delete("/api/crm/projects/:id", requireWrite, async (req, res) => {
+    try {
+      const storage = getTenantStorage(req.tenantContext!.tenantId);
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid project ID" });
+      await storage.deleteProject(id);
+      res.json({ message: "Project deleted" });
+    } catch (error) {
+      handleRouteError(error, res, "Delete project");
+    }
+  });
+
+  app.get("/api/crm/order-signals", requireSubscription, async (req, res) => {
+    try {
+      const storage = getTenantStorage(req.tenantContext!.tenantId);
+      const accountId = req.query.accountId ? parseInt(req.query.accountId as string) : undefined;
+      const signalType = req.query.signalType as string | undefined;
+      const status = req.query.status as string | undefined;
+      res.json(await storage.getOrderSignals(accountId, signalType, status));
+    } catch (error) {
+      handleRouteError(error, res, "Get order signals");
+    }
+  });
+
+  app.patch("/api/crm/order-signals/:id", requireWrite, async (req, res) => {
+    try {
+      const storage = getTenantStorage(req.tenantContext!.tenantId);
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid order signal ID" });
+      const updated = await storage.updateOrderSignal(id, req.body);
+      if (!updated) return res.status(404).json({ message: "Order signal not found" });
+      res.json(updated);
+    } catch (error) {
+      handleRouteError(error, res, "Update order signal");
+    }
+  });
+
+  app.get("/api/crm/competitor-mentions", requireSubscription, async (req, res) => {
+    try {
+      const storage = getTenantStorage(req.tenantContext!.tenantId);
+      const accountId = req.query.accountId ? parseInt(req.query.accountId as string) : undefined;
+      const threatLevel = req.query.threatLevel as string | undefined;
+      res.json(await storage.getCompetitorMentions(accountId, threatLevel));
+    } catch (error) {
+      handleRouteError(error, res, "Get competitor mentions");
+    }
+  });
+
+  app.patch("/api/crm/competitor-mentions/:id", requireWrite, async (req, res) => {
+    try {
+      const storage = getTenantStorage(req.tenantContext!.tenantId);
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid competitor mention ID" });
+      const updated = await storage.updateCompetitorMention(id, req.body);
+      if (!updated) return res.status(404).json({ message: "Competitor mention not found" });
+      res.json(updated);
+    } catch (error) {
+      handleRouteError(error, res, "Update competitor mention");
+    }
+  });
+
+  app.get("/api/crm/contacts/:contactId/interactions", requireSubscription, async (req, res) => {
+    try {
+      const storage = getTenantStorage(req.tenantContext!.tenantId);
+      const contactId = parseInt(req.params.contactId);
+      if (isNaN(contactId)) return res.status(400).json({ message: "Invalid contact ID" });
+      res.json(await storage.getContactInteractions(contactId));
+    } catch (error) {
+      handleRouteError(error, res, "Get contact interactions");
+    }
+  });
+
+  // ============================================================
   // AGENT ROUTES — Phase 0: Identity & Continuity
   // ============================================================
   const { getCoreSystemPrompt, readAgentState } = await import("./services/agent-identity.js");

@@ -6,6 +6,7 @@ import {
   tasks, playbooks, playbookTasks, programAccounts, programRevenueSnapshots,
   dataUploads, settings, scoringWeights, territoryManagers, customCategories,
   revShareTiers,
+  contacts, projects, orderSignals, competitorMentions, emailInteractions,
   type Account, type InsertAccount,
   type Product, type InsertProduct,
   type ProductCategory, type InsertProductCategory,
@@ -26,6 +27,11 @@ import {
   type TerritoryManager, type InsertTerritoryManager,
   type CustomCategory, type InsertCustomCategory,
   type RevShareTier, type InsertRevShareTier,
+  type Contact, type InsertContact,
+  type Project, type InsertProject,
+  type OrderSignal, type InsertOrderSignal,
+  type CompetitorMention, type InsertCompetitorMention,
+  type EmailInteraction, type InsertEmailInteraction,
 } from "@shared/schema";
 
 /**
@@ -710,6 +716,136 @@ export class TenantStorage {
     await db.delete(revShareTiers)
       .where(and(eq(revShareTiers.id, id), eq(revShareTiers.tenantId, this.tenantId)));
     return true;
+  }
+
+  async getContacts(accountId?: number): Promise<Contact[]> {
+    const conditions = [eq(contacts.tenantId, this.tenantId)];
+    if (accountId !== undefined) {
+      conditions.push(eq(contacts.accountId, accountId));
+    }
+    return db.select().from(contacts)
+      .where(and(...conditions))
+      .orderBy(desc(contacts.lastContactedAt));
+  }
+
+  async getContact(id: number): Promise<Contact | undefined> {
+    const [contact] = await db.select().from(contacts)
+      .where(and(eq(contacts.id, id), eq(contacts.tenantId, this.tenantId)));
+    return contact;
+  }
+
+  async createContact(data: InsertContact): Promise<Contact> {
+    const [created] = await db.insert(contacts)
+      .values({ ...data, tenantId: this.tenantId })
+      .returning();
+    return created;
+  }
+
+  async updateContact(id: number, data: Partial<InsertContact>): Promise<Contact | undefined> {
+    const [updated] = await db.update(contacts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(contacts.id, id), eq(contacts.tenantId, this.tenantId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteContact(id: number): Promise<boolean> {
+    await db.delete(emailInteractions)
+      .where(and(eq(emailInteractions.contactId, id), eq(emailInteractions.tenantId, this.tenantId)));
+    await db.delete(contacts)
+      .where(and(eq(contacts.id, id), eq(contacts.tenantId, this.tenantId)));
+    return true;
+  }
+
+  async getProjects(accountId?: number, stage?: string): Promise<Project[]> {
+    const conditions = [eq(projects.tenantId, this.tenantId)];
+    if (accountId !== undefined) {
+      conditions.push(eq(projects.accountId, accountId));
+    }
+    if (stage !== undefined) {
+      conditions.push(eq(projects.stage, stage));
+    }
+    return db.select().from(projects)
+      .where(and(...conditions))
+      .orderBy(desc(projects.createdAt));
+  }
+
+  async getProject(id: number): Promise<Project | undefined> {
+    const [project] = await db.select().from(projects)
+      .where(and(eq(projects.id, id), eq(projects.tenantId, this.tenantId)));
+    return project;
+  }
+
+  async createProject(data: InsertProject): Promise<Project> {
+    const [created] = await db.insert(projects)
+      .values({ ...data, tenantId: this.tenantId })
+      .returning();
+    return created;
+  }
+
+  async updateProject(id: number, data: Partial<InsertProject>): Promise<Project | undefined> {
+    const [updated] = await db.update(projects)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(projects.id, id), eq(projects.tenantId, this.tenantId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteProject(id: number): Promise<boolean> {
+    await db.delete(projects)
+      .where(and(eq(projects.id, id), eq(projects.tenantId, this.tenantId)));
+    return true;
+  }
+
+  async getOrderSignals(accountId?: number, signalType?: string, status?: string): Promise<OrderSignal[]> {
+    const conditions = [eq(orderSignals.tenantId, this.tenantId)];
+    if (accountId !== undefined) {
+      conditions.push(eq(orderSignals.accountId, accountId));
+    }
+    if (signalType !== undefined) {
+      conditions.push(eq(orderSignals.signalType, signalType));
+    }
+    if (status !== undefined) {
+      conditions.push(eq(orderSignals.status, status));
+    }
+    return db.select().from(orderSignals)
+      .where(and(...conditions))
+      .orderBy(desc(orderSignals.createdAt));
+  }
+
+  async updateOrderSignal(id: number, data: Partial<InsertOrderSignal>): Promise<OrderSignal | undefined> {
+    const [updated] = await db.update(orderSignals)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(orderSignals.id, id), eq(orderSignals.tenantId, this.tenantId)))
+      .returning();
+    return updated;
+  }
+
+  async getCompetitorMentions(accountId?: number, threatLevel?: string): Promise<CompetitorMention[]> {
+    const conditions = [eq(competitorMentions.tenantId, this.tenantId)];
+    if (accountId !== undefined) {
+      conditions.push(eq(competitorMentions.accountId, accountId));
+    }
+    if (threatLevel !== undefined) {
+      conditions.push(eq(competitorMentions.threatLevel, threatLevel));
+    }
+    return db.select().from(competitorMentions)
+      .where(and(...conditions))
+      .orderBy(desc(competitorMentions.createdAt));
+  }
+
+  async updateCompetitorMention(id: number, data: Partial<{ notes: string; respondedAt: Date | null }>): Promise<CompetitorMention | undefined> {
+    const [updated] = await db.update(competitorMentions)
+      .set(data)
+      .where(and(eq(competitorMentions.id, id), eq(competitorMentions.tenantId, this.tenantId)))
+      .returning();
+    return updated;
+  }
+
+  async getContactInteractions(contactId: number): Promise<EmailInteraction[]> {
+    return db.select().from(emailInteractions)
+      .where(and(eq(emailInteractions.contactId, contactId), eq(emailInteractions.tenantId, this.tenantId)))
+      .orderBy(desc(emailInteractions.createdAt));
   }
 }
 
