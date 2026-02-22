@@ -2574,6 +2574,87 @@ Output a structured profile with category expectations.`}
               </div>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Layers className="h-4 w-4" />
+                ERP Integrations
+              </CardTitle>
+              <CardDescription>
+                Connect your ERP system to automatically sync accounts, orders, and product data
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 rounded-md border bg-muted/30" data-testid="integration-eclipse">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-md bg-blue-600 flex items-center justify-center text-white font-bold text-xs">
+                    ECL
+                  </div>
+                  <div>
+                    <p className="font-medium">Infor Eclipse</p>
+                    <p className="text-sm text-muted-foreground">
+                      Sync distributor accounts, order history, and product catalogs from Eclipse ERP
+                    </p>
+                  </div>
+                </div>
+                <Badge variant="outline" className="text-muted-foreground whitespace-nowrap">
+                  Coming Soon
+                </Badge>
+              </div>
+
+              <div className="flex items-center justify-between p-4 rounded-md border bg-muted/30" data-testid="integration-epicor-prophet21">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-md bg-orange-600 flex items-center justify-center text-white font-bold text-xs">
+                    P21
+                  </div>
+                  <div>
+                    <p className="font-medium">Epicor Prophet 21</p>
+                    <p className="text-sm text-muted-foreground">
+                      Import customer data, sales orders, and inventory from Prophet 21
+                    </p>
+                  </div>
+                </div>
+                <Badge variant="outline" className="text-muted-foreground whitespace-nowrap">
+                  Coming Soon
+                </Badge>
+              </div>
+
+              <div className="flex items-center justify-between p-4 rounded-md border bg-muted/30" data-testid="integration-epicor-eclipse">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-md bg-orange-500 flex items-center justify-center text-white font-bold text-xs">
+                    EPC
+                  </div>
+                  <div>
+                    <p className="font-medium">Epicor ERP</p>
+                    <p className="text-sm text-muted-foreground">
+                      Connect Epicor Kinetic / ERP for real-time order and account synchronization
+                    </p>
+                  </div>
+                </div>
+                <Badge variant="outline" className="text-muted-foreground whitespace-nowrap">
+                  Coming Soon
+                </Badge>
+              </div>
+
+              <div className="flex items-center justify-between p-4 rounded-md border bg-muted/30" data-testid="integration-epicor-bistrack">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-md bg-amber-600 flex items-center justify-center text-white font-bold text-xs">
+                    BIS
+                  </div>
+                  <div>
+                    <p className="font-medium">Epicor BisTrack</p>
+                    <p className="text-sm text-muted-foreground">
+                      Integrate lumber and building materials data from BisTrack ERP
+                    </p>
+                  </div>
+                </div>
+                <Badge variant="outline" className="text-muted-foreground whitespace-nowrap">
+                  Coming Soon
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="categories" className="space-y-6">
