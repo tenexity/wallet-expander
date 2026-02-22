@@ -61,6 +61,10 @@ The application follows a client-server architecture.
     - **Custom Categories:** Allows full CRUD operations for product categories, which are integrated into AI analysis for ICP and playbook generation.
     - **Scoring Settings:** Customizable weighting factors for opportunity scoring (Gap Size, Revenue Potential, Category Count).
     - **Territory Manager Administration:** CRUD operations for Territory Managers, including territory assignments and task linkage.
+    - **Email OAuth & Inbox Sync:** Microsoft (Azure AD) and Google OAuth integration for syncing customer email inboxes. OAuth tokens stored in `email_connections` table with automatic refresh. Email sync service fetches emails via Graph API / Gmail API and stores in `synced_emails` table.
+    - **AI Email Analysis Pipeline:** Enhanced GPT-4o analysis extracts 10+ intelligence categories from emails: sentiment, sales urgency, action items, contacts, projects, order signals, competitor mentions, account mentions, and product category mapping. Structured JSON output parsed with Zod schemas.
+    - **CRM Auto-Population:** Auto-linking service (`email-crm-linker.ts`) processes AI analysis output to automatically create/update CRM records (contacts, projects, order signals, competitor mentions) with deduplication logic. Contacts deduped by email then name+account; order signals/competitor mentions deduped by sourceEmailId + signal type/competitor name + product category.
+    - **CRM API Routes:** Full CRUD for contacts, projects, order signals, competitor mentions under `/api/crm/*`. Read routes use `requireSubscription`; mutation routes use `requireWrite`. All operations go through TenantStorage for tenant isolation.
     - **Email Notifications:** Integrated with Resend for sending task notification emails to Territory Managers when tasks are assigned. Configurable sender settings and notification preferences in Settings > Email tab. Requires RESEND_API_KEY secret.
     - **Stripe Subscription Billing:** Complete subscription management with:
         - Price ID whitelist validation (STRIPE_PRICE_IDS env var)
@@ -77,7 +81,7 @@ The application follows a client-server architecture.
 - `server/`: Backend application, including database connection, API routes, storage, and seeding scripts.
 - `shared/`: Shared schema definitions and AI chat models.
 
-**Database Schema:** Key tables include `users`, `sessions`, `tenants`, `user_roles`, `accounts`, `products`, `orders`, `segment_profiles`, `account_metrics`, `tasks`, `playbooks`, `program_accounts`, `custom_categories`, `settings`, `territory_managers`, and `rev_share_tiers`.
+**Database Schema:** Key tables include `users`, `sessions`, `tenants`, `user_roles`, `accounts`, `products`, `orders`, `segment_profiles`, `account_metrics`, `tasks`, `playbooks`, `program_accounts`, `custom_categories`, `settings`, `territory_managers`, `rev_share_tiers`, `email_connections`, `synced_emails`, `contacts`, `projects`, `email_interactions`, `order_signals`, and `competitor_mentions`.
 
 ## External Dependencies
 
