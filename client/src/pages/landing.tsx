@@ -8,7 +8,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { SubscriptionPlan } from "@shared/schema";
 import walletExpanderLogo from "@assets/WalletExpander_logo_1769615587162.png";
-import heroConstructionScene from "@assets/hero-construction-scene.png";
+import heroConstructionWide from "@assets/hero-construction-wide.png";
 import {
   TrendingUp,
   Target,
@@ -311,82 +311,74 @@ export default function Landing() {
           </div>
         </div>
       </header>
-      <section className="relative overflow-hidden py-8 md:py-12 lg:py-16" data-testid="section-hero">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-chart-2/5 pointer-events-none" />
-        <div className="absolute top-10 right-[35%] w-[400px] h-[400px] rounded-full bg-primary/5 blur-3xl pointer-events-none" />
-        <div className="absolute bottom-10 left-[10%] w-[200px] h-[200px] rounded-full bg-chart-2/8 blur-2xl pointer-events-none" />
+      <section className="relative overflow-hidden min-h-[500px] md:min-h-[560px] lg:min-h-[620px]" data-testid="section-hero">
+        <img
+          src={heroConstructionWide}
+          alt="Sales representative at a commercial construction site with strip mall and truck in background"
+          className="absolute inset-0 w-full h-full object-cover"
+          data-testid="img-hero-sales-rep"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-transparent dark:from-background dark:via-background/85 dark:to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-background/20 dark:to-background/40" />
 
-        <div className="container mx-auto px-4 relative">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
-            <div className="order-2 lg:order-1">
-              <Badge variant="secondary" className="mb-6" data-testid="badge-hero">
-                Agentic AI That Thinks, Plans, and Reminds
-              </Badge>
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 leading-[1.1]" data-testid="text-hero-headline">
-                Recover{" "}
-                <span className="relative inline-block">
-                  <span className="relative z-10">Lost Revenue</span>
-                  <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 200 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M2 8C40 2 80 2 100 5C120 8 160 10 198 4" stroke="hsl(var(--primary))" strokeWidth="3" strokeLinecap="round" strokeOpacity="0.5" />
-                    <path d="M2 10C50 3 90 3 110 6C130 9 170 8 198 6" stroke="hsl(var(--primary))" strokeWidth="2" strokeLinecap="round" strokeOpacity="0.3" />
-                  </svg>
-                </span>
-                {" "}from Existing Customers
-              </h1>
-              <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-xl" data-testid="text-hero-description">
-                Identify wallet share leakage and prioritize your highest-potential accounts.
-                Let your AI agent monitor overnight, brief your reps each morning,
-                and flag risk before you lose revenue.
-              </p>
+        <div className="relative z-10 container mx-auto px-4 py-12 md:py-16 lg:py-20 flex items-center min-h-[500px] md:min-h-[560px] lg:min-h-[620px]">
+          <div className="max-w-xl lg:max-w-2xl">
+            <Badge variant="secondary" className="mb-6" data-testid="badge-hero">
+              Agentic AI That Thinks, Plans, and Reminds
+            </Badge>
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 leading-[1.1]" data-testid="text-hero-headline">
+              Recover{" "}
+              <span className="relative inline-block">
+                <span className="relative z-10">Lost Revenue</span>
+                <svg className="absolute -bottom-2 left-0 w-full" viewBox="0 0 200 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M2 8C40 2 80 2 100 5C120 8 160 10 198 4" stroke="hsl(var(--primary))" strokeWidth="3" strokeLinecap="round" strokeOpacity="0.5" />
+                  <path d="M2 10C50 3 90 3 110 6C130 9 170 8 198 6" stroke="hsl(var(--primary))" strokeWidth="2" strokeLinecap="round" strokeOpacity="0.3" />
+                </svg>
+              </span>
+              {" "}from Existing Customers
+            </h1>
+            <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-lg" data-testid="text-hero-description">
+              Identify wallet share leakage and prioritize your highest-potential accounts.
+              Let your AI agent monitor overnight, brief your reps each morning,
+              and flag risk before you lose revenue.
+            </p>
 
-              <div className="flex flex-col sm:flex-row flex-wrap gap-4 mb-12">
-                <Button
-                  size="lg"
-                  onClick={() => scrollToSection("pricing")}
-                  data-testid="button-hero-demo"
-                >
-                  Start Free Trial
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="lg"
-                  onClick={() => scrollToSection("features")}
-                  data-testid="button-hero-learn"
-                >
-                  <Play className="mr-2 h-4 w-4 fill-current" />
-                  See How It Works
-                </Button>
-              </div>
+            <div className="flex flex-col sm:flex-row flex-wrap gap-4 mb-10">
+              <Button
+                size="lg"
+                onClick={() => scrollToSection("pricing")}
+                data-testid="button-hero-demo"
+              >
+                Start Free Trial
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                className="bg-background/60 backdrop-blur-sm"
+                onClick={() => scrollToSection("features")}
+                data-testid="button-hero-learn"
+              >
+                <Play className="mr-2 h-4 w-4 fill-current" />
+                See How It Works
+              </Button>
+            </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-8 border-t">
-                {stats.map((stat, index) => (
-                  <div key={index} data-testid={`stat-${index}`}>
-                    <div className="text-2xl md:text-3xl font-bold text-primary mb-1" data-testid={`stat-value-${index}`}>
-                      {stat.value}
-                    </div>
-                    <div className="text-xs text-muted-foreground" data-testid={`stat-label-${index}`}>
-                      {stat.label}
-                    </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-6 border-t border-border/50">
+              {stats.map((stat, index) => (
+                <div key={index} data-testid={`stat-${index}`}>
+                  <div className="text-2xl md:text-3xl font-bold text-primary mb-1" data-testid={`stat-value-${index}`}>
+                    {stat.value}
                   </div>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground/60 mt-4" data-testid="text-stats-disclaimer">
-                *Results based on enrolled accounts following recommended engagement practices
-              </p>
+                  <div className="text-xs text-muted-foreground" data-testid={`stat-label-${index}`}>
+                    {stat.label}
+                  </div>
+                </div>
+              ))}
             </div>
-
-            <div className="order-1 lg:order-2 relative flex justify-center lg:justify-end" data-testid="hero-image-container">
-              <div className="relative rounded-2xl overflow-hidden shadow-2xl">
-                <img
-                  src={heroConstructionScene}
-                  alt="Sales representative at a commercial construction site with strip mall and truck in background"
-                  className="relative z-10 w-full max-w-[560px] h-auto object-cover rounded-2xl"
-                  data-testid="img-hero-sales-rep"
-                />
-                <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-black/10 dark:ring-white/10 z-20 pointer-events-none" />
-              </div>
-            </div>
+            <p className="text-xs text-muted-foreground/60 mt-4" data-testid="text-stats-disclaimer">
+              *Results based on enrolled accounts following recommended engagement practices
+            </p>
           </div>
         </div>
       </section>
