@@ -11,11 +11,13 @@
  *  - At-risk watch list warning banner (collapsible)
  *  - "View Full Briefing" link
  *  - Trigger button for admin to fire a new briefing
+ *  - Checkboxes on action items to track completion through the day
+ *  - Dismiss/reopen: collapsed "Show Daily Briefing" bar when minimized
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, ChevronUp, AlertTriangle, Zap, Sparkles, RefreshCw, ExternalLink, X, Eye } from "lucide-react";
+import { ChevronDown, ChevronUp, AlertTriangle, Zap, Sparkles, RefreshCw, ExternalLink, X, Eye, CheckCircle2, Circle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
@@ -43,6 +45,32 @@ const urgencyBadge: Record<string, string> = {
     this_month: "bg-blue-100 text-blue-700 border-blue-200",
 };
 
+const DISMISSED_KEY = "daily-briefing-dismissed";
+const COMPLETED_KEY = "daily-briefing-completed";
+
+function getToday(): string {
+    return new Date().toDateString();
+}
+
+function loadCompletedActions(): Set<string> {
+    try {
+        const raw = localStorage.getItem(COMPLETED_KEY);
+        if (!raw) return new Set();
+        const parsed = JSON.parse(raw);
+        if (parsed.date !== getToday()) {
+            localStorage.removeItem(COMPLETED_KEY);
+            return new Set();
+        }
+        return new Set(parsed.ids as string[]);
+    } catch {
+        return new Set();
+    }
+}
+
+function saveCompletedActions(ids: Set<string>) {
+    localStorage.setItem(COMPLETED_KEY, JSON.stringify({ date: getToday(), ids: Array.from(ids) }));
+}
+
 interface DailyBriefingCardProps {
     onAccountClick?: (accountId: number) => void;
     showAdminControls?: boolean;
@@ -55,13 +83,14 @@ export function DailyBriefingCard({ onAccountClick, showAdminControls = false }:
     const [fullBriefingExpanded, setFullBriefingExpanded] = useState(false);
     const [isDismissed, setIsDismissed] = useState(false);
     const [isMounted, setIsMounted] = useState(false);
+    const [completedActions, setCompletedActions] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         setIsMounted(true);
+        setCompletedActions(loadCompletedActions());
         if (!showAdminControls) {
-            const dismissedDate = localStorage.getItem("daily-briefing-dismissed");
-            const today = new Date().toDateString();
-            if (dismissedDate === today) {
+            const dismissedDate = localStorage.getItem(DISMISSED_KEY);
+            if (dismissedDate === getToday()) {
                 setIsDismissed(true);
             }
         }
@@ -69,10 +98,28 @@ export function DailyBriefingCard({ onAccountClick, showAdminControls = false }:
 
     const handleDismiss = () => {
         if (showAdminControls) return;
-        const today = new Date().toDateString();
-        localStorage.setItem("daily-briefing-dismissed", today);
+        localStorage.setItem(DISMISSED_KEY, getToday());
         setIsDismissed(true);
     };
+
+    const handleReopen = () => {
+        localStorage.removeItem(DISMISSED_KEY);
+        setIsDismissed(false);
+    };
+
+    const toggleActionCompleted = useCallback((actionKey: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setCompletedActions((prev) => {
+            const next = new Set(prev);
+            if (next.has(actionKey)) {
+                next.delete(actionKey);
+            } else {
+                next.add(actionKey);
+            }
+            saveCompletedActions(next);
+            return next;
+        });
+    }, []);
 
     const { data: agentState, isLoading } = useQuery<AgentStateRow>({
         queryKey: ["/api/agent/state/daily-briefing"],
@@ -88,10 +135,10 @@ export function DailyBriefingCard({ onAccountClick, showAdminControls = false }:
             });
             setTimeout(() => {
                 queryClient.invalidateQueries({ queryKey: ["/api/agent/state/daily-briefing"] });
-            }, 10000); // Wait 10s before first refresh to show progress
+            }, 10000);
             setTimeout(() => {
                 queryClient.invalidateQueries({ queryKey: ["/api/agent/state/daily-briefing"] });
-            }, 25000); // Secondary refresh to capture completion
+            }, 25000);
         },
         onError: () => toast({ title: "Error", description: "Failed to trigger briefing.", variant: "destructive" }),
     });
@@ -102,11 +149,11 @@ export function DailyBriefingCard({ onAccountClick, showAdminControls = false }:
         );
     }
 
-    if (!isMounted || isDismissed) return null;
+    if (!isMounted) return null;
 
     // No state yet = no briefing run
     if (!agentState?.lastRunSummary && !agentState?.currentFocus) {
-        if (!showAdminControls) return null; // Rep doesn't see empty state if no briefing ran
+        if (!showAdminControls) return null;
 
         return (
             <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 p-5 mb-6">
@@ -134,10 +181,39 @@ export function DailyBriefingCard({ onAccountClick, showAdminControls = false }:
         );
     }
 
-    // Parse pending actions as priority items if available
     const priorityItems = Array.isArray(agentState?.pendingActions) ? agentState.pendingActions as any[] : [];
     const atRiskItems = Array.isArray(agentState?.openQuestions) ? agentState.openQuestions as any[] : [];
     const lastRun = agentState?.lastRunAt ? new Date(agentState.lastRunAt) : null;
+    const actionKey = (item: any) => `action-${item.account_id ?? item.account_name}`;
+    const completedCount = priorityItems.filter((item: any) => completedActions.has(actionKey(item))).length;
+    const totalActions = priorityItems.length;
+
+    if (isDismissed) {
+        return (
+            <div className="mb-6">
+                <button
+                    onClick={handleReopen}
+                    className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl border bg-gradient-to-r from-blue-50/60 to-white dark:from-blue-950/10 dark:to-background hover:border-primary/40 transition-colors group"
+                    data-testid="button-reopen-briefing"
+                >
+                    <div className="flex items-center gap-2.5">
+                        <div className="h-6 w-6 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
+                            <Sparkles className="h-3 w-3 text-white" />
+                        </div>
+                        <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                            Show Daily Action Plan
+                        </span>
+                        {totalActions > 0 && (
+                            <span className="text-xs text-muted-foreground">
+                                · {completedCount}/{totalActions} completed
+                            </span>
+                        )}
+                    </div>
+                    <ChevronDown className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                </button>
+            </div>
+        );
+    }
 
     return (
         <div className="rounded-xl border bg-gradient-to-br from-blue-50/80 to-white dark:from-blue-950/20 dark:to-background mb-6 overflow-hidden" id="daily-briefing-card">
@@ -151,6 +227,11 @@ export function DailyBriefingCard({ onAccountClick, showAdminControls = false }:
                         <div className="flex items-center gap-2">
                             <span className="text-sm font-semibold">Daily Action Plan</span>
                             <Badge variant="outline" className="text-[10px] uppercase tracking-wider h-4 px-1.5 bg-blue-50/50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300">Automated</Badge>
+                            {totalActions > 0 && (
+                                <span className="text-xs text-muted-foreground ml-1">
+                                    {completedCount}/{totalActions} done
+                                </span>
+                            )}
                         </div>
                         <p className="text-[10px] text-muted-foreground">Scheduled at 7:00 AM EST · Scans your territory for new gaps and signals</p>
                     </div>
@@ -173,6 +254,7 @@ export function DailyBriefingCard({ onAccountClick, showAdminControls = false }:
                         size="icon"
                         className="h-7 w-7 text-muted-foreground hover:text-foreground"
                         onClick={handleDismiss}
+                        data-testid="button-dismiss-briefing"
                     >
                         <X className="h-3.5 w-3.5" />
                     </Button>
@@ -196,26 +278,43 @@ export function DailyBriefingCard({ onAccountClick, showAdminControls = false }:
                     <p className="text-sm text-muted-foreground leading-relaxed">{agentState.lastRunSummary}</p>
                 )}
 
-                {/* Priority items */}
+                {/* Priority items with checkboxes */}
                 {priorityItems.length > 0 && (
                     <div className="space-y-2">
                         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Priority Accounts</p>
-                        {priorityItems.slice(0, 3).map((item: any, i: number) => (
-                            <div
-                                key={i}
-                                className="flex items-center gap-3 p-2.5 rounded-lg border bg-white dark:bg-card hover:border-primary/40 cursor-pointer transition-colors"
-                                onClick={() => item.account_id && onAccountClick?.(item.account_id)}
-                            >
-                                <span className={`text-xs px-2 py-0.5 rounded-full border font-medium shrink-0 ${urgencyBadge[item.urgency] ?? "bg-slate-100 text-slate-700 border-slate-200"}`}>
-                                    {item.urgency?.replace(/_/g, " ")}
-                                </span>
-                                <div className="flex-1 min-w-0">
-                                    <span className="text-sm font-medium">{item.account_name}</span>
-                                    <span className="text-xs text-muted-foreground ml-2">· {item.action}</span>
+                        {priorityItems.slice(0, 3).map((item: any, i: number) => {
+                            const key = actionKey(item);
+                            const isCompleted = completedActions.has(key);
+                            return (
+                                <div
+                                    key={key}
+                                    className={`flex items-center gap-3 p-2.5 rounded-lg border bg-white dark:bg-card hover:border-primary/40 cursor-pointer transition-all ${isCompleted ? "opacity-60" : ""}`}
+                                    onClick={() => item.account_id && onAccountClick?.(item.account_id)}
+                                    data-testid={`priority-action-${i}`}
+                                >
+                                    <button
+                                        onClick={(e) => toggleActionCompleted(key, e)}
+                                        className="shrink-0 focus:outline-none"
+                                        data-testid={`checkbox-action-${i}`}
+                                        title={isCompleted ? "Mark as incomplete" : "Mark as done"}
+                                    >
+                                        {isCompleted ? (
+                                            <CheckCircle2 className="h-5 w-5 text-green-500" />
+                                        ) : (
+                                            <Circle className="h-5 w-5 text-muted-foreground/40 hover:text-primary transition-colors" />
+                                        )}
+                                    </button>
+                                    <span className={`text-xs px-2 py-0.5 rounded-full border font-medium shrink-0 ${urgencyBadge[item.urgency] ?? "bg-slate-100 text-slate-700 border-slate-200"}`}>
+                                        {item.urgency?.replace(/_/g, " ")}
+                                    </span>
+                                    <div className="flex-1 min-w-0">
+                                        <span className={`text-sm font-medium ${isCompleted ? "line-through text-muted-foreground" : ""}`}>{item.account_name}</span>
+                                        <span className={`text-xs text-muted-foreground ml-2 ${isCompleted ? "line-through" : ""}`}>· {item.action}</span>
+                                    </div>
+                                    <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                                 </div>
-                                <ExternalLink className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
 
@@ -243,12 +342,27 @@ export function DailyBriefingCard({ onAccountClick, showAdminControls = false }:
                                     <div>
                                         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">All Priority Actions ({priorityItems.length})</p>
                                         <div className="space-y-1.5">
-                                            {priorityItems.map((item: any, i: number) => (
-                                                <div key={i} className="text-xs flex items-start gap-2">
-                                                    <span className="font-medium shrink-0">{item.account_name}:</span>
-                                                    <span className="text-muted-foreground">{item.action} — {item.why}</span>
-                                                </div>
-                                            ))}
+                                            {priorityItems.map((item: any, i: number) => {
+                                                const key = actionKey(item);
+                                                const isCompleted = completedActions.has(key);
+                                                return (
+                                                    <div key={key} className={`text-xs flex items-start gap-2 ${isCompleted ? "opacity-50" : ""}`}>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); toggleActionCompleted(key, e); }}
+                                                            className="shrink-0 mt-0.5 focus:outline-none"
+                                                            data-testid={`checkbox-full-action-${i}`}
+                                                        >
+                                                            {isCompleted ? (
+                                                                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                                                            ) : (
+                                                                <Circle className="h-3.5 w-3.5 text-muted-foreground/40 hover:text-primary transition-colors" />
+                                                            )}
+                                                        </button>
+                                                        <span className={`font-medium shrink-0 ${isCompleted ? "line-through text-muted-foreground" : ""}`}>{item.account_name}:</span>
+                                                        <span className={`text-muted-foreground ${isCompleted ? "line-through" : ""}`}>{item.action} — {item.why}</span>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 )}
