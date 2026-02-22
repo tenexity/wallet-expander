@@ -1,7 +1,7 @@
-import { type User, type InsertUser, type AgentState, agentSystemPrompts, agentState } from "@shared/schema";
+import { type User, type InsertUser, type AgentState, type Setting, type InsertSetting, agentSystemPrompts, agentState, settings } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 
 // ─── Interface ────────────────────────────────────────────────────────────────
 
@@ -13,6 +13,10 @@ export interface IStorage {
 
   // Agent system prompts
   getAgentSystemPrompt(promptKey: string): Promise<{ content: string } | undefined>;
+
+  // Settings (key-value store)
+  getSetting(key: string): Promise<Setting | undefined>;
+  upsertSetting(setting: InsertSetting): Promise<Setting>;
 
   // Agent state (rolling memory between runs)
   getAgentState(tenantId: number, runType: string): Promise<AgentState | undefined>;
@@ -47,6 +51,38 @@ export class MemStorage implements IStorage {
     const user: User = { ...insertUser, id };
     this.users.set(id, user);
     return user;
+  }
+
+  // ── Settings ───────────────────────────────────────────────────────────────
+  async getSetting(key: string): Promise<Setting | undefined> {
+    try {
+      const rows = await db
+        .select()
+        .from(settings)
+        .where(eq(settings.key, key))
+        .limit(1);
+      return rows[0] ?? undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async upsertSetting(setting: InsertSetting): Promise<Setting> {
+    const existing = await this.getSetting(setting.key);
+    if (existing) {
+      const [updated] = await db
+        .update(settings)
+        .set({ value: setting.value, updatedAt: sql`CURRENT_TIMESTAMP` })
+        .where(eq(settings.key, setting.key))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(settings)
+        .values(setting)
+        .returning();
+      return created;
+    }
   }
 
   // ── Agent: System Prompt ────────────────────────────────────────────────────

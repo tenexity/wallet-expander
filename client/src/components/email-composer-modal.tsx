@@ -3,7 +3,8 @@
  *
  * Modal triggered from AccountDossierPanel's "Send Email" button.
  * Pre-populated with email_subject + email_draft from the active playbook.
- * On send: calls Resend via /api/agent/send-email, creates an agent_interactions row.
+ * Copy-only: opens the user's own email client via mailto or copies to clipboard.
+ * Logs an agent_interactions row for tracking — does NOT send email through Resend.
  */
 
 import { useState } from "react";
