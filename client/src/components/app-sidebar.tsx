@@ -54,12 +54,6 @@ const mainNavItems = [
     tooltip: "Track enrolled accounts, incremental revenue, and calculate rev-share fees",
   },
   {
-    title: "Workflow Guide",
-    url: "/workflow-guide",
-    icon: GitBranch,
-    tooltip: "Visual guide showing setup, monthly, weekly, and daily workflows",
-  },
-  {
     title: "Program Performance",
     url: "/program-performance",
     icon: BarChart4,
@@ -87,6 +81,12 @@ const mainNavItems = [
 ];
 
 const adminNavItems = [
+  {
+    title: "Setup Guide",
+    url: "/workflow-guide",
+    icon: GitBranch,
+    tooltip: "Visual guide showing setup, monthly, weekly, and daily workflows",
+  },
   {
     title: "Data Uploads",
     url: "/data-uploads",
