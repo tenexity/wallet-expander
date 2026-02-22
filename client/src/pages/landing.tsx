@@ -317,18 +317,18 @@ export default function Landing() {
         <img
           src={heroConstructionWide}
           alt="Sales representative at a commercial construction site with strip mall and truck in background"
-          className="absolute inset-0 w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-cover object-[75%_center] md:object-[60%_center] lg:object-center"
           data-testid="img-hero-sales-rep"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-transparent dark:from-background dark:via-background/85 dark:to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-background/20 dark:to-background/40" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/85 via-[55%] to-transparent dark:from-background dark:via-background/80 dark:via-[55%] dark:to-transparent md:via-background/90 md:via-[50%] lg:via-[45%]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-background/10 dark:to-background/30" />
 
         <div className="relative z-10 container mx-auto px-4 py-12 md:py-16 lg:py-20 flex items-center min-h-[500px] md:min-h-[560px] lg:min-h-[620px]">
-          <div className="max-w-xl lg:max-w-2xl">
+          <div className="max-w-[60%] sm:max-w-[55%] md:max-w-xl lg:max-w-2xl">
             <Badge variant="secondary" className="mb-6" data-testid="badge-hero">
               Agentic AI That Thinks, Plans, and Reminds
             </Badge>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 leading-[1.1]" data-testid="text-hero-headline">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-4 md:mb-6 leading-[1.1]" data-testid="text-hero-headline">
               Recover{" "}
               <span className="relative inline-block">
                 <span className="relative z-10">Lost Revenue</span>
@@ -339,13 +339,13 @@ export default function Landing() {
               </span>
               {" "}from Existing Customers
             </h1>
-            <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-lg" data-testid="text-hero-description">
+            <p className="text-base md:text-lg lg:text-xl text-muted-foreground mb-6 md:mb-8 max-w-[95%] md:max-w-lg" data-testid="text-hero-description">
               Identify wallet share leakage and prioritize your highest-potential accounts.
               Let your AI agent monitor overnight, brief your reps each morning,
               and flag risk before you lose revenue.
             </p>
 
-            <div className="flex flex-col sm:flex-row flex-wrap gap-4 mb-10">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4 mb-8 md:mb-10 max-w-[90%] sm:max-w-none">
               <Button
                 size="lg"
                 onClick={() => scrollToSection("pricing")}
@@ -366,10 +366,10 @@ export default function Landing() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-6 border-t border-border/50">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 pt-6 border-t border-border/50">
               {stats.map((stat, index) => (
                 <div key={index} data-testid={`stat-${index}`}>
-                  <div className="text-2xl md:text-3xl font-bold text-primary mb-1" data-testid={`stat-value-${index}`}>
+                  <div className="text-xl sm:text-2xl md:text-3xl font-bold text-primary mb-1" data-testid={`stat-value-${index}`}>
                     {stat.value}
                   </div>
                   <div className="text-xs text-muted-foreground" data-testid={`stat-label-${index}`}>
