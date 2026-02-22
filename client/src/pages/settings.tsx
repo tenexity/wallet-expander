@@ -1572,12 +1572,207 @@ function ResetDemoDataCard() {
   );
 }
 
+interface EmailConnectionInfo {
+  id: number;
+  provider: string;
+  emailAddress: string;
+  status: string;
+  lastSyncAt: string | null;
+  syncError: string | null;
+  createdAt: string;
+}
+
+function EmailConnectionsCard() {
+  const { toast } = useToast();
+
+  const { data: connections = [], isLoading } = useQuery<EmailConnectionInfo[]>({
+    queryKey: ["/api/email/connections"],
+  });
+
+  const connectMicrosoftMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("GET", "/api/auth/microsoft/start");
+      const data = await res.json();
+      window.location.href = data.authUrl;
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to start Microsoft OAuth. Make sure Microsoft credentials are configured.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const connectGoogleMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("GET", "/api/auth/google-email/start");
+      const data = await res.json();
+      window.location.href = data.authUrl;
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to start Google OAuth. Make sure Google credentials are configured.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const disconnectMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/email/connections/${id}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Disconnected", description: "Email connection removed." });
+      queryClient.invalidateQueries({ queryKey: ["/api/email/connections"] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to disconnect email.", variant: "destructive" });
+    },
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("POST", `/api/email/connections/${id}/sync`);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: "Sync Complete", description: `Synced ${data.synced ?? 0} new emails.` });
+      queryClient.invalidateQueries({ queryKey: ["/api/email/connections"] });
+    },
+    onError: () => {
+      toast({ title: "Sync Failed", description: "Failed to sync emails.", variant: "destructive" });
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Mail className="h-4 w-4" />
+          Email Inbox Connections
+        </CardTitle>
+        <CardDescription>
+          Connect your Microsoft or Google email to automatically sync and analyze customer communications with AI
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-6">
+            <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <>
+            {connections.map((conn) => (
+              <div
+                key={conn.id}
+                className="flex items-center justify-between p-4 rounded-md border bg-chart-2/10 border-chart-2/20"
+                data-testid={`email-connection-${conn.id}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`h-9 w-9 rounded-md flex items-center justify-center text-white font-bold text-xs ${conn.provider === "microsoft" ? "bg-blue-600" : "bg-red-500"}`}>
+                    {conn.provider === "microsoft" ? "MS" : "G"}
+                  </div>
+                  <div>
+                    <p className="font-medium">{conn.emailAddress}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {conn.provider === "microsoft" ? "Microsoft 365" : "Gmail"} · {conn.status === "connected" ? "Connected" : conn.status}
+                      {conn.lastSyncAt && ` · Last synced ${new Date(conn.lastSyncAt).toLocaleDateString()}`}
+                    </p>
+                    {conn.syncError && (
+                      <p className="text-xs text-destructive mt-1">{conn.syncError}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => syncMutation.mutate(conn.id)}
+                    disabled={syncMutation.isPending}
+                    data-testid={`sync-email-${conn.id}`}
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${syncMutation.isPending ? "animate-spin" : ""}`} />
+                    Sync
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => disconnectMutation.mutate(conn.id)}
+                    disabled={disconnectMutation.isPending}
+                    data-testid={`disconnect-email-${conn.id}`}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+
+            {connections.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-2">
+                No email accounts connected. Connect one below to start syncing.
+              </p>
+            )}
+
+            <Separator />
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => connectMicrosoftMutation.mutate()}
+                disabled={connectMicrosoftMutation.isPending}
+                data-testid="connect-microsoft-email"
+              >
+                <div className="h-4 w-4 mr-2 rounded-sm bg-blue-600 flex items-center justify-center text-white text-[8px] font-bold">M</div>
+                Connect Microsoft
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => connectGoogleMutation.mutate()}
+                disabled={connectGoogleMutation.isPending}
+                data-testid="connect-google-email"
+              >
+                <div className="h-4 w-4 mr-2 rounded-sm bg-red-500 flex items-center justify-center text-white text-[8px] font-bold">G</div>
+                Connect Google
+              </Button>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingManager, setEditingManager] = useState<TerritoryManager | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const urlParams = useMemo(() => new URLSearchParams(window.location.search), []);
+  const initialTab = urlParams.get("tab") || "general";
+
+  useEffect(() => {
+    const connected = urlParams.get("connected");
+    const error = urlParams.get("error");
+    if (connected) {
+      toast({
+        title: "Email Connected",
+        description: `Your ${connected === "microsoft" ? "Microsoft" : "Google"} email has been connected successfully.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/email/connections"] });
+      window.history.replaceState({}, "", "/settings?tab=integrations");
+    } else if (error) {
+      toast({
+        title: "Connection Failed",
+        description: `Failed to connect your email account. Please try again.`,
+        variant: "destructive",
+      });
+      window.history.replaceState({}, "", "/settings?tab=integrations");
+    }
+  }, []);
 
   const [companyName, setCompanyName] = useState("ABC Supply");
   const [appTitle, setAppTitle] = useState("AI VP Dashboard");
@@ -1860,7 +2055,7 @@ export default function SettingsPage() {
         </Button>
       </div>
 
-      <Tabs defaultValue="general" className="space-y-6">
+      <Tabs defaultValue={initialTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="general" data-testid="tab-general">
             <Settings className="mr-2 h-4 w-4" />
@@ -2519,14 +2714,16 @@ Output a structured profile with category expectations.`}
             </CardContent>
           </Card>
 
+          <EmailConnectionsCard />
+
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
                 <Mail className="h-4 w-4" />
-                Email Provider
+                Email Provider (Notifications)
               </CardTitle>
               <CardDescription>
-                Configure email sending for task notifications
+                Configure Resend for sending task notification emails to Territory Managers
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

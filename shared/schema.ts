@@ -946,3 +946,71 @@ export const agentOrganizationSettings = pgTable("agent_organization_settings", 
 }, (t) => [index("idx_agent_org_settings_tenant").on(t.tenantId)]);
 
 export type AgentOrganizationSettings = typeof agentOrganizationSettings.$inferSelect;
+
+// ============ EMAIL OAUTH CONNECTIONS ============
+export const emailConnections = pgTable("email_connections", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  userId: text("user_id").notNull(),
+  provider: text("provider").notNull(), // microsoft, google
+  emailAddress: text("email_address").notNull(),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token"),
+  tokenExpiresAt: timestamp("token_expires_at"),
+  status: text("status").default("connected"), // connected, expired, disconnected, error
+  lastSyncAt: timestamp("last_sync_at"),
+  syncError: text("sync_error"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  index("idx_email_connections_tenant").on(t.tenantId),
+  index("idx_email_connections_user").on(t.userId),
+]);
+
+export const insertEmailConnectionSchema = createInsertSchema(emailConnections).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type EmailConnection = typeof emailConnections.$inferSelect;
+export type InsertEmailConnection = z.infer<typeof insertEmailConnectionSchema>;
+
+// ============ SYNCED EMAILS ============
+export const syncedEmails = pgTable("synced_emails", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  connectionId: integer("connection_id").notNull(),
+  externalId: text("external_id").notNull(), // Message ID from provider
+  fromAddress: text("from_address"),
+  fromName: text("from_name"),
+  toAddresses: jsonb("to_addresses"), // Array of { email, name }
+  ccAddresses: jsonb("cc_addresses"),
+  subject: text("subject"),
+  bodyPreview: text("body_preview"), // First ~200 chars
+  bodyText: text("body_text"), // Plain text body
+  receivedAt: timestamp("received_at"),
+  direction: text("direction").default("inbound"), // inbound, outbound
+  linkedAccountId: integer("linked_account_id"), // Linked to an account if matched
+  aiAnalyzed: boolean("ai_analyzed").default(false),
+  aiSentiment: text("ai_sentiment"), // positive, neutral, negative, urgent
+  aiSummary: text("ai_summary"),
+  aiActionItems: jsonb("ai_action_items"), // Array of { action, priority, category }
+  aiOpportunitySignals: jsonb("ai_opportunity_signals"), // Array of { signal, confidence, category }
+  aiAccountMentions: jsonb("ai_account_mentions"), // Array of account names detected
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("idx_synced_emails_tenant").on(t.tenantId),
+  index("idx_synced_emails_connection").on(t.connectionId),
+  index("idx_synced_emails_account").on(t.linkedAccountId),
+  index("idx_synced_emails_received").on(t.receivedAt),
+  index("idx_synced_emails_external").on(t.externalId),
+]);
+
+export const insertSyncedEmailSchema = createInsertSchema(syncedEmails).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type SyncedEmail = typeof syncedEmails.$inferSelect;
+export type InsertSyncedEmail = z.infer<typeof insertSyncedEmailSchema>;

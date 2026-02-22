@@ -3486,6 +3486,192 @@ KEY TALKING POINTS:
   });
 
   // ============================================================
+  // EMAIL OAUTH & SYNC ROUTES
+  // ============================================================
+  const {
+    getMicrosoftAuthUrl,
+    getGoogleAuthUrl,
+    exchangeMicrosoftCode,
+    exchangeGoogleCode,
+    getEmailConnections,
+    getEmailConnection,
+    disconnectEmailConnection,
+    saveEmailConnection,
+  } = await import("./services/email-oauth.js");
+  const { syncEmailsForConnection, getSyncedEmails, getSyncedEmail } = await import("./services/email-sync.js");
+  const { analyzeUnprocessedEmails } = await import("./services/email-ai-analysis.js");
+
+  app.get("/api/email/connections", requireSubscription, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext!.tenantId;
+      const connections = await getEmailConnections(tenantId);
+      const safeConnections = connections.map(c => ({
+        id: c.id,
+        provider: c.provider,
+        emailAddress: c.emailAddress,
+        status: c.status,
+        lastSyncAt: c.lastSyncAt,
+        syncError: c.syncError,
+        createdAt: c.createdAt,
+      }));
+      res.json(safeConnections);
+    } catch (error) {
+      handleRouteError(error, res, "Get email connections");
+    }
+  });
+
+  app.get("/api/auth/microsoft/start", requireAuth, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext!.tenantId;
+      const userId = req.user?.claims?.sub || "";
+      const state = Buffer.from(JSON.stringify({ tenantId, userId })).toString("base64url");
+      const authUrl = getMicrosoftAuthUrl(state);
+      res.json({ authUrl });
+    } catch (error) {
+      handleRouteError(error, res, "Start Microsoft OAuth");
+    }
+  });
+
+  app.get("/api/auth/microsoft/callback", async (req, res) => {
+    try {
+      const { code, state } = req.query;
+      if (!code || !state) {
+        return res.redirect("/settings?error=missing_params");
+      }
+
+      const stateData = JSON.parse(Buffer.from(state as string, "base64url").toString());
+      const { tenantId, userId } = stateData;
+
+      const tokens = await exchangeMicrosoftCode(code as string);
+
+      await saveEmailConnection({
+        tenantId,
+        userId,
+        provider: "microsoft",
+        emailAddress: tokens.email,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        tokenExpiresAt: new Date(Date.now() + tokens.expiresIn * 1000),
+        status: "connected",
+      });
+
+      res.redirect("/settings?tab=integrations&connected=microsoft");
+    } catch (error) {
+      console.error("Microsoft OAuth callback error:", error);
+      res.redirect("/settings?tab=integrations&error=microsoft_failed");
+    }
+  });
+
+  app.get("/api/auth/google-email/start", requireAuth, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext!.tenantId;
+      const userId = req.user?.claims?.sub || "";
+      const state = Buffer.from(JSON.stringify({ tenantId, userId })).toString("base64url");
+      const authUrl = getGoogleAuthUrl(state);
+      res.json({ authUrl });
+    } catch (error) {
+      handleRouteError(error, res, "Start Google OAuth");
+    }
+  });
+
+  app.get("/api/auth/google-email/callback", async (req, res) => {
+    try {
+      const { code, state } = req.query;
+      if (!code || !state) {
+        return res.redirect("/settings?error=missing_params");
+      }
+
+      const stateData = JSON.parse(Buffer.from(state as string, "base64url").toString());
+      const { tenantId, userId } = stateData;
+
+      const tokens = await exchangeGoogleCode(code as string);
+
+      await saveEmailConnection({
+        tenantId,
+        userId,
+        provider: "google",
+        emailAddress: tokens.email,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        tokenExpiresAt: new Date(Date.now() + tokens.expiresIn * 1000),
+        status: "connected",
+      });
+
+      res.redirect("/settings?tab=integrations&connected=google");
+    } catch (error) {
+      console.error("Google OAuth callback error:", error);
+      res.redirect("/settings?tab=integrations&error=google_failed");
+    }
+  });
+
+  app.delete("/api/email/connections/:id", requireSubscription, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext!.tenantId;
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid connection ID" });
+      await disconnectEmailConnection(id, tenantId);
+      res.json({ message: "Connection disconnected" });
+    } catch (error) {
+      handleRouteError(error, res, "Disconnect email");
+    }
+  });
+
+  app.post("/api/email/connections/:id/sync", requireSubscription, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext!.tenantId;
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid connection ID" });
+
+      const connection = await getEmailConnection(id, tenantId);
+      if (!connection) return res.status(404).json({ message: "Connection not found" });
+
+      const result = await syncEmailsForConnection(connection);
+      res.json({ message: "Sync complete", ...result });
+    } catch (error) {
+      handleRouteError(error, res, "Sync emails");
+    }
+  });
+
+  app.post("/api/email/connections/:id/analyze", requireSubscription, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext!.tenantId;
+      const result = await analyzeUnprocessedEmails(tenantId);
+      res.json({ message: "Analysis complete", ...result });
+    } catch (error) {
+      handleRouteError(error, res, "Analyze emails");
+    }
+  });
+
+  app.get("/api/synced-emails", requireSubscription, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext!.tenantId;
+      const connectionId = req.query.connectionId ? parseInt(req.query.connectionId as string) : undefined;
+      const accountId = req.query.accountId ? parseInt(req.query.accountId as string) : undefined;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      const offset = req.query.offset ? parseInt(req.query.offset as string) : 0;
+
+      const result = await getSyncedEmails(tenantId, { connectionId, accountId, limit, offset });
+      res.json(result);
+    } catch (error) {
+      handleRouteError(error, res, "Get synced emails");
+    }
+  });
+
+  app.get("/api/synced-emails/:id", requireSubscription, async (req, res) => {
+    try {
+      const tenantId = req.tenantContext!.tenantId;
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "Invalid email ID" });
+
+      const email = await getSyncedEmail(id, tenantId);
+      if (!email) return res.status(404).json({ message: "Email not found" });
+      res.json(email);
+    } catch (error) {
+      handleRouteError(error, res, "Get synced email");
+    }
+  });
+
+  // ============================================================
   // AGENT ROUTES — Phase 0: Identity & Continuity
   // ============================================================
   const { getCoreSystemPrompt, readAgentState } = await import("./services/agent-identity.js");
