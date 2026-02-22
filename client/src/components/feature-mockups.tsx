@@ -16,6 +16,12 @@ import {
   Sparkles,
   GraduationCap,
   HelpCircle,
+  ShieldAlert,
+  AlertTriangle,
+  Crosshair,
+  UserCheck,
+  Radar,
+  Zap,
 } from "lucide-react";
 
 const mockAccounts = [
