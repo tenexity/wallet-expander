@@ -35,6 +35,7 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { CreditMeter } from "./credit-meter";
 import tenexityLogo from "@assets/Tenexity_Logo_final_1769263645437.png";
 import appLogo from "/favicon2.png";
 
@@ -54,7 +55,7 @@ const mainNavItems = [
     title: "Revenue Tracking",
     url: "/revenue",
     icon: TrendingUp,
-    tooltip: "Track enrolled accounts, incremental revenue, and calculate rev-share fees",
+    tooltip: "Track enrolled accounts, incremental revenue, and subscription performance",
   },
   {
     title: "Program Performance",
@@ -296,6 +297,8 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="p-4 space-y-4 group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:space-y-2">
+        <CreditMeter />
+        <div className="border-t border-sidebar-border" />
         <UserProfile />
         <div className="border-t border-sidebar-border pt-3 group-data-[collapsible=icon]:hidden">
           <div className="flex items-center justify-center gap-2 text-xs text-sidebar-foreground/50">

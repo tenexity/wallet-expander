@@ -936,9 +936,9 @@ export default function Landing() {
                   const features = Array.isArray(plan.features) ? plan.features : [];
                   const planDescriptions: Record<string, string> = {
                     starter: "Try it free with one account",
-                    growth: "For focused account development",
-                    scale: "For growing sales teams",
-                    enterprise: "Full service solution",
+                    growth: "For teams up to 5 users",
+                    scale: "For scaling sales organizations",
+                    enterprise: "Custom enterprise solution",
                   };
 
                   return (
@@ -1044,23 +1044,23 @@ export default function Landing() {
                   <ul className="space-y-3 mb-6">
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>1 user</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>25 AI credits / month</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
+                      <span>Ask Anything AI (limited)</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5" />
                       <span>1 enrolled account</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>1 AI-powered playbook</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm">
-                      <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>1 ICP profile</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm">
-                      <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>Upload unlimited accounts</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm">
-                      <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>Full gap analysis</span>
+                      <span>Basic gap analysis</span>
                     </li>
                   </ul>
                   <a href="/api/login">
@@ -1073,10 +1073,10 @@ export default function Landing() {
                 <Card className="p-6" data-testid="card-plan-growth">
                   <div className="text-center mb-6">
                     <h3 className="text-xl font-bold mb-2">Growth</h3>
-                    <p className="text-sm text-muted-foreground mb-4">For focused account development</p>
+                    <p className="text-sm text-muted-foreground mb-4">For teams up to 5 users</p>
                     <div className="text-center">
                       <div className="flex items-baseline justify-center gap-1">
-                        <span className="text-4xl font-bold">${billingCycle === "yearly" ? 240 : 300}</span>
+                        <span className="text-4xl font-bold">${billingCycle === "yearly" ? 2000 : 2400}</span>
                         <span className="text-muted-foreground">/mo</span>
                       </div>
                       {billingCycle === "yearly" && (
@@ -1087,27 +1087,27 @@ export default function Landing() {
                   <ul className="space-y-3 mb-6">
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>5 enrolled accounts</span>
+                      <span>Up to 5 users</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>Unlimited AI playbooks</span>
+                      <span>500 AI credits / month</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>3 ICP profiles</span>
+                      <span>Ask Anything AI</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>Upload unlimited accounts</span>
+                      <span>Up to 20 enrolled accounts</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>Full gap analysis</span>
+                      <span>AI gap analysis & playbooks</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>Email support</span>
+                      <span>Email intelligence</span>
                     </li>
                   </ul>
                   <a href="/api/login">
@@ -1124,10 +1124,10 @@ export default function Landing() {
                   </Badge>
                   <div className="text-center mb-6">
                     <h3 className="text-xl font-bold mb-2">Scale</h3>
-                    <p className="text-sm text-muted-foreground mb-4">For growing sales teams</p>
+                    <p className="text-sm text-muted-foreground mb-4">For scaling sales organizations</p>
                     <div className="text-center">
                       <div className="flex items-baseline justify-center gap-1">
-                        <span className="text-4xl font-bold">${billingCycle === "yearly" ? 600 : 750}</span>
+                        <span className="text-4xl font-bold">${billingCycle === "yearly" ? 4167 : 5000}</span>
                         <span className="text-muted-foreground">/mo</span>
                       </div>
                       {billingCycle === "yearly" && (
@@ -1138,27 +1138,23 @@ export default function Landing() {
                   <ul className="space-y-3 mb-6">
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>15 enrolled accounts</span>
+                      <span>Up to 20 users</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>Unlimited AI playbooks</span>
+                      <span>2,000 AI credits / month</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>Unlimited ICP profiles</span>
+                      <span>Unlimited enrolled accounts</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>Upload unlimited accounts</span>
+                      <span>Agentic daily briefings</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>Full gap analysis</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm">
-                      <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>AI-powered playbooks</span>
+                      <span>CRM Intelligence auto-population</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
@@ -1175,7 +1171,7 @@ export default function Landing() {
                 <Card className="p-6" data-testid="card-plan-enterprise">
                   <div className="text-center mb-6">
                     <h3 className="text-xl font-bold mb-2">Enterprise</h3>
-                    <p className="text-sm text-muted-foreground mb-4">Full service solution</p>
+                    <p className="text-sm text-muted-foreground mb-4">Custom enterprise solution</p>
                     <div className="flex items-baseline justify-center gap-1">
                       <span className="text-4xl font-bold">Custom</span>
                     </div>
@@ -1183,23 +1179,23 @@ export default function Landing() {
                   <ul className="space-y-3 mb-6">
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>Unlimited enrolled accounts</span>
+                      <span>Unlimited users</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>Weekly account review calls</span>
+                      <span>Unlimited AI credits</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>Fractional VP of Sales services</span>
+                      <span>Everything in Scale</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>Custom AI training for your team</span>
+                      <span>Custom AI training</span>
                     </li>
                     <li className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5" />
-                      <span>Dedicated support</span>
+                      <span>SSO & advanced security</span>
                     </li>
                   </ul>
                   <a href="mailto:sales@tenexity.com?subject=Enterprise%20Plan%20Inquiry">

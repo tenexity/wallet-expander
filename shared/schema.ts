@@ -1176,3 +1176,89 @@ export const insertCompetitorMentionSchema = createInsertSchema(competitorMentio
 
 export type CompetitorMention = typeof competitorMentions.$inferSelect;
 export type InsertCompetitorMention = z.infer<typeof insertCompetitorMentionSchema>;
+
+// ============ AI CREDIT SYSTEM ============
+
+export const AI_ACTION_TYPES = [
+  'ask_anything',
+  'generate_playbook',
+  'icp_analysis',
+  'daily_briefing',
+  'email_analysis',
+  'account_dossier',
+  'email_composer',
+] as const;
+
+export type AIActionType = typeof AI_ACTION_TYPES[number];
+
+export const AI_ACTION_CREDITS: Record<AIActionType, number> = {
+  ask_anything: 2,
+  generate_playbook: 10,
+  icp_analysis: 15,
+  daily_briefing: 5,
+  email_analysis: 3,
+  account_dossier: 8,
+  email_composer: 4,
+};
+
+export const AI_ACTION_LABELS: Record<AIActionType, string> = {
+  ask_anything: "Ask Anything",
+  generate_playbook: "Generate Playbook",
+  icp_analysis: "ICP Analysis",
+  daily_briefing: "Daily Briefing",
+  email_analysis: "Email Analysis",
+  account_dossier: "Account Dossier",
+  email_composer: "Email Composer",
+};
+
+export const PLAN_CREDIT_ALLOWANCES: Record<string, number> = {
+  free: 25,
+  starter: 25,
+  professional: 500,
+  growth: 500,
+  scale: 2000,
+  enterprise: -1,
+};
+
+export const creditTransactions = pgTable("credit_transactions", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  actionType: text("action_type").notNull(),
+  creditsUsed: integer("credits_used").notNull(),
+  metadata: jsonb("metadata").$type<{ accountId?: number; accountName?: string; description?: string }>(),
+  billingPeriod: text("billing_period").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("idx_credit_transactions_tenant").on(t.tenantId),
+  index("idx_credit_transactions_period").on(t.tenantId, t.billingPeriod),
+]);
+
+export const insertCreditTransactionSchema = createInsertSchema(creditTransactions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type CreditTransaction = typeof creditTransactions.$inferSelect;
+export type InsertCreditTransaction = z.infer<typeof insertCreditTransactionSchema>;
+
+export const tenantCreditLedger = pgTable("tenant_credit_ledger", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  billingPeriod: text("billing_period").notNull(),
+  totalAllowance: integer("total_allowance").notNull(),
+  creditsUsed: integer("credits_used").notNull().default(0),
+  creditsRemaining: integer("credits_remaining").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  index("idx_tenant_credit_ledger_tenant_period").on(t.tenantId, t.billingPeriod),
+]);
+
+export const insertTenantCreditLedgerSchema = createInsertSchema(tenantCreditLedger).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type TenantCreditLedger = typeof tenantCreditLedger.$inferSelect;
+export type InsertTenantCreditLedger = z.infer<typeof insertTenantCreditLedgerSchema>;

@@ -55,9 +55,9 @@ The application follows a client-server architecture.
     - **Account Insights:** Provides gap analysis, opportunity scores, and category penetration metrics for accounts.
     - **ICP Builder:** AI-assisted definition and management of Ideal Customer Profiles, including data insights for transparency into AI analysis and decision logic.
     - **Playbooks & Tasks:** AI-generated sales tasks, call scripts, and email templates, with automatic playbook generation upon account enrollment.
-    - **Revenue Tracking:** Tracks enrolled accounts, incremental revenue, and calculates rev-share fees. Includes account graduation system for marking accounts as successfully completed.
+    - **Revenue Tracking:** Tracks enrolled accounts, incremental revenue, and subscription performance. Includes account graduation system for marking accounts as successfully completed.
     - **Account Graduation System:** Allows setting graduation objectives (target penetration %, incremental revenue, enrollment duration), tracking progress, and graduating accounts when objectives are met. Graduated accounts move to an alumni section.
-    - **Tiered Rev-Share Pricing:** Configurable volume-based pricing tiers for calculating fees owed to Tenexity. Supports multiple tiers with different rates at different revenue thresholds, calculates blended effective rates, and displays tier breakdown showing how fees are distributed across tiers.
+    - **AI Credit System:** Flat monthly SaaS subscription with credit-based AI action metering. Plans: Starter (Free/25 credits/1 user), Growth ($2,400/500 credits/5 users), Scale ($5,000/2,000 credits/20 users), Enterprise (custom/unlimited). Credit costs per action: Ask Anything (2), Generate Playbook (10), ICP Analysis (15), Daily Briefing (5), Email Analysis (3), Account Dossier (8), Email Composer (4). Sidebar credit meter shows real-time usage. Credit usage detail page at /credits with action breakdown and transaction history.
     - **Custom Categories:** Allows full CRUD operations for product categories, which are integrated into AI analysis for ICP and playbook generation.
     - **Scoring Settings:** Customizable weighting factors for opportunity scoring (Gap Size, Revenue Potential, Category Count).
     - **Territory Manager Administration:** CRUD operations for Territory Managers, including territory assignments and task linkage.
@@ -81,7 +81,7 @@ The application follows a client-server architecture.
 - `server/`: Backend application, including database connection, API routes, storage, and seeding scripts.
 - `shared/`: Shared schema definitions and AI chat models.
 
-**Database Schema:** Key tables include `users`, `sessions`, `tenants`, `user_roles`, `accounts`, `products`, `orders`, `segment_profiles`, `account_metrics`, `tasks`, `playbooks`, `program_accounts`, `custom_categories`, `settings`, `territory_managers`, `rev_share_tiers`, `email_connections`, `synced_emails`, `contacts`, `projects`, `email_interactions`, `order_signals`, and `competitor_mentions`.
+**Database Schema:** Key tables include `users`, `sessions`, `tenants`, `user_roles`, `accounts`, `products`, `orders`, `segment_profiles`, `account_metrics`, `tasks`, `playbooks`, `program_accounts`, `custom_categories`, `settings`, `territory_managers`, `rev_share_tiers`, `email_connections`, `synced_emails`, `contacts`, `projects`, `email_interactions`, `order_signals`, `competitor_mentions`, `credit_transactions`, and `tenant_credit_ledger`.
 
 ## External Dependencies
 

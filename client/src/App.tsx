@@ -25,6 +25,7 @@ import ProgramPerformance from "@/pages/program-performance";
 import CRMContacts from "@/pages/crm-contacts";
 import CRMProjects from "@/pages/crm-projects";
 import CRMSignals from "@/pages/crm-signals";
+import CreditUsage from "@/pages/credit-usage";
 import { AskAnythingBar } from "@/components/ask-anything-bar";
 
 function AuthenticatedRouter() {
@@ -45,6 +46,7 @@ function AuthenticatedRouter() {
       <Route path="/crm/contacts" component={CRMContacts} />
       <Route path="/crm/projects" component={CRMProjects} />
       <Route path="/crm/signals" component={CRMSignals} />
+      <Route path="/credits" component={CreditUsage} />
       <Route component={NotFound} />
     </Switch>
   );

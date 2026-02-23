@@ -22,6 +22,8 @@ import {
   subscriptionPlans,
   subscriptionEvents,
   stripeWebhookEvents,
+  AI_ACTION_CREDITS,
+  AI_ACTION_LABELS,
 } from "@shared/schema";
 import type Stripe from "stripe";
 import { db } from "./db";
@@ -69,6 +71,8 @@ import { withTenantContext, requireRole, requirePermission, type TenantContext }
 import { getTenantStorage, TenantStorage } from "./storage/tenantStorage";
 import { requireActiveSubscription, requirePlan, checkSubscriptionStatus } from "./middleware/subscription";
 import { requireFeatureLimit, checkFeatureLimit, getUsageWithLimits } from "./middleware/featureLimits";
+import { requireCredits, deductCreditsAfterAction } from "./middleware/creditGuard";
+import { getCreditUsage } from "./services/creditService";
 
 function getStorage(req: Request): TenantStorage {
   if (!req.tenantContext?.tenantId) {
@@ -827,7 +831,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/segment-profiles/analyze", requireSubscription, async (req, res) => {
+  app.post("/api/segment-profiles/analyze", requireSubscription, requireCredits('icp_analysis'), async (req, res) => {
     try {
       const { segment } = req.body;
       if (!segment) {
@@ -835,6 +839,8 @@ KEY TALKING POINTS:
       }
 
       const analysis = await analyzeSegment(segment);
+
+      await deductCreditsAfterAction(req, 'icp_analysis');
 
       res.json({
         message: `Analysis complete for ${segment}`,
@@ -1338,7 +1344,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/playbooks/generate", requireSubscription, async (req, res) => {
+  app.post("/api/playbooks/generate", requireSubscription, requireCredits('generate_playbook'), async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const tenant = req.tenantContext?.tenant;
@@ -1444,6 +1450,8 @@ KEY TALKING POINTS:
           taskId: createdTask.id,
         });
       }
+
+      await deductCreditsAfterAction(req, 'generate_playbook');
 
       res.status(201).json({
         ...playbook,
@@ -3988,23 +3996,25 @@ KEY TALKING POINTS:
   const { runWeeklyAccountReview } = await import("./services/weekly-account-review");
   const { processCrmSyncQueue } = await import("./services/crm-sync-push");
 
-  app.post("/api/agent/generate-playbook", requireAuth, async (req, res) => {
+  app.post("/api/agent/generate-playbook", requireAuth, requireCredits('generate_playbook'), async (req, res) => {
     try {
       const tenantId = req.tenantContext?.tenantId;
       if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
       const { accountId, playbookType } = req.body;
       if (!accountId) return res.status(400).json({ message: "accountId is required" });
       const result = await generatePlaybook(Number(accountId), tenantId, playbookType);
+      await deductCreditsAfterAction(req, 'generate_playbook');
       res.json(result);
     } catch (error) {
       handleRouteError(error, res, "Generate playbook");
     }
   });
 
-  app.post("/api/agent/daily-briefing", requireAdmin, async (req, res) => {
+  app.post("/api/agent/daily-briefing", requireAdmin, requireCredits('daily_briefing'), async (req, res) => {
     try {
       const tenantId = req.tenantContext?.tenantId;
       if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
+      await deductCreditsAfterAction(req, 'daily_briefing');
       runDailyBriefing(tenantId)
         .then((r) => console.log("[daily-briefing] Done:", r))
         .catch((err) => console.error("[daily-briefing] Error:", err));
@@ -4014,25 +4024,27 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/agent/email-intelligence", requireAuth, async (req, res) => {
+  app.post("/api/agent/email-intelligence", requireAuth, requireCredits('email_analysis'), async (req, res) => {
     try {
       const tenantId = req.tenantContext?.tenantId;
       if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
       const { interactionId } = req.body;
       if (!interactionId) return res.status(400).json({ message: "interactionId is required" });
       const result = await analyzeEmailIntelligence(Number(interactionId), tenantId);
+      await deductCreditsAfterAction(req, 'email_analysis');
       res.json(result);
     } catch (error) {
       handleRouteError(error, res, "Email intelligence");
     }
   });
 
-  app.get("/api/agent/ask-anything", requireAuth, async (req, res) => {
+  app.get("/api/agent/ask-anything", requireAuth, requireCredits('ask_anything'), async (req, res) => {
     try {
       const tenantId = req.tenantContext?.tenantId;
       if (!tenantId) return res.status(401).json({ message: "Not authenticated" });
       const { question, scope, scopeId } = req.query as Record<string, string>;
       if (!question) return res.status(400).json({ message: "question is required" });
+      await deductCreditsAfterAction(req, 'ask_anything');
       const validScope = (["account", "portfolio", "program"].includes(scope) ? scope : "portfolio") as "account" | "portfolio" | "program";
       await streamAskAnything(question, validScope, scopeId ? Number(scopeId) : null, tenantId, res);
     } catch (error) {
@@ -4094,6 +4106,27 @@ KEY TALKING POINTS:
     } catch (error) {
       handleRouteError(error, res, "Health check");
     }
+  });
+
+  // ============ Credit Usage Endpoints ============
+  app.get("/api/credits/usage", requireAuth, async (req, res) => {
+    try {
+      const tenant = req.tenantContext?.tenant;
+      if (!tenant) return res.status(401).json({ message: "Not authenticated" });
+      const usage = await getCreditUsage(tenant.id, tenant.planType || "free");
+      res.json(usage);
+    } catch (error) {
+      handleRouteError(error, res, "Get credit usage");
+    }
+  });
+
+  app.get("/api/credits/action-costs", (_req, res) => {
+    const costs = Object.entries(AI_ACTION_CREDITS).map(([key, credits]) => ({
+      actionType: key,
+      credits,
+      label: AI_ACTION_LABELS[key as keyof typeof AI_ACTION_LABELS],
+    }));
+    res.json(costs);
   });
 
   return httpServer;
