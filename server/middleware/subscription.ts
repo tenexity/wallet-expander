@@ -14,12 +14,19 @@ export const requireActiveSubscription: RequestHandler = (
     return res.status(401).json({ message: "Not authenticated" });
   }
 
+  const planType = tenant.planType || "free";
+  const status = tenant.subscriptionStatus || "none";
+
+  if (planType === "free") {
+    return next();
+  }
+
   const activeStatuses = ["active", "trialing"];
-  if (!activeStatuses.includes(tenant.subscriptionStatus || "")) {
+  if (!activeStatuses.includes(status)) {
     return res.status(402).json({
       message: "Active subscription required",
-      subscriptionStatus: tenant.subscriptionStatus || "none",
-      planType: tenant.planType || "free",
+      subscriptionStatus: status,
+      planType,
     });
   }
 
@@ -27,13 +34,15 @@ export const requireActiveSubscription: RequestHandler = (
 };
 
 export const requirePlan = (
-  minPlan: "starter" | "professional" | "enterprise"
+  minPlan: "starter" | "growth" | "professional" | "scale" | "enterprise"
 ): RequestHandler => {
   const planHierarchy: Record<string, number> = {
     free: 0,
     starter: 1,
+    growth: 2,
     professional: 2,
-    enterprise: 3,
+    scale: 3,
+    enterprise: 4,
   };
 
   return (req: Request, res: Response, next: NextFunction) => {

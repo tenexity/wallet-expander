@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction, RequestHandler } from "express";
 import { db } from "../db";
-import { subscriptionPlans, playbooks, segmentProfiles, programAccounts } from "@shared/schema";
+import { subscriptionPlans, playbooks, segmentProfiles, programAccounts, userRoles } from "@shared/schema";
 import { eq, count } from "drizzle-orm";
 
 export interface FeatureLimits {
@@ -8,6 +8,7 @@ export interface FeatureLimits {
   icps: number; // -1 = unlimited
   enrolled_accounts: number; // -1 = unlimited
   accounts: number; // -1 = unlimited
+  users: number; // -1 = unlimited
 }
 
 export interface FeatureUsage {
@@ -15,6 +16,7 @@ export interface FeatureUsage {
   icps: number;
   enrolled_accounts: number;
   accounts: number;
+  users: number;
 }
 
 export interface LimitCheckResult {
@@ -30,6 +32,7 @@ const DEFAULT_FREE_LIMITS: FeatureLimits = {
   icps: 1,
   enrolled_accounts: 1,
   accounts: -1,
+  users: 1,
 };
 
 export async function getPlanLimits(planType: string): Promise<FeatureLimits> {
@@ -52,6 +55,7 @@ export async function getPlanLimits(planType: string): Promise<FeatureLimits> {
     icps: limits.icps ?? -1,
     enrolled_accounts: limits.enrolled_accounts ?? -1,
     accounts: limits.accounts ?? -1,
+    users: limits.users ?? -1,
   };
 }
 
@@ -68,11 +72,16 @@ export async function getFeatureUsage(tenantId: number): Promise<FeatureUsage> {
     .from(programAccounts)
     .where(eq(programAccounts.tenantId, tenantId));
 
+  const [userCount] = await db.select({ count: count() })
+    .from(userRoles)
+    .where(eq(userRoles.tenantId, tenantId));
+
   return {
     playbooks: playbookCount?.count || 0,
     icps: icpCount?.count || 0,
     enrolled_accounts: enrolledCount?.count || 0,
-    accounts: 0, // Accounts are not typically limited
+    accounts: 0,
+    users: userCount?.count || 0,
   };
 }
 
@@ -137,24 +146,17 @@ export async function getUsageWithLimits(tenantId: number, planType: string) {
   const limits = await getPlanLimits(planType);
   const usage = await getFeatureUsage(tenantId);
 
+  const buildEntry = (feature: keyof FeatureLimits) => ({
+    current: usage[feature],
+    limit: limits[feature],
+    remaining: limits[feature] === -1 ? -1 : Math.max(0, limits[feature] - usage[feature]),
+    unlimited: limits[feature] === -1,
+  });
+
   return {
-    playbooks: {
-      current: usage.playbooks,
-      limit: limits.playbooks,
-      remaining: limits.playbooks === -1 ? -1 : Math.max(0, limits.playbooks - usage.playbooks),
-      unlimited: limits.playbooks === -1,
-    },
-    icps: {
-      current: usage.icps,
-      limit: limits.icps,
-      remaining: limits.icps === -1 ? -1 : Math.max(0, limits.icps - usage.icps),
-      unlimited: limits.icps === -1,
-    },
-    enrolled_accounts: {
-      current: usage.enrolled_accounts,
-      limit: limits.enrolled_accounts,
-      remaining: limits.enrolled_accounts === -1 ? -1 : Math.max(0, limits.enrolled_accounts - usage.enrolled_accounts),
-      unlimited: limits.enrolled_accounts === -1,
-    },
+    playbooks: buildEntry("playbooks"),
+    icps: buildEntry("icps"),
+    enrolled_accounts: buildEntry("enrolled_accounts"),
+    users: buildEntry("users"),
   };
 }

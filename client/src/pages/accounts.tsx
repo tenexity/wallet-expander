@@ -29,6 +29,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useSubscriptionUsage } from "@/hooks/use-subscription-usage";
+import { UpgradePrompt, UpgradePromptInline } from "@/components/upgrade-prompt";
 import {
   Search,
   Filter,
@@ -157,7 +159,7 @@ function AccountContactsTab({ accountId }: { accountId: number }) {
         );
       })}
       <Link href="/crm/contacts">
-        <Button variant="link" size="sm" className="w-full mt-2" data-testid="link-view-all-contacts">
+        <Button variant="ghost" size="sm" className="w-full mt-2" data-testid="link-view-all-contacts">
           View all contacts <ChevronRight className="h-3 w-3 ml-1" />
         </Button>
       </Link>
@@ -231,7 +233,7 @@ function AccountProjectsTab({ accountId }: { accountId: number }) {
         );
       })}
       <Link href="/crm/projects">
-        <Button variant="link" size="sm" className="w-full mt-2" data-testid="link-view-all-projects">
+        <Button variant="ghost" size="sm" className="w-full mt-2" data-testid="link-view-all-projects">
           View all projects <ChevronRight className="h-3 w-3 ml-1" />
         </Button>
       </Link>
@@ -337,7 +339,7 @@ function AccountActivityTab({ accountId }: { accountId: number }) {
       )}
 
       <Link href="/crm/signals">
-        <Button variant="link" size="sm" className="w-full" data-testid="link-view-all-signals">
+        <Button variant="ghost" size="sm" className="w-full" data-testid="link-view-all-signals">
           View all signals & threats <ChevronRight className="h-3 w-3 ml-1" />
         </Button>
       </Link>
@@ -358,6 +360,9 @@ export default function Accounts() {
   const [taskDueDate, setTaskDueDate] = useState("");
   const searchParams = useSearch();
   const { toast } = useToast();
+  const { canCreate, getFeatureUsage, planLabel } = useSubscriptionUsage();
+  const enrollUsage = getFeatureUsage("enrolled_accounts");
+  const enrollAtLimit = !canCreate("enrolled_accounts");
 
   const { data: accounts, isLoading } = useQuery<AccountWithMetrics[]>({
     queryKey: ["/api/accounts"],
@@ -1141,38 +1146,46 @@ export default function Accounts() {
                         </Tooltip>
                       )}
                       {!selectedAccount.enrolled && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button 
-                              variant="outline" 
-                              data-testid="button-enroll-account"
-                              onClick={handleEnrollAccount}
-                              disabled={isEnrolling}
-                            >
-                              {isEnrolling ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Enrolling...
-                                </>
-                              ) : (
-                                <>
-                                  <Target className="mr-2 h-4 w-4" />
-                                  Enroll in Program
-                                </>
-                              )}
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs" side="top">
-                            <p className="text-sm font-medium mb-1">What does enrollment do?</p>
-                            <ul className="text-xs space-y-1 list-disc list-inside">
-                              <li>Adds this account to the revenue growth program</li>
-                              <li>Tracks incremental revenue from targeted categories</li>
-                              <li>Calculates rev-share fees based on captured wallet share</li>
-                              <li>Enables performance monitoring on the Revenue tab</li>
-                              <li>Automatically generates an AI-powered sales playbook</li>
-                            </ul>
-                          </TooltipContent>
-                        </Tooltip>
+                        enrollAtLimit ? (
+                          <UpgradePromptInline
+                            feature="enrolled accounts"
+                            limit={enrollUsage.limit}
+                            planType={planLabel()}
+                          />
+                        ) : (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                variant="outline" 
+                                data-testid="button-enroll-account"
+                                onClick={handleEnrollAccount}
+                                disabled={isEnrolling}
+                              >
+                                {isEnrolling ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Enrolling...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Target className="mr-2 h-4 w-4" />
+                                    Enroll in Program
+                                  </>
+                                )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs" side="top">
+                              <p className="text-sm font-medium mb-1">What does enrollment do?</p>
+                              <ul className="text-xs space-y-1 list-disc list-inside">
+                                <li>Adds this account to the revenue growth program</li>
+                                <li>Tracks incremental revenue from targeted categories</li>
+                                <li>Calculates rev-share fees based on captured wallet share</li>
+                                <li>Enables performance monitoring on the Revenue tab</li>
+                                <li>Automatically generates an AI-powered sales playbook</li>
+                              </ul>
+                            </TooltipContent>
+                          </Tooltip>
+                        )
                       )}
                     </div>
                   </div>

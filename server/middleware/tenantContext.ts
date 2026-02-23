@@ -40,7 +40,7 @@ export async function createTenantForUser(userId: string, email: string): Promis
   const name = email.split("@")[0];
 
   const [newTenant] = await db.insert(tenants)
-    .values({ name, slug })
+    .values({ name, slug, subscriptionStatus: "active", planType: "free" })
     .returning();
 
   const [newRole] = await db.insert(userRoles)

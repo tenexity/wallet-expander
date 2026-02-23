@@ -17,8 +17,8 @@ export const tenants = pgTable("tenants", {
   // Subscription fields
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
-  subscriptionStatus: text("subscription_status").default("none"), // none, trialing, active, past_due, canceled, unpaid
-  planType: text("plan_type").default("free"), // free, starter, professional, enterprise
+  subscriptionStatus: text("subscription_status").default("active"), // active, trialing, past_due, canceled, unpaid, none
+  planType: text("plan_type").default("free"), // free, starter, growth, scale, enterprise
   billingPeriodEnd: timestamp("billing_period_end"),
   trialEndsAt: timestamp("trial_ends_at"),
   canceledAt: timestamp("canceled_at"),
@@ -47,7 +47,7 @@ export const SUBSCRIPTION_STATUSES = ['none', 'trialing', 'active', 'past_due', 
 export type SubscriptionStatus = typeof SUBSCRIPTION_STATUSES[number];
 
 // Plan types
-export const PLAN_TYPES = ['free', 'starter', 'professional', 'enterprise'] as const;
+export const PLAN_TYPES = ['free', 'starter', 'growth', 'professional', 'scale', 'enterprise'] as const;
 export type PlanType = typeof PLAN_TYPES[number];
 
 // ============ USER ROLES (Permission levels per tenant) ============

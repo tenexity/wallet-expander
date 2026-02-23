@@ -31,6 +31,8 @@ import {
 } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useSubscriptionUsage } from "@/hooks/use-subscription-usage";
+import { UpgradePrompt } from "@/components/upgrade-prompt";
 import {
   Target,
   Plus,
@@ -185,6 +187,9 @@ export default function ICPBuilder() {
   const [editedCategories, setEditedCategories] = useState<EditedCategory[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+  const { canCreate, getFeatureUsage, planLabel } = useSubscriptionUsage();
+  const icpUsage = getFeatureUsage("icps");
+  const icpAtLimit = !canCreate("icps");
 
   const { data: dataInsights, isLoading: isInsightsLoading } = useQuery<DataInsights>({
     queryKey: ["/api/data-insights", selectedInsightSegment],
@@ -406,11 +411,20 @@ export default function ICPBuilder() {
             Define and manage Ideal Customer Profiles by segment
           </p>
         </div>
-        <Button data-testid="button-new-profile">
+        <Button data-testid="button-new-profile" disabled={icpAtLimit}>
           <Plus className="mr-2 h-4 w-4" />
           New Profile
         </Button>
       </div>
+
+      {icpAtLimit && (
+        <UpgradePrompt
+          feature="ICP profiles"
+          current={icpUsage.current}
+          limit={icpUsage.limit}
+          planType={planLabel()}
+        />
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList>

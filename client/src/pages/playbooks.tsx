@@ -31,6 +31,8 @@ import {
 } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useSubscriptionUsage } from "@/hooks/use-subscription-usage";
+import { UpgradePrompt } from "@/components/upgrade-prompt";
 import {
   ClipboardList,
   Plus,
@@ -119,6 +121,9 @@ export default function Playbooks() {
   const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
   const [expandedTasks, setExpandedTasks] = useState<Set<number>>(new Set());
   const { toast } = useToast();
+  const { canCreate, getFeatureUsage, planLabel } = useSubscriptionUsage();
+  const playbookUsage = getFeatureUsage("playbooks");
+  const playbookAtLimit = !canCreate("playbooks");
   const search = useSearch();
   
   // Generate dialog form state
@@ -420,12 +425,21 @@ export default function Playbooks() {
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
-          <Button onClick={() => setShowGenerateDialog(true)} data-testid="button-generate-playbook">
+          <Button onClick={() => setShowGenerateDialog(true)} data-testid="button-generate-playbook" disabled={playbookAtLimit}>
             <Plus className="mr-2 h-4 w-4" />
             Generate Playbook
           </Button>
         </div>
       </div>
+
+      {playbookAtLimit && (
+        <UpgradePrompt
+          feature="playbooks"
+          current={playbookUsage.current}
+          limit={playbookUsage.limit}
+          planType={planLabel()}
+        />
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>

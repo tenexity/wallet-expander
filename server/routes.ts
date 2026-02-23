@@ -70,7 +70,7 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import { withTenantContext, requireRole, requirePermission, type TenantContext } from "./middleware/tenantContext";
 import { getTenantStorage, TenantStorage } from "./storage/tenantStorage";
 import { requireActiveSubscription, requirePlan, checkSubscriptionStatus } from "./middleware/subscription";
-import { requireFeatureLimit, checkFeatureLimit, getUsageWithLimits } from "./middleware/featureLimits";
+import { requireFeatureLimit, checkFeatureLimit, getUsageWithLimits, getPlanLimits } from "./middleware/featureLimits";
 import { requireCredits, deductCreditsAfterAction } from "./middleware/creditGuard";
 import { getCreditUsage } from "./services/creditService";
 
@@ -457,7 +457,7 @@ export async function registerRoutes(
   });
 
   // Enroll account in growth program and auto-generate playbook
-  app.post("/api/accounts/:id/enroll", requireSubscription, async (req, res) => {
+  app.post("/api/accounts/:id/enroll", requireSubscription, requireFeatureLimit("enrolled_accounts"), async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const tenant = req.tenantContext?.tenant;
@@ -727,7 +727,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/segment-profiles", requireSubscription, async (req, res) => {
+  app.post("/api/segment-profiles", requireSubscription, requireFeatureLimit("icps"), async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const tenant = req.tenantContext?.tenant;
@@ -1344,7 +1344,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/playbooks/generate", requireSubscription, requireCredits('generate_playbook'), async (req, res) => {
+  app.post("/api/playbooks/generate", requireSubscription, requireFeatureLimit("playbooks"), requireCredits('generate_playbook'), async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const tenant = req.tenantContext?.tenant;
@@ -1501,7 +1501,7 @@ KEY TALKING POINTS:
     }
   });
 
-  app.post("/api/program-accounts", requireSubscription, async (req, res) => {
+  app.post("/api/program-accounts", requireSubscription, requireFeatureLimit("enrolled_accounts"), async (req, res) => {
     try {
       const tenantStorage = getStorage(req);
       const data = insertProgramAccountSchema.parse(req.body);
@@ -4117,6 +4117,43 @@ KEY TALKING POINTS:
       res.json(usage);
     } catch (error) {
       handleRouteError(error, res, "Get credit usage");
+    }
+  });
+
+  app.get("/api/subscription/usage", requireAuth, async (req, res) => {
+    try {
+      const tenant = req.tenantContext?.tenant;
+      if (!tenant) return res.status(401).json({ message: "Not authenticated" });
+      const usageWithLimits = await getUsageWithLimits(tenant.id, tenant.planType || "free");
+      const creditUsage = await getCreditUsage(tenant.id, tenant.planType || "free");
+
+      const userCount = await db.select({ count: count() })
+        .from(userRoles)
+        .where(eq(userRoles.tenantId, tenant.id));
+
+      const planLimits = await getPlanLimits(tenant.planType || "free");
+      const userLimit = (planLimits as any).users ?? -1;
+
+      res.json({
+        planType: tenant.planType || "free",
+        subscriptionStatus: tenant.subscriptionStatus || "none",
+        features: usageWithLimits,
+        users: {
+          current: userCount[0]?.count || 0,
+          limit: userLimit,
+          remaining: userLimit === -1 ? -1 : Math.max(0, userLimit - (userCount[0]?.count || 0)),
+          unlimited: userLimit === -1,
+        },
+        credits: {
+          used: creditUsage.creditsUsed,
+          remaining: creditUsage.creditsRemaining,
+          total: creditUsage.totalAllowance,
+          unlimited: creditUsage.unlimited,
+          percentUsed: creditUsage.percentUsed,
+        },
+      });
+    } catch (error) {
+      handleRouteError(error, res, "Get subscription usage");
     }
   });
 
