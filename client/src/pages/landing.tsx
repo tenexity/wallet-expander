@@ -977,7 +977,7 @@ export default function Landing() {
                           ) : (
                             <>
                               <span className="text-4xl font-bold" data-testid={`text-plan-price-${plan.slug}`}>
-                                ${billingCycle === "yearly" ? Math.round(price / 12) : Math.round(price)}
+                                ${(billingCycle === "yearly" ? Math.round(price / 12) : Math.round(price)).toLocaleString()}
                               </span>
                               <span className="text-muted-foreground">/mo</span>
                               {billingCycle === "yearly" && (
@@ -1076,7 +1076,7 @@ export default function Landing() {
                     <p className="text-sm text-muted-foreground mb-4">For teams up to 5 users</p>
                     <div className="text-center">
                       <div className="flex items-baseline justify-center gap-1">
-                        <span className="text-4xl font-bold">${billingCycle === "yearly" ? 2000 : 2400}</span>
+                        <span className="text-4xl font-bold">${billingCycle === "yearly" ? "2,000" : "2,400"}</span>
                         <span className="text-muted-foreground">/mo</span>
                       </div>
                       {billingCycle === "yearly" && (
@@ -1127,7 +1127,7 @@ export default function Landing() {
                     <p className="text-sm text-muted-foreground mb-4">For scaling sales organizations</p>
                     <div className="text-center">
                       <div className="flex items-baseline justify-center gap-1">
-                        <span className="text-4xl font-bold">${billingCycle === "yearly" ? 4167 : 5000}</span>
+                        <span className="text-4xl font-bold">${billingCycle === "yearly" ? "4,167" : "5,000"}</span>
                         <span className="text-muted-foreground">/mo</span>
                       </div>
                       {billingCycle === "yearly" && (
