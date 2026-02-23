@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { db } from "./db";
 import { subscriptionPlans } from "@shared/schema";
 import { eq } from "drizzle-orm";
@@ -13,8 +13,7 @@ function formatPrice(price: string | null): string {
   return "$" + num.toLocaleString();
 }
 
-export function registerSSRLandingRoute(app: Express) {
-  app.get("/promo", async (_req, res) => {
+async function renderLandingPage(_req: Request, res: Response) {
     let plans: Array<{
       name: string;
       slug: string;
@@ -260,12 +259,18 @@ export function registerSSRLandingRoute(app: Express) {
     .btn-outline:hover { background: var(--bg-muted); }
     .btn-lg { padding: 0.75rem 2rem; font-size: 1rem; }
 
+    /* Header logo */
+    .logo img { height: 2.5rem; width: auto; }
+
     /* Hero */
-    .hero { padding: 4rem 0; background: linear-gradient(135deg, var(--bg) 0%, var(--bg-muted) 100%); }
-    .hero h1 { font-size: 3rem; font-weight: 800; margin-bottom: 1.5rem; max-width: 700px; }
+    .hero { position: relative; min-height: 560px; overflow: hidden; display: flex; align-items: center; }
+    .hero-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 60% center; }
+    .hero-overlay { position: absolute; inset: 0; background: linear-gradient(to right, var(--bg) 0%, rgba(255,255,255,0.9) 45%, rgba(255,255,255,0.4) 65%, transparent 100%); }
+    .hero-content { position: relative; z-index: 1; max-width: 600px; }
+    .hero h1 { font-size: 3rem; font-weight: 800; margin-bottom: 1.5rem; }
     .hero h1 span { color: var(--primary); }
     .hero p { font-size: 1.25rem; color: var(--text-muted); max-width: 600px; margin-bottom: 2rem; }
-    .hero-badge { display: inline-block; background: var(--bg-muted); border: 1px solid var(--border); padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-bottom: 1.5rem; }
+    .hero-badge { display: inline-block; background: rgba(248,250,252,0.85); border: 1px solid var(--border); padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-bottom: 1.5rem; }
     .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; margin-top: 2.5rem; padding-top: 2rem; border-top: 1px solid var(--border); }
     .stat-value { font-size: 1.75rem; font-weight: 700; color: var(--primary); }
     .stat-label { font-size: 0.75rem; color: var(--text-muted); }
@@ -355,7 +360,7 @@ export function registerSSRLandingRoute(app: Express) {
   <header>
     <div class="container">
       <div class="logo">
-        <div class="logo-icon">W</div>
+        <img src="/images/tenexity-logo.png" alt="Wallet Share Expander" />
         <span>Wallet Share</span>
       </div>
       <nav>
@@ -369,7 +374,9 @@ export function registerSSRLandingRoute(app: Express) {
   </header>
 
   <section class="hero">
-    <div class="container">
+    <img src="/images/hero-construction-wide.png" alt="Sales representative at a commercial construction site" class="hero-bg" />
+    <div class="hero-overlay"></div>
+    <div class="container hero-content">
       <span class="hero-badge">Agentic AI That Thinks, Plans, and Reminds</span>
       <h1>Recover <span>Lost Revenue</span> from Existing Customers</h1>
       <p>Identify wallet share leakage and prioritize your highest-potential accounts. Let your AI agent monitor overnight, brief your reps each morning, and flag risk before you lose revenue.</p>
@@ -528,13 +535,12 @@ export function registerSSRLandingRoute(app: Express) {
   <footer>
     <div class="container">
       <div class="logo">
-        <div class="logo-icon">W</div>
+        <img src="/images/tenexity-logo.png" alt="Wallet Share Expander" style="height: 2rem;" />
         <span>Wallet Share Expander</span>
       </div>
       <nav>
-        <a href="#">Privacy Policy</a>
-        <a href="#">Terms of Service</a>
-        <a href="#">Contact</a>
+        <a href="mailto:sales@tenexity.com">Contact</a>
+        <a href="/api/login">Login</a>
       </nav>
       <div class="footer-powered">Powered by Tenexity</div>
     </div>
@@ -542,7 +548,18 @@ export function registerSSRLandingRoute(app: Express) {
 </body>
 </html>`;
 
-    res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.send(html);
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(html);
+}
+
+export function registerSSRLandingRoute(app: Express) {
+  app.get("/promo", renderLandingPage);
+
+  app.get("/", (req, res, next) => {
+    const isLoggedIn = req.isAuthenticated && req.isAuthenticated();
+    if (isLoggedIn) {
+      return next();
+    }
+    renderLandingPage(req, res);
   });
 }
