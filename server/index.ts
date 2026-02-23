@@ -4,6 +4,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { startScheduler, stopScheduler } from "./scheduler";
 import { syncSubscriptionPlans } from "./sync-plans";
+import { syncDemoSettings } from "./sync-settings";
 
 const app = express();
 const httpServer = createServer(app);
@@ -65,6 +66,7 @@ app.use((req, res, next) => {
   await registerRoutes(httpServer, app);
 
   await syncSubscriptionPlans();
+  await syncDemoSettings();
 
   // ── Scheduler (agent cron jobs) ─────────────────────────────────────────────
   const schedulerTenantId = parseInt(process.env.SCHEDULER_TENANT_ID ?? "8", 10);
