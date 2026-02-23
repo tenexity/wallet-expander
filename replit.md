@@ -73,8 +73,13 @@ The application follows a client-server architecture.
         - Fail-closed security: events with unknown price IDs or missing app metadata are skipped
         - Structured JSON logging for webhook events
         - Debug endpoint for platform admins (no secrets exposed)
-        - Tier-based feature limits (Starter: 1 playbook/1 ICP/1 enrolled; Growth: unlimited playbooks/3 ICPs/5 enrolled; Scale: unlimited all)
-        - See STRIPE-SETUP.md for configuration details
+        - Tier-based feature limits enforced via `requireFeatureLimit` middleware (Starter: 1 playbook/1 ICP/1 enrolled/1 user; Growth: unlimited playbooks/3 ICPs/20 enrolled/5 users; Scale: unlimited all/20 users; Enterprise: unlimited all)
+        - Plan hierarchy: free(0) < starter(1) < growth/professional(2) < scale(3) < enterprise(4)
+        - New tenants auto-created with planType='free', subscriptionStatus='active'
+        - `GET /api/subscription/usage` endpoint returns comprehensive plan usage (features, users, credits)
+        - Frontend upgrade prompts on ICP builder, playbooks, accounts when at limit
+        - See STRIPE-SETUP.md for Stripe configuration details
+        - See AI-CREDIT-SYSTEM.md for credit system documentation
 
 **Project Structure:**
 - `client/`: Frontend application.
