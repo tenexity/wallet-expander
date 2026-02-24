@@ -116,6 +116,7 @@ interface AccountWithMetrics {
   id: number;
   name: string;
   segment: string;
+  subSegment?: string | null;
   region: string;
   assignedTm: string;
   status: string;
@@ -143,7 +144,7 @@ interface EnrolledAccount {
   status: "active" | "paused" | "graduated";
 }
 
-type OpportunitySortKey = "opportunityScore" | "name" | "segment" | "region" | "last12mRevenue" | "categoryPenetration" | "enrolled";
+type OpportunitySortKey = "opportunityScore" | "name" | "segment" | "subSegment" | "region" | "last12mRevenue" | "categoryPenetration" | "enrolled";
 type SortDirection = "asc" | "desc";
 
 const OPPORTUNITY_COLUMNS_STORAGE_KEY = "dashboard_opportunity_columns";
@@ -151,6 +152,7 @@ const OPPORTUNITY_COLUMNS_STORAGE_KEY = "dashboard_opportunity_columns";
 const ALL_OPPORTUNITY_COLUMNS = [
   { key: "name", label: "Account", default: true },
   { key: "segment", label: "Segment", default: true },
+  { key: "subSegment", label: "Type", default: true },
   { key: "region", label: "Region", default: false },
   { key: "last12mRevenue", label: "Revenue (12M)", default: false },
   { key: "categoryPenetration", label: "Penetration", default: false },
@@ -447,6 +449,9 @@ export default function Dashboard() {
         case "segment":
           comparison = a.segment.localeCompare(b.segment);
           break;
+        case "subSegment":
+          comparison = (a.subSegment || "").localeCompare(b.subSegment || "");
+          break;
         case "region":
           comparison = (a.region || "").localeCompare(b.region || "");
           break;
@@ -666,6 +671,23 @@ export default function Dashboard() {
         cell: (row: AccountWithMetrics) => (
           <Badge variant="outline">{row.segment}</Badge>
         ),
+      },
+      {
+        key: "subSegment",
+        header: <span data-testid="col-sub-segment">{renderSortableHeader("subSegment", "Type")}</span>,
+        cell: (row: AccountWithMetrics) => {
+          const labels: Record<string, string> = {
+            residential_service: "Residential Service",
+            commercial_mechanical: "Commercial Mechanical",
+            builder: "Builder",
+            other: "Other",
+          };
+          return (
+            <span data-testid={`cell-sub-segment-${row.id}`} className="text-muted-foreground">
+              {row.subSegment ? labels[row.subSegment] || row.subSegment : "\u2014"}
+            </span>
+          );
+        },
       },
       {
         key: "region",

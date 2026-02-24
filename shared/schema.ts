@@ -120,15 +120,21 @@ export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Product = typeof products.$inferSelect;
 
 // ============ ACCOUNTS ============
+export const SUB_SEGMENT_TYPES = ['residential_service', 'commercial_mechanical', 'builder', 'other'] as const;
+export type SubSegmentType = typeof SUB_SEGMENT_TYPES[number];
+
 export const accounts = pgTable("accounts", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenant_id"), // Multi-tenant isolation
   externalId: text("external_id"),
   name: text("name").notNull(),
   segment: text("segment"), // HVAC, plumbing, mechanical, etc.
+  subSegment: text("sub_segment"), // residential_service, commercial_mechanical, builder, other
   region: text("region"),
   assignedTm: text("assigned_tm"),
   status: text("status").default("active"), // active, inactive, prospect
+  creditLimit: numeric("credit_limit"),
+  creditUsage: numeric("credit_usage"),
   // Agent / agentic-layer columns
   enrollmentStatus: text("enrollment_status"),   // enrolled, graduated, at_risk, candidate
   enrolledAt: timestamp("enrolled_at"),
@@ -140,6 +146,7 @@ export const accounts = pgTable("accounts", {
 }, (table) => [
   index("idx_accounts_tenant_id").on(table.tenantId),
   index("idx_accounts_segment").on(table.segment),
+  index("idx_accounts_sub_segment").on(table.subSegment),
   index("idx_accounts_assigned_tm").on(table.assignedTm),
 ]);
 
@@ -195,9 +202,12 @@ export const segmentProfiles = pgTable("segment_profiles", {
   id: serial("id").primaryKey(),
   tenantId: integer("tenant_id"), // Multi-tenant isolation
   segment: text("segment").notNull(),
+  subSegment: text("sub_segment"), // residential_service, commercial_mechanical, builder, other
   name: text("name").notNull(),
   description: text("description"),
   minAnnualRevenue: numeric("min_annual_revenue"),
+  referenceAccountIds: jsonb("reference_account_ids").$type<number[]>(), // IDs of exemplar accounts used to derive this ICP
+  baselineMethod: text("baseline_method").default("ai"), // ai, reference_customers
   status: text("status").default("draft"), // draft, approved
   approvedBy: text("approved_by"),
   approvedAt: timestamp("approved_at"),
@@ -272,6 +282,12 @@ export const accountMetrics = pgTable("account_metrics", {
   categoryGapScore: numeric("category_gap_score"),
   opportunityScore: numeric("opportunity_score"),
   matchedProfileId: integer("matched_profile_id"),
+  // RFM + Mix scoring dimensions (0-100 each)
+  recencyScore: numeric("recency_score"),
+  frequencyScore: numeric("frequency_score"),
+  monetaryScore: numeric("monetary_score"),
+  mixScore: numeric("mix_score"),
+  orderCount12m: integer("order_count_12m"),
   // Agent-layer derived metrics
   walletSharePercentage: numeric("wallet_share_percentage"), // % of contractor's total spend captured
   daysSinceLastOrder: integer("days_since_last_order"),
@@ -1262,3 +1278,29 @@ export const insertTenantCreditLedgerSchema = createInsertSchema(tenantCreditLed
 
 export type TenantCreditLedger = typeof tenantCreditLedger.$inferSelect;
 export type InsertTenantCreditLedger = z.infer<typeof insertTenantCreditLedgerSchema>;
+
+// ============ ACCOUNT FLAGS (Behavioral Annotations) ============
+export const ACCOUNT_FLAG_TYPES = ['material_preference', 'brand_exclusive', 'buying_constraint', 'channel_preference'] as const;
+export type AccountFlagType = typeof ACCOUNT_FLAG_TYPES[number];
+
+export const accountFlags = pgTable("account_flags", {
+  id: serial("id").primaryKey(),
+  tenantId: integer("tenant_id").notNull(),
+  accountId: integer("account_id").notNull(),
+  flagType: text("flag_type").notNull(), // material_preference, brand_exclusive, buying_constraint, channel_preference
+  flagValue: text("flag_value").notNull(), // e.g. "PEX-only", "No copper", "Credit constrained"
+  affectedCategories: jsonb("affected_categories").$type<string[]>(), // category names this flag relates to
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("idx_account_flags_tenant").on(t.tenantId),
+  index("idx_account_flags_account").on(t.accountId),
+]);
+
+export const insertAccountFlagSchema = createInsertSchema(accountFlags).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type AccountFlag = typeof accountFlags.$inferSelect;
+export type InsertAccountFlag = z.infer<typeof insertAccountFlagSchema>;

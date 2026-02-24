@@ -32,6 +32,7 @@ import {
   projects,
   orderSignals,
   competitorMentions,
+  accountFlags,
 } from "@shared/schema";
 import { sql } from "drizzle-orm";
 
@@ -42,6 +43,7 @@ export async function seed() {
   console.log("🌱 Seeding ABC Supply Co. demo data...");
 
   // ── Clear in FK-safe order ────────────────────────────────────────────────
+  await db.delete(accountFlags);
   await db.delete(competitorMentions);
   await db.delete(orderSignals);
   await db.delete(projects);
@@ -171,28 +173,28 @@ export async function seed() {
   // ── Accounts (20 named, narrative-specific) ───────────────────────────────
   const accountDefs = [
     // Sarah's territory — Northeast
-    { name: "Metro HVAC Solutions", segment: "HVAC", region: "Northeast", assignedTm: sarah.name, baseRev: 245000, state: "graduated" },
-    { name: "Allied Mechanical Group", segment: "Mechanical", region: "Mid-Atlantic", assignedTm: sarah.name, baseRev: 198000, state: "enrolled" },
-    { name: "Northeast Heating & Cooling", segment: "HVAC", region: "Northeast", assignedTm: sarah.name, baseRev: 156000, state: "enrolled" },
-    { name: "Premier Plumbing NJ", segment: "Plumbing", region: "Mid-Atlantic", assignedTm: sarah.name, baseRev: 134000, state: "candidate" },
-    { name: "Coastal Mechanical", segment: "Mechanical", region: "Northeast", assignedTm: sarah.name, baseRev: 88000, state: "at_risk" },
+    { name: "Metro HVAC Solutions", segment: "HVAC", subSegment: "residential_service", region: "Northeast", assignedTm: sarah.name, baseRev: 245000, state: "graduated", creditLimit: 50000, creditUsage: 32000 },
+    { name: "Allied Mechanical Group", segment: "Mechanical", subSegment: "commercial_mechanical", region: "Mid-Atlantic", assignedTm: sarah.name, baseRev: 198000, state: "enrolled", creditLimit: 75000, creditUsage: 48000 },
+    { name: "Northeast Heating & Cooling", segment: "HVAC", subSegment: "residential_service", region: "Northeast", assignedTm: sarah.name, baseRev: 156000, state: "enrolled", creditLimit: 40000, creditUsage: 28000 },
+    { name: "Premier Plumbing NJ", segment: "Plumbing", subSegment: "residential_service", region: "Mid-Atlantic", assignedTm: sarah.name, baseRev: 134000, state: "candidate", creditLimit: 30000, creditUsage: 27500 },
+    { name: "Coastal Mechanical", segment: "Mechanical", subSegment: "commercial_mechanical", region: "Northeast", assignedTm: sarah.name, baseRev: 88000, state: "at_risk", creditLimit: 25000, creditUsage: 23000 },
     // James's territory — Southeast
-    { name: "Sunshine HVAC Florida", segment: "HVAC", region: "Florida", assignedTm: james.name, baseRev: 189000, state: "graduated" },
-    { name: "Gulf Coast Plumbing", segment: "Plumbing", region: "Southeast", assignedTm: james.name, baseRev: 143000, state: "enrolled" },
-    { name: "Tampa Bay Mechanical", segment: "Mechanical", region: "Florida", assignedTm: james.name, baseRev: 210000, state: "enrolled" },
-    { name: "Palmetto Heating & Air", segment: "HVAC", region: "Southeast", assignedTm: james.name, baseRev: 97000, state: "at_risk" },
-    { name: "Atlantic Plumbing Co", segment: "Plumbing", region: "Southeast", assignedTm: james.name, baseRev: 72000, state: "candidate" },
-    { name: "Carolina Climate Control", segment: "HVAC", region: "Southeast", assignedTm: james.name, baseRev: 61000, state: "candidate" },
+    { name: "Sunshine HVAC Florida", segment: "HVAC", subSegment: "residential_service", region: "Florida", assignedTm: james.name, baseRev: 189000, state: "graduated", creditLimit: 45000, creditUsage: 22000 },
+    { name: "Gulf Coast Plumbing", segment: "Plumbing", subSegment: "commercial_mechanical", region: "Southeast", assignedTm: james.name, baseRev: 143000, state: "enrolled", creditLimit: 35000, creditUsage: 18000 },
+    { name: "Tampa Bay Mechanical", segment: "Mechanical", subSegment: "builder", region: "Florida", assignedTm: james.name, baseRev: 210000, state: "enrolled", creditLimit: 100000, creditUsage: 72000 },
+    { name: "Palmetto Heating & Air", segment: "HVAC", subSegment: "residential_service", region: "Southeast", assignedTm: james.name, baseRev: 97000, state: "at_risk", creditLimit: 20000, creditUsage: 19500 },
+    { name: "Atlantic Plumbing Co", segment: "Plumbing", subSegment: "residential_service", region: "Southeast", assignedTm: james.name, baseRev: 72000, state: "candidate", creditLimit: 15000, creditUsage: 8000 },
+    { name: "Carolina Climate Control", segment: "HVAC", subSegment: "commercial_mechanical", region: "Southeast", assignedTm: james.name, baseRev: 61000, state: "candidate", creditLimit: 20000, creditUsage: 12000 },
     // Mike's territory — Midwest
-    { name: "Great Lakes Heating", segment: "HVAC", region: "Great Lakes", assignedTm: mike.name, baseRev: 178000, state: "graduated" },
-    { name: "Midwest Pipe & Supply", segment: "Plumbing", region: "Midwest", assignedTm: mike.name, baseRev: 162000, state: "candidate" },
-    { name: "Heartland Mechanical", segment: "Mechanical", region: "Midwest", assignedTm: mike.name, baseRev: 145000, state: "enrolled" },
-    { name: "Chicago Comfort Systems", segment: "HVAC", region: "Great Lakes", assignedTm: mike.name, baseRev: 118000, state: "candidate" },
-    { name: "Lake Shore Plumbing", segment: "Plumbing", region: "Great Lakes", assignedTm: mike.name, baseRev: 94000, state: "candidate" },
-    { name: "Detroit Climate Pro", segment: "HVAC", region: "Midwest", assignedTm: mike.name, baseRev: 87000, state: "candidate" },
-    { name: "Ohio Valley HVAC", segment: "HVAC", region: "Midwest", assignedTm: mike.name, baseRev: 76000, state: "candidate" },
-    { name: "Buckeye Mechanical", segment: "Mechanical", region: "Great Lakes", assignedTm: mike.name, baseRev: 234000, state: "enrolled" },
-    { name: "Indiana Plumbing Services", segment: "Plumbing", region: "Midwest", assignedTm: mike.name, baseRev: 58000, state: "candidate" },
+    { name: "Great Lakes Heating", segment: "HVAC", subSegment: "residential_service", region: "Great Lakes", assignedTm: mike.name, baseRev: 178000, state: "graduated", creditLimit: 40000, creditUsage: 15000 },
+    { name: "Midwest Pipe & Supply", segment: "Plumbing", subSegment: "commercial_mechanical", region: "Midwest", assignedTm: mike.name, baseRev: 162000, state: "candidate", creditLimit: 50000, creditUsage: 35000 },
+    { name: "Heartland Mechanical", segment: "Mechanical", subSegment: "commercial_mechanical", region: "Midwest", assignedTm: mike.name, baseRev: 145000, state: "enrolled", creditLimit: 60000, creditUsage: 42000 },
+    { name: "Chicago Comfort Systems", segment: "HVAC", subSegment: "builder", region: "Great Lakes", assignedTm: mike.name, baseRev: 118000, state: "candidate", creditLimit: 80000, creditUsage: 65000 },
+    { name: "Lake Shore Plumbing", segment: "Plumbing", subSegment: "residential_service", region: "Great Lakes", assignedTm: mike.name, baseRev: 94000, state: "candidate", creditLimit: 25000, creditUsage: 14000 },
+    { name: "Detroit Climate Pro", segment: "HVAC", subSegment: "residential_service", region: "Midwest", assignedTm: mike.name, baseRev: 87000, state: "candidate", creditLimit: 20000, creditUsage: 11000 },
+    { name: "Ohio Valley HVAC", segment: "HVAC", subSegment: "other", region: "Midwest", assignedTm: mike.name, baseRev: 76000, state: "candidate", creditLimit: 18000, creditUsage: 16500 },
+    { name: "Buckeye Mechanical", segment: "Mechanical", subSegment: "builder", region: "Great Lakes", assignedTm: mike.name, baseRev: 234000, state: "enrolled", creditLimit: 120000, creditUsage: 88000 },
+    { name: "Indiana Plumbing Services", segment: "Plumbing", subSegment: "residential_service", region: "Midwest", assignedTm: mike.name, baseRev: 58000, state: "candidate", creditLimit: 12000, creditUsage: 5000 },
   ];
 
   const accs = await db
@@ -202,13 +204,28 @@ export async function seed() {
         tenantId: TENANT_ID,
         name: a.name,
         segment: a.segment,
+        subSegment: a.subSegment,
         region: a.region,
         assignedTm: a.assignedTm,
         status: "active",
+        creditLimit: String(a.creditLimit),
+        creditUsage: String(a.creditUsage),
       }))
     )
     .returning();
   console.log(`✓ ${accs.length} accounts`);
+
+  // ── Account Flags (behavioral annotations) ────────────────────────────────
+  const flagRows = [
+    { tenantId: TENANT_ID, accountId: accs[3].id, flagType: "material_preference", flagValue: "PEX-only", affectedCategories: ["Copper Fittings", "Copper Pipe"], notes: "Customer exclusively uses PEX; does not install copper" },
+    { tenantId: TENANT_ID, accountId: accs[4].id, flagType: "buying_constraint", flagValue: "Credit constrained", affectedCategories: null, notes: "Maxed out credit line — spreading purchases across 3 houses" },
+    { tenantId: TENANT_ID, accountId: accs[8].id, flagType: "buying_constraint", flagValue: "Credit constrained", affectedCategories: null, notes: "Near credit limit — opportunity unlocked if limit raised" },
+    { tenantId: TENANT_ID, accountId: accs[7].id, flagType: "brand_exclusive", flagValue: "Trane only", affectedCategories: ["HVAC Equipment"], notes: "Exclusively installs Trane — does not buy other brands" },
+    { tenantId: TENANT_ID, accountId: accs[14].id, flagType: "channel_preference", flagValue: "Counter only", affectedCategories: null, notes: "Only picks up at counter — no delivery" },
+    { tenantId: TENANT_ID, accountId: accs[17].id, flagType: "material_preference", flagValue: "No cast iron", affectedCategories: ["Drain/Waste/Vent"], notes: "Uses PVC/ABS exclusively for DWV work" },
+  ];
+  await db.insert(accountFlags).values(flagRows);
+  console.log(`✓ ${flagRows.length} account flags`);
 
   // ── Orders (12 months shaped by account state) ────────────────────────────
   const orderRows: {
@@ -300,9 +317,11 @@ export async function seed() {
       {
         tenantId: TENANT_ID,
         segment: "HVAC",
+        subSegment: "residential_service",
         name: "Full-Scope HVAC Contractor",
         description: "HVAC contractors who purchase across all major categories — equipment, refrigerant, controls, and water heaters",
         minAnnualRevenue: "75000",
+        baselineMethod: "ai",
         status: "approved",
         approvedBy: "Admin",
         approvedAt: sql`CURRENT_TIMESTAMP`,
@@ -310,9 +329,11 @@ export async function seed() {
       {
         tenantId: TENANT_ID,
         segment: "Plumbing",
+        subSegment: "residential_service",
         name: "Full-Scope Plumbing Contractor",
         description: "Plumbing contractors purchasing pipe, fixtures, water heaters, and drainage across all job types",
         minAnnualRevenue: "60000",
+        baselineMethod: "ai",
         status: "approved",
         approvedBy: "Admin",
         approvedAt: sql`CURRENT_TIMESTAMP`,
@@ -320,9 +341,11 @@ export async function seed() {
       {
         tenantId: TENANT_ID,
         segment: "Mechanical",
+        subSegment: "commercial_mechanical",
         name: "Commercial Mechanical Contractor",
         description: "Commercial mechanical with diverse HVAC and plumbing needs — highest-value segment",
         minAnnualRevenue: "100000",
+        baselineMethod: "ai",
         status: "approved",
         approvedBy: "Admin",
         approvedAt: sql`CURRENT_TIMESTAMP`,
@@ -402,6 +425,12 @@ export async function seed() {
     categoryGapScore: string;
     opportunityScore: string;
     matchedProfileId: number;
+    recencyScore: string;
+    frequencyScore: string;
+    monetaryScore: string;
+    mixScore: string;
+    orderCount12m: number;
+    daysSinceLastOrder: number;
   }[] = [];
 
   const gapRows: {
@@ -433,17 +462,37 @@ export async function seed() {
       def.segment === "HVAC" ? profiles[0] :
         def.segment === "Plumbing" ? profiles[1] : profiles[2];
 
+    const daysLastOrder = def.state === "graduated" ? 3 + Math.floor(Math.random() * 7) :
+      def.state === "enrolled" ? 5 + Math.floor(Math.random() * 14) :
+      def.state === "at_risk" ? 30 + Math.floor(Math.random() * 60) :
+      10 + Math.floor(Math.random() * 30);
+    const recScore = daysLastOrder <= 7 ? 100 : daysLastOrder <= 14 ? 85 : daysLastOrder <= 30 ? 65 : daysLastOrder <= 60 ? 40 : daysLastOrder <= 90 ? 20 : 5;
+    const orderCnt = def.state === "graduated" ? 40 + Math.floor(Math.random() * 20) :
+      def.state === "enrolled" ? 25 + Math.floor(Math.random() * 15) :
+      def.state === "at_risk" ? 8 + Math.floor(Math.random() * 8) :
+      12 + Math.floor(Math.random() * 20);
+    const freqScore = Math.min(100, Math.floor(orderCnt / 60 * 100));
+    const monScore = Math.min(100, Math.floor(def.baseRev / 250000 * 100));
+    const catCount = Math.floor(penetration / 10);
+    const mxScore = Math.min(100, Math.floor(catCount / 12 * 100));
+
     metricsRows.push({
       tenantId: TENANT_ID,
       accountId: acc.id,
       last12mRevenue: String(def.baseRev),
       last3mRevenue: String(Math.floor((def.baseRev / 4) * (1 + yoy / 100))),
       yoyGrowthRate: String(yoy),
-      categoryCount: Math.floor(penetration / 10),
+      categoryCount: catCount,
       categoryPenetration: String(penetration),
       categoryGapScore: String(100 - penetration),
       opportunityScore: String(Math.max(50, Math.min(99, score))),
       matchedProfileId: profile.id,
+      recencyScore: String(recScore),
+      frequencyScore: String(freqScore),
+      monetaryScore: String(monScore),
+      mixScore: String(mxScore),
+      orderCount12m: orderCnt,
+      daysSinceLastOrder: daysLastOrder,
     });
 
     const gaps = scriptedGaps[def.name];

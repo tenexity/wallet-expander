@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,22 @@ import { Label } from "@/components/ui/label";
 import { EmptyState } from "@/components/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -33,6 +49,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useSubscriptionUsage } from "@/hooks/use-subscription-usage";
 import { UpgradePrompt } from "@/components/upgrade-prompt";
+import { SUB_SEGMENT_TYPES } from "@shared/schema";
 import {
   Target,
   Plus,
@@ -59,6 +76,7 @@ import {
   ArrowRight,
   DollarSign,
   Zap,
+  Search,
 } from "lucide-react";
 import {
   BarChart,
@@ -89,13 +107,31 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+interface AccountWithMetrics {
+  id: number;
+  name: string;
+  segment: string;
+  subSegment: string | null;
+  last12mRevenue: number;
+  gapCategories: Array<{ name: string; gapPct: number; estimatedValue: number }>;
+}
+
+interface ReferenceBaselineResult {
+  categoryId: number;
+  avgPct: number;
+  accountsCovered: number;
+}
+
 interface SegmentProfile {
   id: number;
   segment: string;
+  subSegment?: string | null;
   name: string;
   description: string;
   minAnnualRevenue: number;
   status: "draft" | "approved";
+  baselineMethod?: "ai" | "reference_customers" | null;
+  referenceAccountIds?: number[] | null;
   categories: Array<{
     id: number;
     categoryName: string;
@@ -186,6 +222,11 @@ export default function ICPBuilder() {
   const [editedMinRevenue, setEditedMinRevenue] = useState<number>(0);
   const [editedCategories, setEditedCategories] = useState<EditedCategory[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [baselineMethod, setBaselineMethod] = useState<"ai" | "reference_customers">("ai");
+  const [selectedSubSegment, setSelectedSubSegment] = useState<string>("");
+  const [referenceAccountIds, setReferenceAccountIds] = useState<number[]>([]);
+  const [referenceSearch, setReferenceSearch] = useState("");
+  const [referenceBaseline, setReferenceBaseline] = useState<ReferenceBaselineResult[] | null>(null);
   const { toast } = useToast();
   const { canCreate, getFeatureUsage, planLabel } = useSubscriptionUsage();
   const icpUsage = getFeatureUsage("icps");
@@ -199,6 +240,63 @@ export default function ICPBuilder() {
   const { data: profiles, isLoading } = useQuery<SegmentProfile[]>({
     queryKey: ["/api/segment-profiles"],
   });
+
+  const { data: allAccounts } = useQuery<AccountWithMetrics[]>({
+    queryKey: ["/api/accounts"],
+  });
+
+  const { data: categories } = useQuery<Array<{ id: number; name: string }>>({
+    queryKey: ["/api/categories"],
+  });
+
+  const categoryMap = useMemo(() => {
+    if (!categories) return new Map<number, string>();
+    return new Map(categories.map(c => [c.id, c.name]));
+  }, [categories]);
+
+  const filteredReferenceAccounts = useMemo(() => {
+    if (!allAccounts) return [];
+    return allAccounts.filter(a => {
+      const matchesSegment = selectedProfile?.segment ? a.segment === selectedProfile.segment : true;
+      const matchesSubSegment = selectedSubSegment && selectedSubSegment !== "all" && selectedSubSegment !== "none" && selectedSubSegment !== ""
+        ? a.subSegment === selectedSubSegment : true;
+      const matchesSearch = referenceSearch
+        ? a.name.toLowerCase().includes(referenceSearch.toLowerCase())
+        : true;
+      return matchesSegment && matchesSubSegment && matchesSearch;
+    });
+  }, [allAccounts, selectedProfile?.segment, selectedSubSegment, referenceSearch]);
+
+  const computeBaselineMutation = useMutation({
+    mutationFn: async (accountIds: number[]) => {
+      const res = await apiRequest("POST", "/api/profiles/compute-reference-baseline", { accountIds });
+      return res.json() as Promise<ReferenceBaselineResult[]>;
+    },
+    onSuccess: (data) => {
+      setReferenceBaseline(data);
+      toast({
+        title: "Baseline computed",
+        description: `Computed baseline from ${referenceAccountIds.length} reference accounts`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Computation failed",
+        description: "Could not compute reference baseline. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const toggleReferenceAccount = (accountId: number) => {
+    setReferenceAccountIds(prev => {
+      if (prev.includes(accountId)) {
+        return prev.filter(id => id !== accountId);
+      }
+      if (prev.length >= 12) return prev;
+      return [...prev, accountId];
+    });
+  };
 
   const analyzeMutation = useMutation({
     mutationFn: async (segment: string) => {
@@ -268,7 +366,7 @@ export default function ICPBuilder() {
   });
 
   const updateProfileMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: { minAnnualRevenue: string } }) => {
+    mutationFn: async ({ id, data }: { id: number; data: Record<string, unknown> }) => {
       return apiRequest("PATCH", `/api/segment-profiles/${id}`, data);
     },
   });
@@ -290,6 +388,10 @@ export default function ICPBuilder() {
         isRequired: cat.isRequired,
         notes: cat.notes,
       })));
+      setBaselineMethod(selectedProfile.baselineMethod || "ai");
+      setSelectedSubSegment(selectedProfile.subSegment || "");
+      setReferenceAccountIds(selectedProfile.referenceAccountIds || []);
+      setReferenceBaseline(null);
       setEditMode(true);
     }
   };
@@ -298,6 +400,10 @@ export default function ICPBuilder() {
     setEditMode(false);
     setEditedMinRevenue(0);
     setEditedCategories([]);
+    setBaselineMethod("ai");
+    setSelectedSubSegment("");
+    setReferenceAccountIds([]);
+    setReferenceBaseline(null);
   };
 
   const handleSaveChanges = async () => {
@@ -305,9 +411,17 @@ export default function ICPBuilder() {
     
     setIsSaving(true);
     try {
+      const profileData: Record<string, unknown> = {
+        minAnnualRevenue: editedMinRevenue.toString(),
+        baselineMethod,
+        subSegment: selectedSubSegment === "none" || selectedSubSegment === "" ? null : selectedSubSegment,
+      };
+      if (baselineMethod === "reference_customers") {
+        profileData.referenceAccountIds = referenceAccountIds;
+      }
       await updateProfileMutation.mutateAsync({
         id: selectedProfile.id,
-        data: { minAnnualRevenue: editedMinRevenue.toString() },
+        data: profileData,
       });
 
       for (const category of editedCategories) {
@@ -568,11 +682,24 @@ export default function ICPBuilder() {
                           </p>
                         </div>
                       </div>
-                      <Badge
-                        variant={profile.status === "approved" ? "default" : "secondary"}
-                      >
-                        {profile.status}
-                      </Badge>
+                      <div className="flex flex-col items-end gap-1">
+                        <Badge
+                          variant={profile.status === "approved" ? "default" : "secondary"}
+                        >
+                          {profile.status}
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className="text-xs"
+                          data-testid={`badge-baseline-method-${profile.id}`}
+                        >
+                          {profile.baselineMethod === "reference_customers" ? (
+                            <>Reference ({profile.referenceAccountIds?.length || 0})</>
+                          ) : (
+                            <>AI</>
+                          )}
+                        </Badge>
+                      </div>
                     </div>
                   </button>
                 ))
@@ -766,6 +893,236 @@ export default function ICPBuilder() {
                     </div>
                   </div>
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Sub-Segment</Label>
+                    {editMode ? (
+                      <Select
+                        value={selectedSubSegment}
+                        onValueChange={setSelectedSubSegment}
+                        data-testid="select-sub-segment"
+                      >
+                        <SelectTrigger className="mt-1" data-testid="select-sub-segment-trigger">
+                          <SelectValue placeholder="Select sub-segment" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          {SUB_SEGMENT_TYPES.map(sub => (
+                            <SelectItem key={sub} value={sub} data-testid={`option-sub-segment-${sub}`}>
+                              {sub.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="font-medium" data-testid="text-sub-segment">
+                        {selectedProfile.subSegment
+                          ? selectedProfile.subSegment.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())
+                          : "All"}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Baseline Method</Label>
+                    <div className="mt-1 flex items-center gap-2">
+                      <Badge
+                        variant="outline"
+                        data-testid="badge-profile-baseline-method"
+                      >
+                        {selectedProfile.baselineMethod === "reference_customers"
+                          ? `Reference (${selectedProfile.referenceAccountIds?.length || 0} accounts)`
+                          : "AI-Generated"}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                {editMode && (
+                  <div>
+                    <Label className="text-sm font-semibold mb-3 block">Baseline Method</Label>
+                    <div className="flex gap-2" data-testid="baseline-method-toggle">
+                      <Button
+                        variant={baselineMethod === "ai" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          setBaselineMethod("ai");
+                          setReferenceAccountIds([]);
+                          setReferenceBaseline(null);
+                        }}
+                        data-testid="button-baseline-ai"
+                      >
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        AI-Generated
+                      </Button>
+                      <Button
+                        variant={baselineMethod === "reference_customers" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setBaselineMethod("reference_customers")}
+                        data-testid="button-baseline-reference"
+                      >
+                        <Users className="mr-2 h-4 w-4" />
+                        Reference Customers
+                      </Button>
+                    </div>
+
+                    {baselineMethod === "reference_customers" && (
+                      <Card className="mt-4">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-sm">Select Reference Accounts</CardTitle>
+                            <Badge variant="secondary" data-testid="badge-reference-count">
+                              {referenceAccountIds.length} of 3-12 selected
+                            </Badge>
+                          </div>
+                          <CardDescription className="text-xs">
+                            Choose 3-12 exemplar accounts to compute baseline category expectations
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div className="flex gap-2">
+                            <div className="relative flex-1">
+                              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                placeholder="Search accounts..."
+                                value={referenceSearch}
+                                onChange={(e) => setReferenceSearch(e.target.value)}
+                                className="pl-9"
+                                data-testid="input-reference-search"
+                              />
+                            </div>
+                            <Select
+                              value={selectedSubSegment}
+                              onValueChange={setSelectedSubSegment}
+                            >
+                              <SelectTrigger className="w-[180px]" data-testid="select-reference-sub-segment">
+                                <SelectValue placeholder="Sub-segment" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All sub-segments</SelectItem>
+                                {SUB_SEGMENT_TYPES.map(sub => (
+                                  <SelectItem key={sub} value={sub}>
+                                    {sub.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="max-h-64 overflow-y-auto space-y-1 border rounded-md p-2">
+                            {filteredReferenceAccounts.length === 0 ? (
+                              <p className="text-sm text-muted-foreground text-center py-4">
+                                No accounts found matching filters
+                              </p>
+                            ) : (
+                              filteredReferenceAccounts.map(account => {
+                                const isSelected = referenceAccountIds.includes(account.id);
+                                return (
+                                  <label
+                                    key={account.id}
+                                    className={`flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors ${
+                                      isSelected ? "bg-primary/5" : "hover:bg-muted/50"
+                                    }`}
+                                    data-testid={`reference-account-${account.id}`}
+                                  >
+                                    <Checkbox
+                                      checked={isSelected}
+                                      onCheckedChange={() => toggleReferenceAccount(account.id)}
+                                      disabled={!isSelected && referenceAccountIds.length >= 12}
+                                      data-testid={`checkbox-reference-${account.id}`}
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium truncate">{account.name}</p>
+                                    </div>
+                                    <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
+                                      <span data-testid={`text-revenue-${account.id}`}>
+                                        {formatCurrency(account.last12mRevenue)}
+                                      </span>
+                                      <Badge variant="outline" className="text-xs">
+                                        {account.gapCategories?.length || 0} cats
+                                      </Badge>
+                                    </div>
+                                  </label>
+                                );
+                              })
+                            )}
+                          </div>
+
+                          {referenceAccountIds.length >= 3 && (
+                            <Button
+                              className="w-full"
+                              onClick={() => computeBaselineMutation.mutate(referenceAccountIds)}
+                              disabled={computeBaselineMutation.isPending}
+                              data-testid="button-compute-baseline"
+                            >
+                              {computeBaselineMutation.isPending ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Computing...
+                                </>
+                              ) : (
+                                <>
+                                  <BarChart3 className="mr-2 h-4 w-4" />
+                                  Compute Baseline
+                                </>
+                              )}
+                            </Button>
+                          )}
+
+                          {referenceBaseline && referenceBaseline.length > 0 && (
+                            <div className="space-y-3">
+                              <Label className="text-sm font-medium">Computed Baseline</Label>
+                              <Table data-testid="table-reference-baseline">
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Category</TableHead>
+                                    <TableHead className="text-right">Average %</TableHead>
+                                    <TableHead className="text-right">Accounts Covered</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {referenceBaseline.map(row => (
+                                    <TableRow key={row.categoryId} data-testid={`baseline-row-${row.categoryId}`}>
+                                      <TableCell>{categoryMap.get(row.categoryId) || `Category ${row.categoryId}`}</TableCell>
+                                      <TableCell className="text-right font-medium">{row.avgPct.toFixed(1)}%</TableCell>
+                                      <TableCell className="text-right">{row.accountsCovered}</TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                              <Button
+                                className="w-full"
+                                variant="outline"
+                                onClick={() => {
+                                  if (!referenceBaseline) return;
+                                  setEditedCategories(prev => {
+                                    const updated = [...prev];
+                                    for (const bl of referenceBaseline) {
+                                      const catName = categoryMap.get(bl.categoryId) || "";
+                                      const existing = updated.find(c => c.categoryName === catName);
+                                      if (existing) {
+                                        existing.expectedPct = Math.round(bl.avgPct);
+                                      }
+                                    }
+                                    return updated;
+                                  });
+                                  toast({
+                                    title: "Values applied",
+                                    description: "Category percentages updated from reference baseline",
+                                  });
+                                }}
+                                data-testid="button-use-baseline-values"
+                              >
+                                <CheckCircle className="mr-2 h-4 w-4" />
+                                Use These Values
+                              </Button>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <Label className="text-sm font-semibold mb-3 block">

@@ -5,7 +5,7 @@ import {
   segmentProfiles, profileCategories, profileReviewLog, accountMetrics, accountCategoryGaps,
   tasks, playbooks, playbookTasks, programAccounts, programRevenueSnapshots,
   dataUploads, settings, scoringWeights, territoryManagers, customCategories,
-  revShareTiers,
+  revShareTiers, accountFlags,
   contacts, projects, orderSignals, competitorMentions, emailInteractions,
   type Account, type InsertAccount,
   type Product, type InsertProduct,
@@ -32,6 +32,7 @@ import {
   type OrderSignal, type InsertOrderSignal,
   type CompetitorMention, type InsertCompetitorMention,
   type EmailInteraction, type InsertEmailInteraction,
+  type AccountFlag, type InsertAccountFlag,
 } from "@shared/schema";
 
 /**
@@ -846,6 +847,84 @@ export class TenantStorage {
     return db.select().from(emailInteractions)
       .where(and(eq(emailInteractions.contactId, contactId), eq(emailInteractions.tenantId, this.tenantId)))
       .orderBy(desc(emailInteractions.createdAt));
+  }
+
+  async getAccountFlags(accountId: number): Promise<AccountFlag[]> {
+    return db.select().from(accountFlags)
+      .where(and(eq(accountFlags.accountId, accountId), eq(accountFlags.tenantId, this.tenantId)))
+      .orderBy(desc(accountFlags.createdAt));
+  }
+
+  async getAllAccountFlags(): Promise<AccountFlag[]> {
+    return db.select().from(accountFlags)
+      .where(eq(accountFlags.tenantId, this.tenantId));
+  }
+
+  async createAccountFlag(flag: InsertAccountFlag): Promise<AccountFlag> {
+    const [created] = await db.insert(accountFlags)
+      .values({ ...flag, tenantId: this.tenantId })
+      .returning();
+    return created;
+  }
+
+  async deleteAccountFlag(id: number): Promise<void> {
+    await db.delete(accountFlags)
+      .where(and(eq(accountFlags.id, id), eq(accountFlags.tenantId, this.tenantId)));
+  }
+
+  async computeReferenceBaseline(accountIds: number[]): Promise<{ categoryId: number; avgPct: number; accountsCovered: number }[]> {
+    const result = await db.execute(sql`
+      WITH account_totals AS (
+        SELECT
+          o.account_id,
+          SUM(oi.line_total::numeric) as total_spend
+        FROM orders o
+        JOIN order_items oi ON oi.order_id = o.id AND oi.tenant_id = ${this.tenantId}
+        WHERE o.tenant_id = ${this.tenantId}
+          AND o.account_id IN (${sql.join(accountIds.map(id => sql`${id}`), sql`, `)})
+          AND o.order_date >= NOW() - INTERVAL '12 months'
+        GROUP BY o.account_id
+      ),
+      account_category_spend AS (
+        SELECT
+          o.account_id,
+          p.category_id,
+          SUM(oi.line_total::numeric) as category_spend,
+          at2.total_spend
+        FROM orders o
+        JOIN order_items oi ON oi.order_id = o.id AND oi.tenant_id = ${this.tenantId}
+        JOIN products p ON p.id = oi.product_id AND p.tenant_id = ${this.tenantId}
+        JOIN account_totals at2 ON at2.account_id = o.account_id
+        WHERE o.tenant_id = ${this.tenantId}
+          AND o.account_id IN (${sql.join(accountIds.map(id => sql`${id}`), sql`, `)})
+          AND o.order_date >= NOW() - INTERVAL '12 months'
+          AND p.category_id IS NOT NULL
+        GROUP BY o.account_id, p.category_id, at2.total_spend
+      )
+      SELECT
+        category_id as "categoryId",
+        ROUND(AVG(category_spend / NULLIF(total_spend, 0) * 100)::numeric, 2) as "avgPct",
+        COUNT(DISTINCT account_id)::int as "accountsCovered"
+      FROM account_category_spend
+      GROUP BY category_id
+      ORDER BY "avgPct" DESC
+    `);
+    return (result.rows || []) as { categoryId: number; avgPct: number; accountsCovered: number }[];
+  }
+
+  async getOrderCountByAccount(accountIds: number[]): Promise<{ accountId: number; orderCount: number }[]> {
+    if (accountIds.length === 0) return [];
+    const result = await db.execute(sql`
+      SELECT
+        account_id as "accountId",
+        COUNT(*)::int as "orderCount"
+      FROM orders
+      WHERE tenant_id = ${this.tenantId}
+        AND account_id IN (${sql.join(accountIds.map(id => sql`${id}`), sql`, `)})
+        AND order_date >= NOW() - INTERVAL '12 months'
+      GROUP BY account_id
+    `);
+    return (result.rows || []) as { accountId: number; orderCount: number }[];
   }
 }
 

@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { DataTable } from "@/components/data-table";
 import { ScoreBadge } from "@/components/score-badge";
 import { ProgressRing } from "@/components/progress-ring";
@@ -61,8 +62,13 @@ import {
   Package,
   FolderKanban,
   Contact,
+  X,
+  Plus,
+  Tag,
+  CreditCard,
 } from "lucide-react";
 import type { Contact as ContactType, Project, OrderSignal, CompetitorMention } from "@shared/schema";
+import { SUB_SEGMENT_TYPES, ACCOUNT_FLAG_TYPES } from "@shared/schema";
 import { Link, useLocation, useSearch } from "wouter";
 import {
   Tooltip,
@@ -79,18 +85,77 @@ interface AccountWithMetrics {
   id: number;
   name: string;
   segment: string;
+  subSegment: string | null;
   region: string;
   assignedTm: string;
   status: string;
+  creditLimit: number | null;
+  creditUsage: number | null;
   last12mRevenue: number;
   categoryPenetration: number;
   opportunityScore: number;
+  recencyScore: number | null;
+  frequencyScore: number | null;
+  monetaryScore: number | null;
+  mixScore: number | null;
+  orderCount12m: number | null;
+  daysSinceLastOrder: number | null;
   gapCategories: Array<{
     name: string;
     gapPct: number;
     estimatedValue: number;
   }>;
   enrolled: boolean;
+}
+
+interface AccountFlag {
+  id: number;
+  tenantId: number;
+  accountId: number;
+  flagType: string;
+  flagValue: string;
+  affectedCategories: string[] | null;
+  notes: string | null;
+  createdAt: string;
+}
+
+const SUB_SEGMENT_LABELS: Record<string, string> = {
+  residential_service: "Residential Service",
+  commercial_mechanical: "Commercial Mechanical",
+  builder: "Builder",
+  other: "Other",
+};
+
+const FLAG_TYPE_LABELS: Record<string, string> = {
+  material_preference: "Material Preference",
+  brand_exclusive: "Brand Exclusive",
+  buying_constraint: "Buying Constraint",
+  channel_preference: "Channel Preference",
+};
+
+const FLAG_TYPE_COLORS: Record<string, string> = {
+  material_preference: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  brand_exclusive: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+  buying_constraint: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+  channel_preference: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200",
+};
+
+function getRfmColor(score: number): string {
+  if (score > 70) return "bg-green-500";
+  if (score >= 40) return "bg-yellow-500";
+  return "bg-red-500";
+}
+
+function getRfmTextColor(score: number): string {
+  if (score > 70) return "text-green-600 dark:text-green-400";
+  if (score >= 40) return "text-yellow-600 dark:text-yellow-400";
+  return "text-red-600 dark:text-red-400";
+}
+
+function formatCreditShort(value: number): string {
+  if (value >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+  if (value >= 1000) return `$${(value / 1000).toFixed(0)}k`;
+  return `$${value.toFixed(0)}`;
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -347,11 +412,362 @@ function AccountActivityTab({ accountId }: { accountId: number }) {
   );
 }
 
+function AddFlagDialog({
+  accountId,
+  open,
+  onOpenChange,
+  flagType,
+  onFlagTypeChange,
+  flagValue,
+  onFlagValueChange,
+  flagCategories,
+  onFlagCategoriesChange,
+  flagNotes,
+  onFlagNotesChange,
+  gapCategories,
+}: {
+  accountId: number;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  flagType: string;
+  onFlagTypeChange: (v: string) => void;
+  flagValue: string;
+  onFlagValueChange: (v: string) => void;
+  flagCategories: string[];
+  onFlagCategoriesChange: (v: string[]) => void;
+  flagNotes: string;
+  onFlagNotesChange: (v: string) => void;
+  gapCategories: AccountWithMetrics["gapCategories"];
+}) {
+  const { toast } = useToast();
+
+  const addFlagMutation = useMutation({
+    mutationFn: async (data: {
+      flagType: string;
+      flagValue: string;
+      affectedCategories?: string[];
+      notes?: string;
+    }) => {
+      const res = await apiRequest("POST", `/api/accounts/${accountId}/flags`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "flags"] });
+      toast({ title: "Flag added" });
+      onOpenChange(false);
+    },
+    onError: () => {
+      toast({ title: "Failed to add flag", variant: "destructive" });
+    },
+  });
+
+  const handleSubmit = () => {
+    if (!flagValue.trim()) {
+      toast({ title: "Please enter a flag value", variant: "destructive" });
+      return;
+    }
+    addFlagMutation.mutate({
+      flagType,
+      flagValue: flagValue.trim(),
+      affectedCategories: flagCategories.length > 0 ? flagCategories : undefined,
+      notes: flagNotes.trim() || undefined,
+    });
+  };
+
+  const toggleCategory = (catName: string) => {
+    if (flagCategories.includes(catName)) {
+      onFlagCategoriesChange(flagCategories.filter((c) => c !== catName));
+    } else {
+      onFlagCategoriesChange([...flagCategories, catName]);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add Behavioral Flag</DialogTitle>
+          <DialogDescription>
+            Add a behavioral annotation to this account.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label>Flag Type</Label>
+            <Select value={flagType} onValueChange={onFlagTypeChange}>
+              <SelectTrigger data-testid="select-flag-type">
+                <SelectValue placeholder="Select flag type" />
+              </SelectTrigger>
+              <SelectContent>
+                {ACCOUNT_FLAG_TYPES.map((ft) => (
+                  <SelectItem key={ft} value={ft}>
+                    {FLAG_TYPE_LABELS[ft] || ft}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Flag Value</Label>
+            <Input
+              placeholder="e.g., PEX-only, No copper, Credit constrained"
+              value={flagValue}
+              onChange={(e) => onFlagValueChange(e.target.value)}
+              data-testid="input-flag-value"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Affected Categories (optional)</Label>
+            <div className="flex flex-wrap gap-2">
+              {gapCategories.map((gap) => (
+                <Badge
+                  key={gap.name}
+                  variant={flagCategories.includes(gap.name) ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => toggleCategory(gap.name)}
+                  data-testid={`toggle-category-${gap.name}`}
+                >
+                  {gap.name}
+                </Badge>
+              ))}
+            </div>
+            {gapCategories.length === 0 && (
+              <p className="text-xs text-muted-foreground">No gap categories available for this account.</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label>Notes (optional)</Label>
+            <Textarea
+              placeholder="Add any additional context..."
+              value={flagNotes}
+              onChange={(e) => onFlagNotesChange(e.target.value)}
+              rows={2}
+              data-testid="input-flag-notes"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            data-testid="button-cancel-flag"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={!flagValue.trim() || addFlagMutation.isPending}
+            data-testid="button-save-flag"
+          >
+            {addFlagMutation.isPending ? "Adding..." : "Add Flag"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function RfmScoresSection({ account }: { account: AccountWithMetrics }) {
+  const scores = [
+    { label: "Recency", value: account.recencyScore, testId: "rfm-recency" },
+    { label: "Frequency", value: account.frequencyScore, testId: "rfm-frequency" },
+    { label: "Monetary", value: account.monetaryScore, testId: "rfm-monetary" },
+    { label: "Mix", value: account.mixScore, testId: "rfm-mix" },
+  ];
+
+  const hasAnyScore = scores.some((s) => s.value !== null);
+  if (!hasAnyScore) return null;
+
+  return (
+    <div data-testid="section-rfm-scores">
+      <h3 className="text-sm font-semibold mb-3">RFM + Mix Scores</h3>
+      <div className="space-y-3">
+        {scores.map((s) => {
+          const val = s.value ?? 0;
+          return (
+            <div key={s.testId} className="flex items-center gap-3" data-testid={s.testId}>
+              <span className="text-sm w-20 shrink-0">{s.label}</span>
+              <div className="flex-1 h-2 rounded-full bg-secondary">
+                <div
+                  className={`h-full rounded-full transition-all ${getRfmColor(val)}`}
+                  style={{ width: `${val}%` }}
+                />
+              </div>
+              <span className={`text-sm font-semibold w-8 text-right ${getRfmTextColor(val)}`} data-testid={`${s.testId}-value`}>
+                {Math.round(val)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      {(account.orderCount12m !== null || account.daysSinceLastOrder !== null) && (
+        <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+          {account.orderCount12m !== null && (
+            <span data-testid="text-order-count-12m">Orders (12M): {account.orderCount12m}</span>
+          )}
+          {account.daysSinceLastOrder !== null && (
+            <span data-testid="text-days-since-last-order">Last order: {account.daysSinceLastOrder}d ago</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BehavioralFlagsSection({
+  accountId,
+  gapCategories,
+  onOpenAddFlag,
+}: {
+  accountId: number;
+  gapCategories: AccountWithMetrics["gapCategories"];
+  onOpenAddFlag: () => void;
+}) {
+  const { toast } = useToast();
+
+  const { data: flags, isLoading } = useQuery<AccountFlag[]>({
+    queryKey: ["/api/accounts", accountId, "flags"],
+  });
+
+  const deleteFlagMutation = useMutation({
+    mutationFn: async (flagId: number) => {
+      await apiRequest("DELETE", `/api/account-flags/${flagId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts", accountId, "flags"] });
+      toast({ title: "Flag removed" });
+    },
+    onError: () => {
+      toast({ title: "Failed to remove flag", variant: "destructive" });
+    },
+  });
+
+  return (
+    <div data-testid="section-behavioral-flags">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold">Behavioral Flags</h3>
+        <Button variant="outline" size="sm" onClick={onOpenAddFlag} data-testid="button-add-flag">
+          <Plus className="h-3 w-3 mr-1" />
+          Add Flag
+        </Button>
+      </div>
+      {isLoading ? (
+        <div className="flex justify-center py-4">
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        </div>
+      ) : !flags?.length ? (
+        <p className="text-sm text-muted-foreground py-2">No behavioral flags set for this account.</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {flags.map((flag) => (
+            <span
+              key={flag.id}
+              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium ${FLAG_TYPE_COLORS[flag.flagType] || "bg-muted text-foreground"}`}
+              data-testid={`flag-tag-${flag.id}`}
+            >
+              <Tag className="h-3 w-3" />
+              <span>{FLAG_TYPE_LABELS[flag.flagType] || flag.flagType}: {flag.flagValue}</span>
+              <button
+                className="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-black/10 dark:hover:bg-white/10"
+                onClick={() => deleteFlagMutation.mutate(flag.id)}
+                disabled={deleteFlagMutation.isPending}
+                data-testid={`button-delete-flag-${flag.id}`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GapCategoriesWithFlags({
+  accountId,
+  gapCategories,
+  formatCurrency,
+}: {
+  accountId: number;
+  gapCategories: AccountWithMetrics["gapCategories"];
+  formatCurrency: (v: number) => string;
+}) {
+  const { data: flags } = useQuery<AccountFlag[]>({
+    queryKey: ["/api/accounts", accountId, "flags"],
+  });
+
+  const flaggedCategoryNames = useMemo(() => {
+    if (!flags?.length) return new Set<string>();
+    const names = new Set<string>();
+    flags.forEach((f) => {
+      if (f.affectedCategories?.length) {
+        f.affectedCategories.forEach((c) => names.add(c.toLowerCase()));
+      }
+    });
+    return names;
+  }, [flags]);
+
+  return (
+    <div>
+      <h3 className="text-sm font-semibold mb-3">Gap Categories</h3>
+      <div className="space-y-3">
+        {gapCategories.map((gap) => {
+          const hasFlag = flaggedCategoryNames.has(gap.name.toLowerCase());
+          return (
+            <div
+              key={gap.name}
+              className="flex items-center justify-between p-3 rounded-md bg-muted/50"
+              data-testid={`gap-category-${gap.name}`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="h-2 w-2 rounded-full bg-chart-5" />
+                <span className="font-medium">{gap.name}</span>
+                {hasFlag && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span data-testid={`badge-flag-warning-${gap.name}`}>
+                        <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">A behavioral flag affects this category</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <p className="text-sm font-medium text-chart-5">
+                    -{gap.gapPct}%
+                  </p>
+                  <p className="text-xs text-muted-foreground">gap</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-semibold text-chart-2">
+                    {formatCurrency(gap.estimatedValue)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">opportunity</p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function Accounts() {
   const [searchQuery, setSearchQuery] = useState("");
   const [segmentFilter, setSegmentFilter] = useState<string>("all");
+  const [subSegmentFilter, setSubSegmentFilter] = useState<string>("all");
   const [regionFilter, setRegionFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("default");
+  const [showAddFlagDialog, setShowAddFlagDialog] = useState(false);
+  const [newFlagType, setNewFlagType] = useState<string>(ACCOUNT_FLAG_TYPES[0]);
+  const [newFlagValue, setNewFlagValue] = useState("");
+  const [newFlagCategories, setNewFlagCategories] = useState<string[]>([]);
+  const [newFlagNotes, setNewFlagNotes] = useState("");
   const [selectedAccount, setSelectedAccount] = useState<AccountWithMetrics | null>(null);
   const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
   const [taskType, setTaskType] = useState<string>("call");
@@ -521,12 +937,21 @@ export default function Accounts() {
       id: 1,
       name: "ABC Plumbing Co",
       segment: "Plumbing",
+      subSegment: "residential_service",
       region: "Northeast",
       assignedTm: "John Smith",
       status: "active",
+      creditLimit: 10000,
+      creditUsage: 8200,
       last12mRevenue: 125000,
       categoryPenetration: 45,
       opportunityScore: 87,
+      recencyScore: 82,
+      frequencyScore: 65,
+      monetaryScore: 48,
+      mixScore: 35,
+      orderCount12m: 24,
+      daysSinceLastOrder: 12,
       gapCategories: [
         { name: "Water Heaters", gapPct: 35, estimatedValue: 18000 },
         { name: "Tools & Safety", gapPct: 28, estimatedValue: 12000 },
@@ -538,12 +963,21 @@ export default function Accounts() {
       id: 2,
       name: "Elite HVAC Services",
       segment: "HVAC",
+      subSegment: "commercial_mechanical",
       region: "Southeast",
       assignedTm: "Sarah Johnson",
       status: "active",
+      creditLimit: 25000,
+      creditUsage: 12000,
       last12mRevenue: 210000,
       categoryPenetration: 52,
       opportunityScore: 82,
+      recencyScore: 75,
+      frequencyScore: 80,
+      monetaryScore: 72,
+      mixScore: 55,
+      orderCount12m: 36,
+      daysSinceLastOrder: 5,
       gapCategories: [
         { name: "Controls & Thermostats", gapPct: 25, estimatedValue: 15000 },
         { name: "Pipe & Fittings", gapPct: 20, estimatedValue: 12000 },
@@ -554,12 +988,21 @@ export default function Accounts() {
       id: 3,
       name: "Metro Mechanical",
       segment: "Mechanical",
+      subSegment: "commercial_mechanical",
       region: "Midwest",
       assignedTm: "Mike Wilson",
       status: "active",
+      creditLimit: 15000,
+      creditUsage: 13500,
       last12mRevenue: 175000,
       categoryPenetration: 38,
       opportunityScore: 76,
+      recencyScore: 55,
+      frequencyScore: 42,
+      monetaryScore: 60,
+      mixScore: 30,
+      orderCount12m: 18,
+      daysSinceLastOrder: 28,
       gapCategories: [
         { name: "Water Heaters", gapPct: 40, estimatedValue: 22000 },
         { name: "Ductwork", gapPct: 18, estimatedValue: 10000 },
@@ -570,12 +1013,21 @@ export default function Accounts() {
       id: 4,
       name: "Premier Plumbing",
       segment: "Plumbing",
+      subSegment: "builder",
       region: "Northeast",
       assignedTm: "John Smith",
       status: "active",
+      creditLimit: null,
+      creditUsage: null,
       last12mRevenue: 98000,
       categoryPenetration: 55,
       opportunityScore: 71,
+      recencyScore: 90,
+      frequencyScore: 85,
+      monetaryScore: 40,
+      mixScore: 62,
+      orderCount12m: 42,
+      daysSinceLastOrder: 3,
       gapCategories: [
         { name: "PVF", gapPct: 22, estimatedValue: 8000 },
         { name: "Tools", gapPct: 18, estimatedValue: 6000 },
@@ -586,12 +1038,21 @@ export default function Accounts() {
       id: 5,
       name: "Climate Control Inc",
       segment: "HVAC",
+      subSegment: "other",
       region: "West",
       assignedTm: "Lisa Brown",
       status: "active",
+      creditLimit: 50000,
+      creditUsage: 18000,
       last12mRevenue: 320000,
       categoryPenetration: 68,
       opportunityScore: 68,
+      recencyScore: 92,
+      frequencyScore: 88,
+      monetaryScore: 95,
+      mixScore: 78,
+      orderCount12m: 60,
+      daysSinceLastOrder: 2,
       gapCategories: [
         { name: "Refrigerant & Supplies", gapPct: 15, estimatedValue: 12000 },
       ],
@@ -601,12 +1062,21 @@ export default function Accounts() {
       id: 6,
       name: "Superior Heating",
       segment: "HVAC",
+      subSegment: "residential_service",
       region: "Midwest",
       assignedTm: "Mike Wilson",
       status: "active",
+      creditLimit: 20000,
+      creditUsage: 5000,
       last12mRevenue: 145000,
       categoryPenetration: 42,
       opportunityScore: 79,
+      recencyScore: 38,
+      frequencyScore: 30,
+      monetaryScore: 55,
+      mixScore: 45,
+      orderCount12m: 12,
+      daysSinceLastOrder: 45,
       gapCategories: [
         { name: "Controls", gapPct: 30, estimatedValue: 14000 },
         { name: "Water Heaters", gapPct: 25, estimatedValue: 11000 },
@@ -640,8 +1110,9 @@ export default function Accounts() {
         account.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         account.assignedTm.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesSegment = segmentFilter === "all" || account.segment === segmentFilter;
+      const matchesSubSegment = subSegmentFilter === "all" || account.subSegment === subSegmentFilter;
       const matchesRegion = regionFilter === "all" || account.region === regionFilter;
-      return matchesSearch && matchesSegment && matchesRegion;
+      return matchesSearch && matchesSegment && matchesSubSegment && matchesRegion;
     });
 
     if (sortBy === "revenue-impact") {
@@ -655,7 +1126,7 @@ export default function Accounts() {
     }
 
     return result;
-  }, [displayAccounts, searchQuery, segmentFilter, regionFilter, sortBy]);
+  }, [displayAccounts, searchQuery, segmentFilter, subSegmentFilter, regionFilter, sortBy]);
 
   const filteredAccounts = filteredAndSortedAccounts;
 
@@ -689,6 +1160,19 @@ export default function Accounts() {
       ),
     },
     {
+      key: "subSegment",
+      header: "Sub-Segment",
+      cell: (row: AccountWithMetrics) => (
+        row.subSegment ? (
+          <span className="text-sm text-muted-foreground" data-testid={`text-subsegment-${row.id}`}>
+            {SUB_SEGMENT_LABELS[row.subSegment] || row.subSegment}
+          </span>
+        ) : (
+          <span className="text-sm text-muted-foreground">—</span>
+        )
+      ),
+    },
+    {
       key: "region",
       header: "Region",
       cell: (row: AccountWithMetrics) => (
@@ -701,6 +1185,38 @@ export default function Accounts() {
       cell: (row: AccountWithMetrics) => (
         <span className="font-semibold">{formatCurrency(row.last12mRevenue)}</span>
       ),
+    },
+    {
+      key: "credit",
+      header: "Credit",
+      cell: (row: AccountWithMetrics) => {
+        if (!row.creditLimit || row.creditLimit === 0) {
+          return <span className="text-sm text-muted-foreground">—</span>;
+        }
+        const usage = row.creditUsage || 0;
+        const utilPct = (usage / row.creditLimit) * 100;
+        const isConstrained = utilPct > 80;
+        return (
+          <div className="min-w-[100px]" data-testid={`credit-indicator-${row.id}`}>
+            <div className="flex items-center gap-1 text-xs mb-1">
+              <span>{formatCreditShort(usage)}</span>
+              <span className="text-muted-foreground">/</span>
+              <span className="text-muted-foreground">{formatCreditShort(row.creditLimit)}</span>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-secondary">
+              <div
+                className={`h-full rounded-full transition-all ${isConstrained ? "bg-orange-500" : "bg-green-500"}`}
+                style={{ width: `${Math.min(utilPct, 100)}%` }}
+              />
+            </div>
+            {isConstrained && (
+              <Badge variant="outline" className="mt-1 text-[10px] px-1.5 py-0 border-orange-400 text-orange-600 dark:text-orange-400" data-testid={`badge-credit-constrained-${row.id}`}>
+                Credit Constrained
+              </Badge>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "categoryPenetration",
@@ -914,6 +1430,19 @@ export default function Accounts() {
                   ))}
                 </SelectContent>
               </Select>
+              <Select value={subSegmentFilter} onValueChange={setSubSegmentFilter}>
+                <SelectTrigger className="w-48" data-testid="select-sub-segment">
+                  <SelectValue placeholder="Sub-Segment" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sub-Segments</SelectItem>
+                  {SUB_SEGMENT_TYPES.map((subSeg) => (
+                    <SelectItem key={subSeg} value={subSeg}>
+                      {SUB_SEGMENT_LABELS[subSeg] || subSeg}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Select value={regionFilter} onValueChange={setRegionFilter}>
                 <SelectTrigger className="w-36" data-testid="select-region">
                   <SelectValue placeholder="Region" />
@@ -972,11 +1501,17 @@ export default function Accounts() {
 
                 <TabsContent value="overview">
                   <div className="space-y-6 pt-2">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                       <div>
                         <p className="text-sm text-muted-foreground">Segment</p>
                         <p className="font-medium">{selectedAccount.segment}</p>
                       </div>
+                      {selectedAccount.subSegment && (
+                        <div data-testid="detail-sub-segment">
+                          <p className="text-sm text-muted-foreground">Sub-Segment</p>
+                          <p className="font-medium">{SUB_SEGMENT_LABELS[selectedAccount.subSegment] || selectedAccount.subSegment}</p>
+                        </div>
+                      )}
                       <div>
                         <p className="text-sm text-muted-foreground">Region</p>
                         <p className="font-medium">{selectedAccount.region}</p>
@@ -1079,36 +1614,19 @@ export default function Accounts() {
                       </Card>
                     </div>
 
-                    <div>
-                      <h3 className="text-sm font-semibold mb-3">Gap Categories</h3>
-                      <div className="space-y-3">
-                        {selectedAccount.gapCategories.map((gap) => (
-                          <div
-                            key={gap.name}
-                            className="flex items-center justify-between p-3 rounded-md bg-muted/50"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="h-2 w-2 rounded-full bg-chart-5" />
-                              <span className="font-medium">{gap.name}</span>
-                            </div>
-                            <div className="flex items-center gap-4">
-                              <div className="text-right">
-                                <p className="text-sm font-medium text-chart-5">
-                                  -{gap.gapPct}%
-                                </p>
-                                <p className="text-xs text-muted-foreground">gap</p>
-                              </div>
-                              <div className="text-right">
-                                <p className="text-sm font-semibold text-chart-2">
-                                  {formatCurrency(gap.estimatedValue)}
-                                </p>
-                                <p className="text-xs text-muted-foreground">opportunity</p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    <RfmScoresSection account={selectedAccount} />
+
+                    <BehavioralFlagsSection
+                      accountId={selectedAccount.id}
+                      gapCategories={selectedAccount.gapCategories}
+                      onOpenAddFlag={() => setShowAddFlagDialog(true)}
+                    />
+
+                    <GapCategoriesWithFlags
+                      accountId={selectedAccount.id}
+                      gapCategories={selectedAccount.gapCategories}
+                      formatCurrency={formatCurrency}
+                    />
 
                     <div className="flex gap-3 flex-wrap">
                       <Tooltip>
@@ -1207,6 +1725,32 @@ export default function Accounts() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Add Flag Dialog */}
+      {selectedAccount && (
+        <AddFlagDialog
+          accountId={selectedAccount.id}
+          open={showAddFlagDialog}
+          onOpenChange={(open) => {
+            setShowAddFlagDialog(open);
+            if (!open) {
+              setNewFlagType(ACCOUNT_FLAG_TYPES[0]);
+              setNewFlagValue("");
+              setNewFlagCategories([]);
+              setNewFlagNotes("");
+            }
+          }}
+          flagType={newFlagType}
+          onFlagTypeChange={setNewFlagType}
+          flagValue={newFlagValue}
+          onFlagValueChange={setNewFlagValue}
+          flagCategories={newFlagCategories}
+          onFlagCategoriesChange={setNewFlagCategories}
+          flagNotes={newFlagNotes}
+          onFlagNotesChange={setNewFlagNotes}
+          gapCategories={selectedAccount.gapCategories}
+        />
+      )}
 
       {/* Create Task Dialog */}
       <Dialog open={showCreateTaskDialog} onOpenChange={(open) => {

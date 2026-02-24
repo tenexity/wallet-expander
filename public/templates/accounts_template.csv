@@ -1,4 +1,4 @@
-id,name,segment,region,assigned_tm,status
-1001,ABC Heating & Cooling,HVAC,Northeast,John Smith,active
-1002,Premier Plumbing Solutions,Plumbing,Southwest,Sarah Johnson,active
-1003,Midwest Mechanical Inc,Mechanical,Midwest,Mike Williams,prospect
+id,name,segment,sub_segment,region,assigned_tm,status,credit_limit,credit_usage
+1001,ABC Heating & Cooling,HVAC,residential_service,Northeast,John Smith,active,25000,18000
+1002,Premier Plumbing Solutions,Plumbing,commercial_mechanical,Southwest,Sarah Johnson,active,50000,22000
+1003,Midwest Mechanical Inc,Mechanical,builder,Midwest,Mike Williams,prospect,75000,45000

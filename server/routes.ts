@@ -16,6 +16,7 @@ import {
   insertTerritoryManagerSchema,
   insertCustomCategorySchema,
   insertRevShareTierSchema,
+  insertAccountFlagSchema,
   updateEmailSettingsSchema,
   DEFAULT_SCORING_WEIGHTS,
   tenants,
@@ -24,6 +25,8 @@ import {
   stripeWebhookEvents,
   AI_ACTION_CREDITS,
   AI_ACTION_LABELS,
+  ACCOUNT_FLAG_TYPES,
+  SUB_SEGMENT_TYPES,
 } from "@shared/schema";
 import type Stripe from "stripe";
 import { db } from "./db";
@@ -212,6 +215,7 @@ export async function registerRoutes(
           id: account.id,
           name: account.name,
           segment: account.segment || "Unknown",
+          subSegment: account.subSegment || null,
           region: account.region || "",
           assignedTm: account.assignedTm || "",
           status: account.status || "active",
@@ -403,19 +407,27 @@ export async function registerRoutes(
           id: account.id,
           name: account.name,
           segment: account.segment || "Unknown",
+          subSegment: account.subSegment || null,
           region: account.region || "Unknown",
           assignedTm: account.assignedTm || "Unassigned",
           status: account.status,
+          creditLimit: account.creditLimit ? parseFloat(account.creditLimit) : null,
+          creditUsage: account.creditUsage ? parseFloat(account.creditUsage) : null,
           last12mRevenue: metrics ? parseFloat(metrics.last12mRevenue || "0") : 0,
           categoryPenetration: metrics ? parseFloat(metrics.categoryPenetration || "0") : 0,
           opportunityScore: metrics ? parseFloat(metrics.opportunityScore || "0") : 0,
-          // Map top category gaps to display format with category name and opportunity metrics
+          recencyScore: metrics?.recencyScore ? parseFloat(metrics.recencyScore) : null,
+          frequencyScore: metrics?.frequencyScore ? parseFloat(metrics.frequencyScore) : null,
+          monetaryScore: metrics?.monetaryScore ? parseFloat(metrics.monetaryScore) : null,
+          mixScore: metrics?.mixScore ? parseFloat(metrics.mixScore) : null,
+          orderCount12m: metrics?.orderCount12m ?? null,
+          daysSinceLastOrder: metrics?.daysSinceLastOrder ?? null,
           gapCategories: gaps.slice(0, DASHBOARD_LIMITS.ACCOUNT_GAPS_DISPLAY).map(g => {
             const cat = categoryMap.get(g.categoryId);
             return {
               name: cat?.name || "Unknown",
-              gapPct: parseFloat(g.gapPct || "0"), // Percentage gap vs ICP benchmark
-              estimatedValue: parseFloat(g.estimatedOpportunity || "0"), // Revenue potential in dollars
+              gapPct: parseFloat(g.gapPct || "0"),
+              estimatedValue: parseFloat(g.estimatedOpportunity || "0"),
             };
           }),
           enrolled: enrolledAccountIds.has(account.id),
@@ -2171,6 +2183,53 @@ KEY TALKING POINTS:
       res.json({ success: true, message: "Demo data has been reset successfully." });
     } catch (error) {
       handleRouteError(error, res, "Reset seed data");
+    }
+  });
+
+  // ============ Account Flags ============
+  app.get("/api/accounts/:id/flags", requireAuth, async (req, res) => {
+    try {
+      const tenantStorage = getStorage(req);
+      const id = parseInt(req.params.id);
+      const flags = await tenantStorage.getAccountFlags(id);
+      res.json(flags);
+    } catch (error) {
+      handleRouteError(error, res, "Get account flags");
+    }
+  });
+
+  app.post("/api/accounts/:id/flags", requireAuth, async (req, res) => {
+    try {
+      const tenantStorage = getStorage(req);
+      const accountId = parseInt(req.params.id);
+      const data = insertAccountFlagSchema.parse({ ...req.body, accountId });
+      const flag = await tenantStorage.createAccountFlag(data);
+      res.status(201).json(flag);
+    } catch (error) {
+      handleRouteError(error, res, "Create account flag");
+    }
+  });
+
+  app.delete("/api/account-flags/:id", requireAuth, async (req, res) => {
+    try {
+      const tenantStorage = getStorage(req);
+      const id = parseInt(req.params.id);
+      await tenantStorage.deleteAccountFlag(id);
+      res.json({ success: true });
+    } catch (error) {
+      handleRouteError(error, res, "Delete account flag");
+    }
+  });
+
+  // ============ Reference Baseline Computation ============
+  app.post("/api/profiles/compute-reference-baseline", requireAuth, async (req, res) => {
+    try {
+      const tenantStorage = getStorage(req);
+      const { accountIds } = z.object({ accountIds: z.array(z.number()).min(1).max(20) }).parse(req.body);
+      const baseline = await tenantStorage.computeReferenceBaseline(accountIds);
+      res.json(baseline);
+    } catch (error) {
+      handleRouteError(error, res, "Compute reference baseline");
     }
   });
 

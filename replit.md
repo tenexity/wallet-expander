@@ -86,7 +86,26 @@ The application follows a client-server architecture.
 - `server/`: Backend application, including database connection, API routes, storage, and seeding scripts.
 - `shared/`: Shared schema definitions and AI chat models.
 
-**Database Schema:** Key tables include `users`, `sessions`, `tenants`, `user_roles`, `accounts`, `products`, `orders`, `segment_profiles`, `account_metrics`, `tasks`, `playbooks`, `program_accounts`, `custom_categories`, `settings`, `territory_managers`, `rev_share_tiers`, `email_connections`, `synced_emails`, `contacts`, `projects`, `email_interactions`, `order_signals`, `competitor_mentions`, `credit_transactions`, and `tenant_credit_ledger`.
+**Database Schema:** Key tables include `users`, `sessions`, `tenants`, `user_roles`, `accounts`, `products`, `orders`, `segment_profiles`, `account_metrics`, `tasks`, `playbooks`, `program_accounts`, `custom_categories`, `settings`, `territory_managers`, `rev_share_tiers`, `email_connections`, `synced_emails`, `contacts`, `projects`, `email_interactions`, `order_signals`, `competitor_mentions`, `credit_transactions`, `tenant_credit_ledger`, and `account_flags`.
+
+## SME Feedback Features (Implemented)
+
+Based on subject matter expert review, the following enhancements were implemented:
+
+1. **Sub-segment Classification:** Accounts now have a `subSegment` field (residential_service, commercial_mechanical, builder, other). ICP profiles can be scoped by sub-segment for more precise targeting. Sub-segment filter added to Accounts page and column added to Dashboard Top Opportunities.
+
+2. **Reference Customer Baseline Selection:** ICP Builder now supports two baseline methods:
+   - "AI-Generated" (existing default)
+   - "Reference Customers" — select 3-12 exemplar accounts, compute ICP from their real purchasing data via POST `/api/profiles/compute-reference-baseline`
+   Profile list shows baseline method badge ("AI" or "Reference (N)").
+
+3. **Account Behavioral Flags:** New `account_flags` table allows annotating accounts with behavioral tags (material_preference, brand_exclusive, buying_constraint, channel_preference). Flags display as colored tags on account detail. When a flag's affected categories overlap with a gap category, a warning icon appears.
+
+4. **Formalized RFM+Mix Scoring:** Each account now has 4 scored dimensions (0-100): Recency, Frequency, Monetary, Mix. Displayed as colored progress bars on account detail (green >70, yellow 40-70, red <40). Also shows order count and days since last order.
+
+5. **Credit Opportunity Annotation:** Accounts have `creditLimit` and `creditUsage` fields. Accounts page shows credit utilization bar. When utilization >80%, a "Credit Constrained" badge appears.
+
+**Constants:** `SUB_SEGMENT_TYPES` and `ACCOUNT_FLAG_TYPES` are exported from `@shared/schema`.
 
 ## External Dependencies
 
