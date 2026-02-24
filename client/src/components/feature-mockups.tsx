@@ -22,6 +22,10 @@ import {
   UserCheck,
   Radar,
   Zap,
+  CreditCard,
+  Layers,
+  Activity,
+  ShieldCheck,
 } from "lucide-react";
 
 const mockAccounts = [
@@ -836,6 +840,207 @@ export function MockupEmailIntelligence() {
       <Card className="p-2.5 border-red-500/30 bg-red-500/5">
         <p className="text-[10px] font-semibold text-red-600">⚠ Urgent Alert Sent to Rep</p>
         <p className="text-[10px] text-muted-foreground mt-0.5">Metro HVAC is evaluating a competitor. Respond within 24 hours to protect this account.</p>
+      </Card>
+    </div>
+  );
+}
+
+const mockSubSegmentAccounts = [
+  { name: "Tri-County Plumbing", subSegment: "Residential Service", revenue: "$134K", strategy: "High frequency, broad SKU mix", color: "bg-blue-500", icon: Users },
+  { name: "Midwest Pipe & Supply", subSegment: "Commercial Mechanical", revenue: "$162K", strategy: "Project-based, large orders", color: "bg-purple-500", icon: Building2 },
+  { name: "Chicago Comfort Systems", subSegment: "Builder", revenue: "$118K", strategy: "Volume pricing, spec-driven", color: "bg-amber-500", icon: Layers },
+];
+
+export function MockupSubSegments() {
+  return (
+    <div className="bg-background rounded-lg p-4 space-y-4 text-sm border shadow-sm" data-testid="mockup-sub-segments">
+      <div className="flex items-center justify-between border-b pb-3">
+        <div>
+          <h3 className="font-semibold">Customer Classification</h3>
+          <p className="text-xs text-muted-foreground">Sub-segment driven strategies</p>
+        </div>
+        <Badge variant="secondary" className="text-xs">3 Types</Badge>
+      </div>
+
+      <div className="space-y-2">
+        {mockSubSegmentAccounts.map((account, i) => (
+          <Card key={i} className="p-3" data-testid={`card-sub-segment-${i}`}>
+            <div className="flex items-center gap-3">
+              <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${account.color} text-white`}>
+                <account.icon className="h-4 w-4" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="font-medium text-xs" data-testid={`text-account-name-${i}`}>{account.name}</p>
+                  <Badge variant="outline" className="text-[10px] shrink-0" data-testid={`badge-sub-segment-${i}`}>{account.subSegment}</Badge>
+                </div>
+                <p className="text-[10px] text-muted-foreground">{account.revenue} revenue</p>
+              </div>
+            </div>
+            <div className="mt-2 pt-2 border-t">
+              <div className="flex items-center gap-1.5">
+                <Target className="h-3 w-3 text-primary" />
+                <p className="text-[10px] text-muted-foreground">Strategy: <span className="font-medium text-foreground" data-testid={`text-strategy-${i}`}>{account.strategy}</span></p>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      <Card className="p-3 bg-primary/5 border-primary/20">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-primary" />
+          <div>
+            <p className="text-xs font-semibold">ICPs auto-adapt by sub-segment</p>
+            <p className="text-[10px] text-muted-foreground">Each type gets a tailored profile and playbook strategy</p>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+const mockCreditAccounts = [
+  { name: "Premier Plumbing NJ", creditUsed: 27500, creditLimit: 30000, gap: "$30.8K", constrained: true },
+  { name: "Heartland Mechanical", creditUsed: 42000, creditLimit: 60000, gap: "$27.5K", constrained: false },
+  { name: "Ohio Valley HVAC", creditUsed: 16500, creditLimit: 18000, gap: "$19.0K", constrained: true },
+];
+
+export function MockupCreditAssessment() {
+  return (
+    <div className="bg-background rounded-lg p-4 space-y-4 text-sm border shadow-sm" data-testid="mockup-credit-assessment">
+      <div className="flex items-center justify-between border-b pb-3">
+        <div>
+          <h3 className="font-semibold">Opportunity Filtering</h3>
+          <p className="text-xs text-muted-foreground">Credit constraint assessment</p>
+        </div>
+        <Badge variant="outline" className="text-xs gap-1">
+          <CreditCard className="h-3 w-3" />
+          Credit Check
+        </Badge>
+      </div>
+
+      <div className="space-y-2">
+        {mockCreditAccounts.map((account, i) => {
+          const utilization = Math.round((account.creditUsed / account.creditLimit) * 100);
+          return (
+            <Card key={i} className={`p-3 ${account.constrained ? 'border-orange-400/40 bg-orange-50/50 dark:bg-orange-950/10' : ''}`} data-testid={`card-credit-${i}`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <p className="font-medium text-xs" data-testid={`text-credit-account-${i}`}>{account.name}</p>
+                  {account.constrained && (
+                    <Badge variant="outline" className="text-[10px] border-orange-400 text-orange-600 dark:text-orange-400 gap-0.5" data-testid={`badge-constrained-${i}`}>
+                      <AlertTriangle className="h-2.5 w-2.5" />
+                      Credit Constrained
+                    </Badge>
+                  )}
+                </div>
+                <span className="text-[10px] text-muted-foreground">{account.gap} opportunity</span>
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="text-muted-foreground">Credit Utilization</span>
+                  <span className={`font-semibold ${utilization > 80 ? 'text-orange-600 dark:text-orange-400' : 'text-green-600 dark:text-green-400'}`}>${(account.creditUsed / 1000).toFixed(0)}K / ${(account.creditLimit / 1000).toFixed(0)}K ({utilization}%)</span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${utilization > 80 ? 'bg-orange-500' : 'bg-green-500'}`}
+                    style={{ width: `${utilization}%` }}
+                  />
+                </div>
+              </div>
+              {account.constrained && (
+                <p className="text-[10px] text-orange-600 dark:text-orange-400 mt-1.5 flex items-center gap-1">
+                  <ShieldCheck className="h-3 w-3" />
+                  Gap may require credit increase before pursuing
+                </p>
+              )}
+            </Card>
+          );
+        })}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <Card className="p-2.5 text-center">
+          <p className="text-lg font-bold text-green-600">7</p>
+          <p className="text-[10px] text-muted-foreground">Real Opportunities</p>
+        </Card>
+        <Card className="p-2.5 text-center">
+          <p className="text-lg font-bold text-orange-500">3</p>
+          <p className="text-[10px] text-muted-foreground">Credit Constrained</p>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+const mockRFMScores = [
+  { label: "Recency", score: 85, description: "Last order 8 days ago" },
+  { label: "Frequency", score: 66, description: "40 orders in 12 months" },
+  { label: "Monetary", score: 92, description: "$245K annual revenue" },
+  { label: "Mix", score: 50, description: "6 of 12 categories purchased" },
+];
+
+export function MockupRFMScoring() {
+  return (
+    <div className="bg-background rounded-lg p-4 space-y-4 text-sm border shadow-sm" data-testid="mockup-rfm-scoring">
+      <div className="flex items-center justify-between border-b pb-3">
+        <div>
+          <h3 className="font-semibold">Account Health Scoring</h3>
+          <p className="text-xs text-muted-foreground">Metro HVAC Solutions — RFM + Mix</p>
+        </div>
+        <Badge className="text-xs gap-1" data-testid="badge-health-status">
+          <Activity className="h-3 w-3" />
+          Healthy
+        </Badge>
+      </div>
+
+      <div className="space-y-3">
+        {mockRFMScores.map((dim, i) => {
+          const color = dim.score > 70 ? 'bg-green-500' : dim.score > 40 ? 'bg-amber-500' : 'bg-red-500';
+          const textColor = dim.score > 70 ? 'text-green-600 dark:text-green-400' : dim.score > 40 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400';
+          return (
+            <div key={i} className="space-y-1" data-testid={`rfm-dimension-${dim.label.toLowerCase()}`}>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium">{dim.label}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground">{dim.description}</span>
+                  <span className={`text-xs font-bold ${textColor}`} data-testid={`text-score-${dim.label.toLowerCase()}`}>{dim.score}</span>
+                </div>
+              </div>
+              <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${dim.score}%` }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <Card className="p-2.5">
+          <p className="text-[10px] text-muted-foreground">Overall Health</p>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
+            <p className="text-xs font-bold">73 / 100</p>
+          </div>
+        </Card>
+        <Card className="p-2.5">
+          <p className="text-[10px] text-muted-foreground">Growth Signal</p>
+          <div className="flex items-center gap-1 mt-0.5">
+            <TrendingUp className="h-3 w-3 text-green-500" />
+            <p className="text-xs font-semibold text-green-600 dark:text-green-400">Expanding</p>
+          </div>
+        </Card>
+      </div>
+
+      <Card className="p-2.5 bg-amber-500/5 border-amber-500/20">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+          <div>
+            <p className="text-[10px] font-semibold">Mix score below target</p>
+            <p className="text-[10px] text-muted-foreground">6 categories purchased vs. 12 available — category breadth opportunity detected</p>
+          </div>
+        </div>
       </Card>
     </div>
   );

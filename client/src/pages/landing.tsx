@@ -47,6 +47,9 @@ import {
   MockupAskAnything,
   MockupEmailIntelligence,
   MockupCRMIntelligence,
+  MockupSubSegments,
+  MockupCreditAssessment,
+  MockupRFMScoring,
 } from "@/components/feature-mockups";
 
 import Tenexity_Official_Logo_BW_Cirlce from "@assets/Tenexity Official Logo BW Cirlce.png";
@@ -63,6 +66,19 @@ const showcaseFeatures = [
       "Prioritize based on growth potential, not just current spend",
       "Focus your best reps on the accounts most likely to grow",
       "Turn data into a strategic advantage for account selection",
+    ],
+  },
+  {
+    id: "rfm-scoring",
+    badge: "Multi-Dimensional Growth",
+    title: "Grow Accounts Across Four Dimensions, Not Just Revenue",
+    description: "Revenue alone doesn't tell the whole story. Our RFM+Mix scoring evaluates every account across four critical dimensions — how recently they ordered, how frequently they buy, how much they spend, and how broadly they purchase across categories. Reps get a complete picture of account health and can spot declining engagement before it becomes a lost customer.",
+    MockupComponent: MockupRFMScoring,
+    benefits: [
+      "Four-dimension health scoring reveals the full account picture",
+      "Early warning when purchase frequency or recency starts declining",
+      "Category breadth scoring identifies cross-sell expansion opportunities",
+      "Data-driven prioritization so reps focus on accounts ready to grow",
     ],
   },
   {
@@ -105,6 +121,19 @@ const showcaseFeatures = [
     ],
   },
   {
+    id: "credit-assessment",
+    badge: "Smart Opportunity Filtering",
+    title: "Know Which Gaps Are Real Opportunities — and Which Aren't",
+    description: "Not every category gap is a selling opportunity. Some accounts are maxed on credit. Others have material preferences that make certain categories irrelevant. Our system tracks credit utilization and behavioral flags so your reps stop wasting time on opportunities that can't close, and focus on the ones that can.",
+    MockupComponent: MockupCreditAssessment,
+    benefits: [
+      "Automatic credit utilization tracking flags constrained accounts",
+      "Behavioral flags like \"PEX-only\" suppress irrelevant gap recommendations",
+      "Reps see which opportunities are real before picking up the phone",
+      "Credit-constrained accounts are flagged, not hidden — context over guesswork",
+    ],
+  },
+  {
     id: "ask-anything",
     badge: "Ask Anything Intelligence",
     title: "Ask Your Portfolio Any Question, Get an Answer in Seconds",
@@ -128,6 +157,19 @@ const showcaseFeatures = [
       "Segment-specific success patterns you can replicate",
       "Data-driven targets based on real customer behavior",
       "Continuous learning as your customer base evolves",
+    ],
+  },
+  {
+    id: "sub-segments",
+    badge: "Customer Intelligence",
+    title: "Know Your Customer Type Before You Sell",
+    description: "A residential service plumber restocks weekly across a broad SKU mix. A builder places large project orders with tight specs. A commercial mechanical contractor buys in planned cycles. They're all \"Plumbing\" in your ERP — but they need completely different strategies. Our system classifies customers by type and tailors every recommendation accordingly.",
+    MockupComponent: MockupSubSegments,
+    benefits: [
+      "Automatic sub-segment classification tailors ICPs to customer behavior",
+      "Playbooks adapt strategy to how each customer type actually buys",
+      "Filter your portfolio by sub-segment to find the right opportunities",
+      "Eliminate false positives from one-size-fits-all profiles",
     ],
   },
   {
