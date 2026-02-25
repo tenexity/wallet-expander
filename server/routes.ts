@@ -2964,17 +2964,18 @@ KEY TALKING POINTS:
         return res.status(400).json({ message: "Price ID or plan slug required" });
       }
 
-      // Get the price ID from plan if not provided
+      // Look up plan details for checkout display and price resolution
+      let plan: typeof subscriptionPlans.$inferSelect | undefined;
       let stripePriceId = priceId;
-      if (!stripePriceId && planSlug) {
-        const [plan] = await db.select().from(subscriptionPlans)
+
+      if (planSlug) {
+        const [foundPlan] = await db.select().from(subscriptionPlans)
           .where(eq(subscriptionPlans.slug, planSlug))
           .limit(1);
+        plan = foundPlan;
+      }
 
-        if (!plan) {
-          return res.status(404).json({ message: "Plan not found" });
-        }
-
+      if (!stripePriceId && plan) {
         stripePriceId = billingCycle === 'yearly'
           ? plan.stripeYearlyPriceId
           : plan.stripeMonthlyPriceId;
@@ -2982,6 +2983,8 @@ KEY TALKING POINTS:
         if (!stripePriceId) {
           return res.status(400).json({ message: "Stripe price not configured for this plan" });
         }
+      } else if (!stripePriceId) {
+        return res.status(404).json({ message: "Plan not found" });
       }
 
       // Validate price ID against whitelist (if configured)
@@ -3011,11 +3014,30 @@ KEY TALKING POINTS:
           .where(eq(tenants.id, tenant.id));
       }
 
+      const planName = plan?.name || 'Subscription';
+      const intervalLabel = billingCycle === 'yearly' ? 'year' : 'month';
+      const priceAmount = billingCycle === 'yearly'
+        ? parseInt(plan?.yearlyPrice || '0', 10)
+        : parseInt(plan?.monthlyPrice || '0', 10);
+      const formattedPrice = `$${(priceAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
         mode: 'subscription',
         client_reference_id: tenant.id.toString(),
-        line_items: [{ price: stripePriceId, quantity: 1 }],
+        allow_promotion_codes: true,
+        line_items: [{
+          price_data: {
+            currency: 'usd',
+            unit_amount: priceAmount * 100,
+            recurring: { interval: billingCycle === 'yearly' ? 'year' : 'month' },
+            product_data: {
+              name: `Wallet Share - ${planName} Plan`,
+              description: `Price for Tenexity Wallet Share Expander - ${planName} edition\n${formattedPrice} / ${intervalLabel}`,
+            },
+          },
+          quantity: 1,
+        }],
         success_url: `${config.baseUrl}/subscription?success=true&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${config.baseUrl}/subscription?canceled=true`,
         metadata: {
@@ -3080,9 +3102,27 @@ KEY TALKING POINTS:
 
       const config = getStripeConfig();
 
+      const intervalLabel = billingCycle === 'yearly' ? 'year' : 'month';
+      const priceAmount = billingCycle === 'yearly'
+        ? parseInt(plan.yearlyPrice || '0', 10)
+        : parseInt(plan.monthlyPrice || '0', 10);
+      const formattedPrice = `$${(priceAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+
       const session = await stripe.checkout.sessions.create({
         mode: 'subscription',
-        line_items: [{ price: stripePriceId, quantity: 1 }],
+        allow_promotion_codes: true,
+        line_items: [{
+          price_data: {
+            currency: 'usd',
+            unit_amount: priceAmount * 100,
+            recurring: { interval: billingCycle === 'yearly' ? 'year' : 'month' },
+            product_data: {
+              name: `Wallet Share - ${plan.name} Plan`,
+              description: `Price for Tenexity Wallet Share Expander - ${plan.name} edition\n${formattedPrice} / ${intervalLabel}`,
+            },
+          },
+          quantity: 1,
+        }],
         success_url: `${config.baseUrl}/promo?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${config.baseUrl}/promo?checkout=canceled`,
         metadata: {
