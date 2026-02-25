@@ -19,9 +19,9 @@ server.listen(port, "0.0.0.0", () => {
 
   const appPath = path.join(__dirname, "app.cjs");
   const loadApp = new Function("p", "return import(p)");
-  loadApp(appPath).then((mod: any) => {
+  loadApp(appPath).then(async (mod: any) => {
+    await mod.initialize(server);
     expressApp = mod.expressApp;
-    mod.initialize(server);
     console.log(`[bootstrap] Express app loaded and initialized`);
   }).catch((err: any) => {
     console.error("[bootstrap] Failed to load application:", err);
