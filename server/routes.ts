@@ -106,14 +106,14 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // ============ Health Check (Public, before auth/session middleware) ============
+  app.get("/health", (_req, res) => {
+    res.json({ status: "OK", timestamp: new Date().toISOString() });
+  });
+
   // ============ Setup Authentication ============
   await setupAuth(app);
   registerAuthRoutes(app);
-
-  // ============ Health Check (Public) ============
-  app.get("/health", (req, res) => {
-    res.json({ status: "OK", timestamp: new Date().toISOString() });
-  });
 
   // ============ Protected API Routes ============
   // All routes below require authentication and tenant context
@@ -3539,7 +3539,7 @@ KEY TALKING POINTS:
 
     // Validate price ID against whitelist (if whitelist is configured)
     // FAIL CLOSED: If whitelist is set and we can't determine the priceId, skip the event
-    if (config.whitelistedPriceIds.length > 0) {
+    if (config.priceIds.length > 0) {
       const priceId = await getPriceIdFromRelatedObject(eventData);
 
       // Fail closed: if we have a whitelist but can't determine priceId, skip
