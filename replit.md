@@ -85,7 +85,7 @@ The application follows a client-server architecture.
         - See STRIPE-SETUP.md for Stripe configuration details
         - See AI-CREDIT-SYSTEM.md for credit system documentation
     - **Tenant Deletion:** Platform admins can permanently delete tenants and all associated data from the App Admin page. Cascade-deletes all tenant-scoped tables. Demo tenant (ID 8) is protected from deletion.
-    - **Cold-Start Resilience:** `/health` endpoint registered before session/DB middleware in `server/index.ts`, and `httpServer.listen()` fires before async initialization so the port is open immediately during cold starts. This prevents Replit autoscale "Unable to Wake Up" errors.
+    - **Cold-Start Resilience:** Production uses a lightweight bootstrap (`server/bootstrap.ts` → `dist/bootstrap.cjs`, 2KB) that starts a raw Node.js HTTP server within milliseconds, responds to healthchecks instantly with 200, then dynamically imports the full Express app (`dist/app.cjs`). This prevents Replit autoscale "Unable to Wake Up" errors. Dev mode uses `server/index.ts` directly.
 
 **Project Structure:**
 - `client/`: Frontend application.

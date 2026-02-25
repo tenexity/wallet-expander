@@ -1,15 +1,10 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
-import { createServer } from "http";
+import { createServer, type Server } from "http";
 import { startScheduler, stopScheduler } from "./scheduler";
 import { syncSubscriptionPlans } from "./sync-plans";
 import { syncDemoSettings } from "./sync-settings";
-
-const app = express();
-const httpServer = createServer(app);
-
-let appReady = false;
 
 declare module "http" {
   interface IncomingMessage {
@@ -17,11 +12,15 @@ declare module "http" {
   }
 }
 
-app.get("/health", (_req, res) => {
+export const expressApp = express();
+
+let appReady = false;
+
+expressApp.get("/health", (_req, res) => {
   res.json({ status: "OK", timestamp: new Date().toISOString() });
 });
 
-app.use((req, res, next) => {
+expressApp.use((req, res, next) => {
   if (!appReady && !req.path.startsWith("/api/stripe/webhook")) {
     if (req.path === "/" || !req.path.startsWith("/api")) {
       return res.status(200).send("<!DOCTYPE html><html><head><meta charset='utf-8'><title>Loading...</title><meta http-equiv='refresh' content='3'></head><body><p>Starting up, please wait...</p></body></html>");
@@ -31,7 +30,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(
+expressApp.use(
   express.json({
     verify: (req, _res, buf) => {
       req.rawBody = buf;
@@ -39,7 +38,7 @@ app.use(
   }),
 );
 
-app.use(express.urlencoded({ extended: false }));
+expressApp.use(express.urlencoded({ extended: false }));
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -52,7 +51,7 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
-app.use((req, res, next) => {
+expressApp.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
@@ -78,20 +77,8 @@ app.use((req, res, next) => {
   next();
 });
 
-const port = parseInt(process.env.PORT || "5000", 10);
-httpServer.listen(
-  {
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  },
-  () => {
-    log(`serving on port ${port}`);
-  },
-);
-
-(async () => {
-  await registerRoutes(httpServer, app);
+export async function initialize(httpServer: Server) {
+  await registerRoutes(httpServer, expressApp);
 
   await syncSubscriptionPlans();
   await syncDemoSettings();
@@ -110,7 +97,7 @@ httpServer.listen(
   process.once("SIGTERM", () => gracefulShutdown("SIGTERM"));
   process.once("SIGINT", () => gracefulShutdown("SIGINT"));
 
-  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+  expressApp.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
@@ -124,12 +111,29 @@ httpServer.listen(
   });
 
   if (process.env.NODE_ENV === "production") {
-    serveStatic(app);
+    serveStatic(expressApp);
   } else {
     const { setupVite } = await import("./vite");
-    await setupVite(httpServer, app);
+    await setupVite(httpServer, expressApp);
   }
 
   appReady = true;
   log("Application fully initialized");
-})();
+}
+
+if (process.env.NODE_ENV !== "production") {
+  const httpServer = createServer(expressApp);
+  const port = parseInt(process.env.PORT || "5000", 10);
+  httpServer.listen(
+    {
+      port,
+      host: "0.0.0.0",
+      reusePort: true,
+    },
+    () => {
+      log(`serving on port ${port}`);
+    },
+  );
+
+  initialize(httpServer);
+}
