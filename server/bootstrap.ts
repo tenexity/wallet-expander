@@ -23,7 +23,8 @@ const server = http.createServer((req, res) => {
 server.listen({ port, host: "0.0.0.0", reusePort: true }, () => {
   console.log(`Bootstrap server listening on port ${port}`);
 
-  import("./app").then((mod) => {
+  setImmediate(() => {
+    const mod = require("./app.cjs");
     app = mod.expressApp;
     mod.initialize(server);
   });
