@@ -1,29 +1,15 @@
-const http = require("http");
-const path = require("path");
-
-const port = parseInt(process.env.PORT || "5000", 10);
-let expressApp: any = null;
-
-const server = http.createServer((req: any, res: any) => {
-  if (expressApp) {
-    return expressApp(req, res);
-  }
-
-  res.writeHead(200, { "Content-Type": "text/plain" });
+var port = +(process.env.PORT || 5000);
+var app: any = null;
+var srv = require("http").createServer(function(req: any, res: any) {
+  if (app) return app(req, res);
+  res.writeHead(200);
   res.end("OK");
 });
-
-server.listen(port, "0.0.0.0", () => {
-  console.log(`[bootstrap] Listening on port ${port}`);
-
-  const appPath = path.join(__dirname, "app.cjs");
-  const loadApp = new Function("p", "return import(p)");
-  loadApp(appPath).then(async (mod: any) => {
-    await mod.initialize(server);
-    expressApp = mod.expressApp;
-    console.log(`[bootstrap] Express app loaded and initialized`);
-  }).catch((err: any) => {
-    console.error("[bootstrap] Failed to load application:", err);
-    process.exit(1);
-  });
+srv.listen(port, "0.0.0.0", function() {
+  console.log("[bootstrap] Listening on port " + port);
+  new Function("p", "return import(p)")(__dirname + "/app.cjs").then(async function(mod: any) {
+    await mod.initialize(srv);
+    app = mod.expressApp;
+    console.log("[bootstrap] Ready");
+  }).catch(function(e: any) { console.error(e); process.exit(1); });
 });
