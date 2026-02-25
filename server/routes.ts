@@ -3026,6 +3026,12 @@ KEY TALKING POINTS:
         mode: 'subscription',
         client_reference_id: tenant.id.toString(),
         allow_promotion_codes: true,
+        billing_address_collection: 'required',
+        custom_fields: [{
+          key: 'company_name',
+          label: { type: 'custom', custom: 'Company Name' },
+          type: 'text',
+        }],
         line_items: [{
           price_data: {
             currency: 'usd',
@@ -3111,6 +3117,12 @@ KEY TALKING POINTS:
       const session = await stripe.checkout.sessions.create({
         mode: 'subscription',
         allow_promotion_codes: true,
+        billing_address_collection: 'required',
+        custom_fields: [{
+          key: 'company_name',
+          label: { type: 'custom', custom: 'Company Name' },
+          type: 'text',
+        }],
         line_items: [{
           price_data: {
             currency: 'usd',
