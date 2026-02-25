@@ -3,6 +3,12 @@ import { subscriptionPlans } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { getStripeConfig } from "./utils/stripeConfig";
 
+const STRIPE_PRICE_MAP: Record<string, { monthly?: string; yearly?: string }> = {
+  starter: { monthly: "price_1T4kPxGiPbra2nUo9ht7EJON" },
+  growth: { monthly: "price_1T4kN8GiPbra2nUovk6gBgMs", yearly: "price_1T4kNtGiPbra2nUotnn3cfx4" },
+  scale: { monthly: "price_1T4kOMGiPbra2nUoGdnYHlit", yearly: "price_1T4kP5GiPbra2nUo8NeKL6J4" },
+};
+
 const CURRENT_PLANS = [
   {
     name: "Starter",

@@ -278,17 +278,11 @@ export default function Landing() {
       }
       setSelectedPlan(pendingPlan);
       window.history.replaceState({}, "", window.location.pathname);
-      if (pendingPlan !== "starter") {
-        checkoutMutation.mutate({ planSlug: pendingPlan, cycle: pendingCycle || billingCycle });
-      }
+      checkoutMutation.mutate({ planSlug: pendingPlan, cycle: pendingCycle || billingCycle });
     }
   }, [isAuthenticated]);
 
   const handleSelectPlan = (planSlug: string) => {
-    if (planSlug === "starter") {
-      window.location.href = "/api/login";
-      return;
-    }
     if (!isAuthenticated) {
       const returnTo = encodeURIComponent(`/promo?plan=${planSlug}&cycle=${billingCycle}`);
       window.location.href = `/api/login?returnTo=${returnTo}`;
