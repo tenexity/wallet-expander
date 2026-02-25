@@ -85,7 +85,7 @@ The application follows a client-server architecture.
         - See STRIPE-SETUP.md for Stripe configuration details
         - See AI-CREDIT-SYSTEM.md for credit system documentation
     - **Tenant Deletion:** Platform admins can permanently delete tenants and all associated data from the App Admin page. Cascade-deletes all tenant-scoped tables. Demo tenant (ID 8) is protected from deletion.
-    - **Deployment:** Uses Reserved VM (always-on) deployment to avoid autoscale cold-start issues. Production uses a lightweight bootstrap (`server/bootstrap.ts` → `dist/bootstrap.cjs`, 1.2KB) that starts a raw HTTP server immediately, then async-imports the full Express app (`dist/app.cjs`). Dev mode uses `server/index.ts` directly.
+    - **Deployment:** Uses autoscale deployment with a Perl+Node.js cold-start strategy. `dist/start.sh` launches a Perl micro-HTTP-server instantly on port 5000 (responds 200 to healthchecks within ~10ms), then starts Node.js bootstrap which loads and initializes the full Express app (`dist/app.cjs`). Once initialized, Perl is killed and Node.js takes over the port. Dev mode uses `server/index.ts` directly.
 
 **Project Structure:**
 - `client/`: Frontend application.

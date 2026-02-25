@@ -10,6 +10,30 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
+localPort = 9876
+externalPort = 4200
+
+[[ports]]
+localPort = 9877
+externalPort = 5000
+
+[[ports]]
+localPort = 9990
+externalPort = 3002
+
+[[ports]]
+localPort = 9991
+externalPort = 3003
+
+[[ports]]
+localPort = 9994
+externalPort = 6000
+
+[[ports]]
+localPort = 9995
+externalPort = 5173
+
+[[ports]]
 localPort = 9998
 externalPort = 3001
 
@@ -21,8 +45,8 @@ externalPort = 3000
 PORT = "5000"
 
 [deployment]
-deploymentTarget = "vm"
-run = ["node", "./dist/bootstrap.cjs"]
+deploymentTarget = "autoscale"
+run = ["bash", "./dist/start.sh"]
 build = ["npm", "run", "build"]
 publicDir = "dist/public"
 

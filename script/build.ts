@@ -1,6 +1,6 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
-import { rm, readFile } from "fs/promises";
+import { rm, readFile, copyFile, chmod } from "fs/promises";
 
 const allowlist = [
   "@google/generative-ai",
@@ -71,6 +71,9 @@ async function buildAll() {
     external: externals,
     logLevel: "info",
   });
+
+  await copyFile("server/start.sh", "dist/start.sh");
+  await chmod("dist/start.sh", 0o755);
 }
 
 buildAll().catch((err) => {
