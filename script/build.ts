@@ -2,8 +2,6 @@ import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
 import { rm, readFile } from "fs/promises";
 
-// server deps to bundle to reduce openat(2) syscalls
-// which helps cold start times
 const allowlist = [
   "@google/generative-ai",
   "axios",
@@ -47,25 +45,11 @@ async function buildAll() {
   const externals = allDeps.filter((dep) => !allowlist.includes(dep));
 
   await esbuild({
-    entryPoints: ["server/bootstrap.ts"],
+    entryPoints: ["server/index.ts"],
     platform: "node",
     bundle: true,
     format: "cjs",
-    outfile: "dist/bootstrap.cjs",
-    define: {
-      "process.env.NODE_ENV": '"production"',
-    },
-    minify: false,
-    external: externals,
-    logLevel: "info",
-  });
-
-  await esbuild({
-    entryPoints: ["server/app.ts"],
-    platform: "node",
-    bundle: true,
-    format: "cjs",
-    outfile: "dist/app.cjs",
+    outfile: "dist/index.cjs",
     define: {
       "process.env.NODE_ENV": '"production"',
     },
