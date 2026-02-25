@@ -3538,11 +3538,15 @@ KEY TALKING POINTS:
     }
 
     // Validate price ID against whitelist (if whitelist is configured)
-    // FAIL CLOSED: If whitelist is set and we can't determine the priceId, skip the event
-    if (config.priceIds.length > 0) {
+    // Skip validation for checkout.session.completed events that already passed app metadata check
+    // (public checkout uses price_data inline pricing which won't have a whitelisted price ID)
+    const appMetadataVerified = eventData.metadata?.app === config.appSlug;
+    const subscriptionAppVerified = event.type.startsWith('customer.subscription.') && eventData.metadata?.app === config.appSlug;
+    const skipPriceValidation = (event.type === 'checkout.session.completed' && appMetadataVerified) || subscriptionAppVerified;
+
+    if (config.priceIds.length > 0 && !skipPriceValidation) {
       const priceId = await getPriceIdFromRelatedObject(eventData);
 
-      // Fail closed: if we have a whitelist but can't determine priceId, skip
       if (!priceId) {
         await db.update(stripeWebhookEvents)
           .set({ result: "skipped_unknown_price" })
