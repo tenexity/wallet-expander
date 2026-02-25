@@ -80,8 +80,11 @@ The application follows a client-server architecture.
         - New tenants auto-created with planType='free', subscriptionStatus='active' (or with Stripe subscription if pending checkout exists)
         - `GET /api/subscription/usage` endpoint returns comprehensive plan usage (features, users, credits)
         - Frontend upgrade prompts on ICP builder, playbooks, accounts when at limit
+        - Manual session claim tool in App Admin: paste a Stripe Checkout Session ID to create pending subscription when webhook is missed
+        - Pending Subscriptions tab in App Admin: view, manage, and delete unclaimed checkout records
         - See STRIPE-SETUP.md for Stripe configuration details
         - See AI-CREDIT-SYSTEM.md for credit system documentation
+    - **Tenant Deletion:** Platform admins can permanently delete tenants and all associated data from the App Admin page. Cascade-deletes all tenant-scoped tables. Demo tenant (ID 8) is protected from deletion.
 
 **Project Structure:**
 - `client/`: Frontend application.

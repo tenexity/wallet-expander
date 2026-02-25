@@ -38,6 +38,16 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Building2,
   Users,
   FileText,
@@ -54,6 +64,9 @@ import {
   Sparkles,
   Clock,
   Zap,
+  Trash2,
+  Link,
+  Mail,
 } from "lucide-react";
 import type { Tenant, SubscriptionPlan } from "@shared/schema";
 
@@ -249,6 +262,9 @@ export default function AppAdmin() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [selectedTenant, setSelectedTenant] = useState<TenantWithMetrics | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [tenantToDelete, setTenantToDelete] = useState<TenantWithMetrics | null>(null);
+  const [claimSessionId, setClaimSessionId] = useState("");
 
   const { data: tenantsData, isLoading: tenantsLoading, refetch: refetchTenants } = useQuery<TenantUsageResponse>({
     queryKey: ["/api/app-admin/tenants"],
@@ -280,6 +296,66 @@ export default function AppAdmin() {
         variant: "destructive",
       });
     },
+  });
+
+  const deleteTenantMutation = useMutation({
+    mutationFn: async (tenantId: number) => {
+      return apiRequest("DELETE", `/api/app-admin/tenants/${tenantId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/app-admin/tenants"] });
+      setDeleteDialogOpen(false);
+      setTenantToDelete(null);
+      toast({
+        title: "Tenant Deleted",
+        description: "Tenant and all associated data have been permanently deleted.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Delete Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const claimSessionMutation = useMutation({
+    mutationFn: async (sessionId: string) => {
+      return apiRequest("POST", "/api/app-admin/claim-session", { sessionId });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/app-admin/pending-subscriptions"] });
+      setClaimSessionId("");
+      toast({
+        title: "Session Claimed",
+        description: data.message || "Pending subscription created successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Claim Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deletePendingMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest("DELETE", `/api/app-admin/pending-subscriptions/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/app-admin/pending-subscriptions"] });
+      toast({ title: "Pending Subscription Deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Delete Failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const { data: pendingSubs } = useQuery<any[]>({
+    queryKey: ["/api/app-admin/pending-subscriptions"],
   });
 
   const tenants = tenantsData?.tenants || [];
@@ -375,6 +451,10 @@ export default function AppAdmin() {
           <TabsTrigger value="stripe" data-testid="tab-stripe">
             <CreditCard className="mr-2 h-4 w-4" />
             Stripe Configuration
+          </TabsTrigger>
+          <TabsTrigger value="subscriptions" data-testid="tab-subscriptions">
+            <Mail className="mr-2 h-4 w-4" />
+            Subscriptions
           </TabsTrigger>
           <TabsTrigger value="intelligence" data-testid="tab-intelligence">
             <Sparkles className="mr-2 h-4 w-4" />
@@ -585,17 +665,32 @@ export default function AppAdmin() {
                             {tenant.icpCount}
                           </TableCell>
                           <TableCell>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => {
-                                setSelectedTenant(tenant);
-                                setEditDialogOpen(true);
-                              }}
-                              data-testid={`button-edit-tenant-${tenant.id}`}
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => {
+                                  setSelectedTenant(tenant);
+                                  setEditDialogOpen(true);
+                                }}
+                                data-testid={`button-edit-tenant-${tenant.id}`}
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => {
+                                  setTenantToDelete(tenant);
+                                  setDeleteDialogOpen(true);
+                                }}
+                                disabled={tenant.id === 8}
+                                data-testid={`button-delete-tenant-${tenant.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))
@@ -629,10 +724,144 @@ export default function AppAdmin() {
               )}
             </DialogContent>
           </Dialog>
+
+          <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Tenant Permanently</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete <strong>{tenantToDelete?.name}</strong> ({tenantToDelete?.ownerEmail || tenantToDelete?.slug}) and all associated data including accounts, orders, playbooks, ICPs, tasks, and settings. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={() => {
+                    if (tenantToDelete) {
+                      deleteTenantMutation.mutate(tenantToDelete.id);
+                    }
+                  }}
+                  disabled={deleteTenantMutation.isPending}
+                  data-testid="button-confirm-delete"
+                >
+                  {deleteTenantMutation.isPending ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Deleting...</>
+                  ) : (
+                    "Delete Permanently"
+                  )}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </TabsContent>
 
         <TabsContent value="stripe" className="space-y-6">
           <StripeConfigManager />
+        </TabsContent>
+
+        <TabsContent value="subscriptions" className="space-y-6">
+          <Card className="p-6">
+            <CardHeader className="px-0 pt-0">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Link className="h-4 w-4" />
+                Claim Stripe Checkout Session
+              </CardTitle>
+              <CardDescription>
+                If a webhook was missed, paste the Stripe Checkout Session ID here to manually create the pending subscription.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="px-0 pb-0">
+              <div className="flex items-end gap-3">
+                <div className="flex-1 max-w-lg space-y-1">
+                  <Label htmlFor="sessionId">Checkout Session ID</Label>
+                  <Input
+                    id="sessionId"
+                    placeholder="cs_live_..."
+                    value={claimSessionId}
+                    onChange={(e) => setClaimSessionId(e.target.value)}
+                    data-testid="input-claim-session"
+                  />
+                </div>
+                <Button
+                  onClick={() => claimSessionMutation.mutate(claimSessionId)}
+                  disabled={!claimSessionId.trim() || claimSessionMutation.isPending}
+                  data-testid="button-claim-session"
+                >
+                  {claimSessionMutation.isPending ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Claiming...</>
+                  ) : (
+                    "Claim Session"
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="p-6">
+            <CardHeader className="px-0 pt-0">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                Pending Subscriptions
+              </CardTitle>
+              <CardDescription>
+                Pre-login checkouts waiting to be claimed when the customer logs in for the first time.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="px-0 pb-0">
+              {!pendingSubs || pendingSubs.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4">No pending subscriptions.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Plan</TableHead>
+                      <TableHead>Billing</TableHead>
+                      <TableHead>Stripe Customer</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Claimed</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pendingSubs.map((ps: any) => (
+                      <TableRow key={ps.id} data-testid={`row-pending-${ps.id}`}>
+                        <TableCell className="font-medium">{ps.email}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{ps.planSlug}</Badge>
+                        </TableCell>
+                        <TableCell>{ps.billingCycle}</TableCell>
+                        <TableCell className="font-mono text-xs">{ps.stripeCustomerId || '—'}</TableCell>
+                        <TableCell className="text-sm">
+                          {new Date(ps.createdAt).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          {ps.claimedAt ? (
+                            <Badge variant="default">Claimed</Badge>
+                          ) : (
+                            <Badge variant="outline">Unclaimed</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => deletePendingMutation.mutate(ps.id)}
+                            disabled={deletePendingMutation.isPending}
+                            data-testid={`button-delete-pending-${ps.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="intelligence" className="space-y-6">

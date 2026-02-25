@@ -2792,6 +2792,163 @@ KEY TALKING POINTS:
     }
   });
 
+  /**
+   * Delete a tenant and all associated data
+   * @route DELETE /api/app-admin/tenants/:id
+   * @security requirePlatformAdmin
+   */
+  app.delete("/api/app-admin/tenants/:id", [...requireAuth, requirePlatformAdmin], async (req, res) => {
+    try {
+      const tenantId = parseInt(req.params.id);
+      if (isNaN(tenantId)) {
+        return res.status(400).json({ message: "Invalid tenant ID" });
+      }
+
+      const PROTECTED_TENANT_IDS = [8];
+      if (PROTECTED_TENANT_IDS.includes(tenantId)) {
+        return res.status(403).json({ message: "Cannot delete protected demo tenant" });
+      }
+
+      const [tenant] = await db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
+      if (!tenant) {
+        return res.status(404).json({ message: "Tenant not found" });
+      }
+
+      const tenantScopedTables = [
+        'agent_crm_sync_queue', 'agent_rep_daily_briefings', 'agent_query_log',
+        'agent_playbook_learnings', 'agent_playbooks', 'agent_interactions',
+        'agent_account_category_spend', 'agent_account_competitors', 'agent_competitors',
+        'agent_contacts', 'agent_projects', 'agent_similar_account_pairs',
+        'agent_organization_settings', 'agent_system_prompts', 'agent_state',
+        'competitor_mentions', 'order_signals', 'email_interactions',
+        'synced_emails', 'email_connections', 'contacts', 'projects',
+        'credit_transactions', 'tenant_credit_ledger',
+        'account_flags', 'account_category_gaps', 'account_metrics',
+        'playbook_tasks', 'playbooks', 'tasks',
+        'profile_categories', 'profile_review_log', 'segment_profiles',
+        'program_accounts', 'order_items', 'orders',
+        'products', 'product_categories', 'custom_categories',
+        'scoring_weights', 'territory_managers', 'rev_share_tiers',
+        'data_uploads', 'settings', 'subscription_events',
+        'accounts', 'user_roles',
+      ];
+
+      for (const table of tenantScopedTables) {
+        await db.execute(sql.raw(`DELETE FROM "${table}" WHERE tenant_id = ${tenantId}`));
+      }
+
+      await db.delete(tenants).where(eq(tenants.id, tenantId));
+
+      console.log(`[app-admin] Tenant ${tenantId} (${tenant.name}) deleted by platform admin`);
+      res.json({ success: true, message: `Tenant "${tenant.name}" and all associated data deleted` });
+    } catch (error) {
+      handleRouteError(error, res, "Delete tenant");
+    }
+  });
+
+  /**
+   * Manually claim a Stripe checkout session and create a pending subscription
+   * @route POST /api/app-admin/claim-session
+   * @security requirePlatformAdmin
+   */
+  app.post("/api/app-admin/claim-session", [...requireAuth, requirePlatformAdmin], async (req, res) => {
+    try {
+      if (!stripe) {
+        return res.status(503).json({ message: "Stripe is not configured" });
+      }
+
+      const { sessionId } = req.body;
+      if (!sessionId) {
+        return res.status(400).json({ message: "Session ID is required" });
+      }
+
+      const session = await stripe.checkout.sessions.retrieve(sessionId, {
+        expand: ['subscription', 'customer'],
+      });
+
+      if (!session) {
+        return res.status(404).json({ message: "Checkout session not found in Stripe" });
+      }
+
+      if (session.payment_status !== 'paid' && session.status !== 'complete') {
+        return res.status(400).json({ message: `Session is not completed (status: ${session.status}, payment: ${session.payment_status})` });
+      }
+
+      const customerEmail = session.customer_details?.email?.toLowerCase();
+      if (!customerEmail) {
+        return res.status(400).json({ message: "No customer email found on this session" });
+      }
+
+      const planSlug = session.metadata?.planSlug || 'starter';
+      const billingCycle = session.metadata?.billingCycle || 'monthly';
+      const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
+      const subscriptionId = typeof session.subscription === 'string' ? session.subscription : session.subscription?.id;
+
+      const [existing] = await db.select().from(pendingSubscriptions)
+        .where(eq(pendingSubscriptions.email, customerEmail))
+        .limit(1);
+
+      if (existing) {
+        return res.status(409).json({
+          message: `Pending subscription already exists for ${customerEmail}`,
+          pendingSubscription: existing,
+        });
+      }
+
+      const [created] = await db.insert(pendingSubscriptions).values({
+        email: customerEmail,
+        stripeCustomerId: customerId || null,
+        stripeSubscriptionId: subscriptionId || null,
+        planSlug,
+        billingCycle,
+      }).returning();
+
+      console.log(`[app-admin] Manually created pending subscription for ${customerEmail} (plan: ${planSlug})`);
+      res.json({
+        success: true,
+        message: `Pending subscription created for ${customerEmail}. They will be provisioned on next login.`,
+        pendingSubscription: created,
+      });
+    } catch (error: any) {
+      if (error.type === 'StripeInvalidRequestError') {
+        return res.status(404).json({ message: `Stripe session not found: ${error.message}` });
+      }
+      handleRouteError(error, res, "Claim session");
+    }
+  });
+
+  /**
+   * List all pending subscriptions
+   * @route GET /api/app-admin/pending-subscriptions
+   * @security requirePlatformAdmin
+   */
+  app.get("/api/app-admin/pending-subscriptions", [...requireAuth, requirePlatformAdmin], async (req, res) => {
+    try {
+      const all = await db.select().from(pendingSubscriptions).orderBy(pendingSubscriptions.createdAt);
+      res.json(all);
+    } catch (error) {
+      handleRouteError(error, res, "List pending subscriptions");
+    }
+  });
+
+  /**
+   * Delete a pending subscription
+   * @route DELETE /api/app-admin/pending-subscriptions/:id
+   * @security requirePlatformAdmin
+   */
+  app.delete("/api/app-admin/pending-subscriptions/:id", [...requireAuth, requirePlatformAdmin], async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid ID" });
+      }
+      await db.delete(pendingSubscriptions).where(eq(pendingSubscriptions.id, id));
+      res.json({ success: true });
+    } catch (error) {
+      handleRouteError(error, res, "Delete pending subscription");
+    }
+  });
+
   // ============ Stripe & Subscription ============
   const stripeConfig = initializeStripeConfig();
   const stripe = stripeConfig.stripe;
