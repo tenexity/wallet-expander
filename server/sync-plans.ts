@@ -1,8 +1,6 @@
 import { db } from "./db";
 import { subscriptionPlans } from "@shared/schema";
 import { eq } from "drizzle-orm";
-import { getStripeConfig } from "./utils/stripeConfig";
-
 const STRIPE_PRICE_MAP: Record<string, { monthly?: string; yearly?: string }> = {
   starter: { monthly: "price_1T4kPxGiPbra2nUo9ht7EJON" },
   growth: { monthly: "price_1T4kN8GiPbra2nUovk6gBgMs", yearly: "price_1T4kNtGiPbra2nUotnn3cfx4" },
@@ -87,10 +85,8 @@ const CURRENT_PLANS = [
 ];
 
 export async function syncSubscriptionPlans(): Promise<void> {
-  const stripePriceMap = await fetchStripePriceMap();
-
   for (const plan of CURRENT_PLANS) {
-    const priceMapping = stripePriceMap.get(plan.slug);
+    const priceMapping = STRIPE_PRICE_MAP[plan.slug];
     const [existing] = await db
       .select()
       .from(subscriptionPlans)
@@ -125,51 +121,4 @@ export async function syncSubscriptionPlans(): Promise<void> {
   }
 
   console.log("[sync-plans] Subscription plans synced successfully");
-}
-
-async function fetchStripePriceMap(): Promise<Map<string, { monthly?: string; yearly?: string }>> {
-  const result = new Map<string, { monthly?: string; yearly?: string }>();
-  const config = getStripeConfig();
-
-  if (!config.stripe || !config.isConfigured || config.priceIds.length === 0) {
-    return result;
-  }
-
-  const planPriceAmounts: Record<string, { monthly: number; yearly: number }> = {
-    growth: { monthly: 2400, yearly: 24000 },
-    scale: { monthly: 5000, yearly: 50000 },
-  };
-
-  try {
-    for (const priceId of config.priceIds) {
-      const price = await config.stripe.prices.retrieve(priceId);
-      if (!price.active || !price.unit_amount) continue;
-
-      const amountInCents = price.unit_amount;
-      const interval = price.recurring?.interval;
-
-      for (const [slug, amounts] of Object.entries(planPriceAmounts)) {
-        const monthlyInCents = amounts.monthly * 100;
-        const yearlyInCents = amounts.yearly * 100;
-
-        if (!result.has(slug)) {
-          result.set(slug, {});
-        }
-
-        if (interval === "month" && amountInCents === monthlyInCents) {
-          result.get(slug)!.monthly = priceId;
-        } else if (interval === "year" && amountInCents === yearlyInCents) {
-          result.get(slug)!.yearly = priceId;
-        }
-      }
-    }
-
-    if (result.size > 0) {
-      console.log(`[sync-plans] Mapped Stripe prices for plans: ${[...result.keys()].join(", ")}`);
-    }
-  } catch (error: any) {
-    console.warn(`[sync-plans] Could not fetch Stripe prices: ${error.message}`);
-  }
-
-  return result;
 }
