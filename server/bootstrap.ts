@@ -9,7 +9,6 @@ const server = http.createServer((req: any, res: any) => {
     return expressApp(req, res);
   }
 
-  console.log(`[bootstrap] Healthcheck request: ${req.method} ${req.url} - responding 200`);
   res.writeHead(200, { "Content-Type": "text/plain" });
   res.end("OK");
 });
