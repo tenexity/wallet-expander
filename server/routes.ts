@@ -23,6 +23,7 @@ import {
   subscriptionPlans,
   subscriptionEvents,
   stripeWebhookEvents,
+  pendingSubscriptions,
   AI_ACTION_CREDITS,
   AI_ACTION_LABELS,
   ACCOUNT_FLAG_TYPES,
@@ -3038,6 +3039,75 @@ KEY TALKING POINTS:
   });
 
   /**
+   * Create a Stripe checkout session for unauthenticated users (public landing page)
+   * @route POST /api/stripe/public-checkout
+   * @body {string} planSlug - Plan slug
+   * @body {string} [billingCycle=monthly] - Billing cycle (monthly or yearly)
+   * @security None - Public endpoint, Stripe collects email
+   * @returns {Object} Checkout session URL and session ID
+   */
+  app.post("/api/stripe/public-checkout", async (req, res) => {
+    try {
+      if (!stripe) {
+        return res.status(503).json({ message: "Stripe is not configured" });
+      }
+
+      const { planSlug, billingCycle = "monthly" } = req.body;
+
+      if (!planSlug) {
+        return res.status(400).json({ message: "Plan slug is required" });
+      }
+
+      const [plan] = await db.select().from(subscriptionPlans)
+        .where(eq(subscriptionPlans.slug, planSlug))
+        .limit(1);
+
+      if (!plan) {
+        return res.status(404).json({ message: "Plan not found" });
+      }
+
+      const stripePriceId = billingCycle === 'yearly'
+        ? plan.stripeYearlyPriceId
+        : plan.stripeMonthlyPriceId;
+
+      if (!stripePriceId) {
+        return res.status(400).json({ message: "Stripe price not configured for this plan" });
+      }
+
+      if (!isPriceIdWhitelisted(stripePriceId)) {
+        return res.status(400).json({ message: "Invalid price ID" });
+      }
+
+      const config = getStripeConfig();
+
+      const session = await stripe.checkout.sessions.create({
+        mode: 'subscription',
+        line_items: [{ price: stripePriceId, quantity: 1 }],
+        success_url: `${config.baseUrl}/promo?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${config.baseUrl}/promo?checkout=canceled`,
+        metadata: {
+          app: config.appSlug,
+          planSlug,
+          billingCycle,
+          source: 'public_landing',
+        },
+        subscription_data: {
+          metadata: {
+            app: config.appSlug,
+            planSlug,
+            billingCycle,
+            source: 'public_landing',
+          }
+        }
+      });
+
+      res.json({ url: session.url, sessionId: session.id });
+    } catch (error: any) {
+      handleRouteError(error, res, "Create public checkout session");
+    }
+  });
+
+  /**
    * Create a Stripe billing portal session for subscription management
    * @route POST /api/stripe/create-portal-session
    * @security requireAuth - Requires authentication
@@ -3287,30 +3357,44 @@ KEY TALKING POINTS:
         case 'checkout.session.completed': {
           const session = event.data.object as Stripe.Checkout.Session;
           const tenantId = session.metadata?.tenantId ? parseInt(session.metadata.tenantId) : null;
+          const isPublicCheckout = session.metadata?.source === 'public_landing';
 
           if (tenantId && session.subscription) {
-            // Get subscription details to extract plan info
             const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
             const priceId = subscription.items.data[0]?.price.id;
-
-            // Find matching plan by price ID (monthly or yearly)
             const matchingPlan = priceId ? await findPlanByPriceId(priceId) : null;
 
             if (!matchingPlan) {
               console.error(`Webhook: No plan found for price ID ${priceId}`);
-              // Don't fail - just log and continue with unknown plan
             }
 
             await db.update(tenants)
               .set({
                 stripeSubscriptionId: session.subscription as string,
                 subscriptionStatus: 'active',
-                planType: matchingPlan?.slug || null, // Store null if unknown, don't assume 'starter'
+                planType: matchingPlan?.slug || null,
                 billingPeriodEnd: new Date(subscription.current_period_end * 1000),
               })
               .where(eq(tenants.id, tenantId));
 
             console.log(`Tenant ${tenantId} subscription activated: ${matchingPlan?.slug || 'unknown'}`);
+          } else if (isPublicCheckout && session.subscription && session.customer_details?.email) {
+            const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
+            const customerEmail = session.customer_details.email.toLowerCase();
+            const planSlug = session.metadata?.planSlug || 'starter';
+            const billingCycle = session.metadata?.billingCycle || 'monthly';
+
+            await db.insert(pendingSubscriptions).values({
+              email: customerEmail,
+              stripeCustomerId: session.customer as string,
+              stripeSubscriptionId: session.subscription as string,
+              stripeSessionId: session.id,
+              planSlug,
+              billingCycle,
+              billingPeriodEnd: new Date(subscription.current_period_end * 1000),
+            });
+
+            console.log(`Pending subscription created for ${customerEmail}: ${planSlug} (${billingCycle})`);
           }
           break;
         }

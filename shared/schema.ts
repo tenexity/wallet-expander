@@ -50,6 +50,24 @@ export type SubscriptionStatus = typeof SUBSCRIPTION_STATUSES[number];
 export const PLAN_TYPES = ['free', 'starter', 'growth', 'professional', 'scale', 'enterprise'] as const;
 export type PlanType = typeof PLAN_TYPES[number];
 
+// ============ PENDING SUBSCRIPTIONS (Pre-login Stripe checkouts) ============
+export const pendingSubscriptions = pgTable("pending_subscriptions", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull(),
+  stripeCustomerId: text("stripe_customer_id").notNull(),
+  stripeSubscriptionId: text("stripe_subscription_id").notNull(),
+  stripeSessionId: text("stripe_session_id").notNull(),
+  planSlug: text("plan_slug").notNull(),
+  billingCycle: text("billing_cycle").notNull().default("monthly"),
+  billingPeriodEnd: timestamp("billing_period_end"),
+  claimedAt: timestamp("claimed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_pending_subscriptions_email").on(table.email),
+]);
+
+export type PendingSubscription = typeof pendingSubscriptions.$inferSelect;
+
 // ============ USER ROLES (Permission levels per tenant) ============
 // Roles: super_admin (full access), reviewer (view + approve), viewer (read-only)
 export const userRoles = pgTable("user_roles", {

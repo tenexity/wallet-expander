@@ -75,7 +75,9 @@ The application follows a client-server architecture.
         - Debug endpoint for platform admins (no secrets exposed)
         - Tier-based feature limits enforced via `requireFeatureLimit` middleware (Starter: 1 playbook/1 ICP/1 enrolled/1 user; Growth: unlimited playbooks/3 ICPs/20 enrolled/5 users; Scale: unlimited all/20 users; Enterprise: unlimited all)
         - Plan hierarchy: free(0) < starter(1) < growth/professional(2) < scale(3) < enterprise(4)
-        - New tenants auto-created with planType='free', subscriptionStatus='active'
+        - Public checkout flow: unauthenticated users go directly to Stripe Checkout from landing page, webhook stores pending subscription by email, tenant auto-provisioned with correct plan on first Replit login (matched by email)
+        - `pending_subscriptions` table tracks pre-login Stripe checkouts (email, stripeCustomerId, stripeSubscriptionId, planSlug, billingCycle, claimedAt)
+        - New tenants auto-created with planType='free', subscriptionStatus='active' (or with Stripe subscription if pending checkout exists)
         - `GET /api/subscription/usage` endpoint returns comprehensive plan usage (features, users, credits)
         - Frontend upgrade prompts on ICP builder, playbooks, accounts when at limit
         - See STRIPE-SETUP.md for Stripe configuration details

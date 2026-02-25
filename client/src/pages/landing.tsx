@@ -4,9 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
 import type { SubscriptionPlan } from "@shared/schema";
 import walletExpanderLogo from "@assets/WalletExpander_logo_1769615587162.png";
 import heroConstructionWide from "@assets/hero-construction-wide.png";
@@ -238,7 +236,6 @@ const stats = [
 
 export default function Landing() {
   const { toast } = useToast();
-  const { user, isAuthenticated } = useAuth();
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
 
@@ -248,10 +245,15 @@ export default function Landing() {
 
   const checkoutMutation = useMutation({
     mutationFn: async ({ planSlug, cycle }: { planSlug: string; cycle: string }) => {
-      const res = await apiRequest("POST", "/api/stripe/create-checkout-session", {
-        planSlug,
-        billingCycle: cycle,
+      const res = await fetch("/api/stripe/public-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planSlug, billingCycle: cycle }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Checkout failed" }));
+        throw new Error(err.message);
+      }
       return res.json();
     },
     onSuccess: (data) => {
@@ -270,24 +272,24 @@ export default function Landing() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const pendingPlan = params.get("plan");
-    const pendingCycle = params.get("cycle") as "monthly" | "yearly" | null;
-    if (pendingPlan && isAuthenticated) {
-      if (pendingCycle === "monthly" || pendingCycle === "yearly") {
-        setBillingCycle(pendingCycle);
-      }
-      setSelectedPlan(pendingPlan);
+    const checkoutStatus = params.get("checkout");
+    if (checkoutStatus === "success") {
       window.history.replaceState({}, "", window.location.pathname);
-      checkoutMutation.mutate({ planSlug: pendingPlan, cycle: pendingCycle || billingCycle });
+      toast({
+        title: "Payment Successful!",
+        description: "Your subscription is active. Click Login to access your dashboard.",
+      });
+    } else if (checkoutStatus === "canceled") {
+      window.history.replaceState({}, "", window.location.pathname);
+      toast({
+        title: "Checkout Canceled",
+        description: "You can select a plan and try again anytime.",
+        variant: "destructive",
+      });
     }
-  }, [isAuthenticated]);
+  }, []);
 
   const handleSelectPlan = (planSlug: string) => {
-    if (!isAuthenticated) {
-      const returnTo = encodeURIComponent(`/promo?plan=${planSlug}&cycle=${billingCycle}`);
-      window.location.href = `/api/login?returnTo=${returnTo}`;
-      return;
-    }
     checkoutMutation.mutate({ planSlug, cycle: billingCycle });
   };
 

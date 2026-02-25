@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction, RequestHandler } from "express";
 import { db } from "../db";
-import { tenants, userRoles, type Tenant, type UserRole, type RoleType, ROLE_PERMISSIONS } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { tenants, userRoles, pendingSubscriptions, type Tenant, type UserRole, type RoleType, ROLE_PERMISSIONS } from "@shared/schema";
+import { eq, and, isNull } from "drizzle-orm";
 
 import "../types/express.d";
 
@@ -39,8 +39,30 @@ export async function createTenantForUser(userId: string, email: string): Promis
   const slug = email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "-") + "-" + Date.now();
   const name = email.split("@")[0];
 
+  const [pending] = await db.select()
+    .from(pendingSubscriptions)
+    .where(and(
+      eq(pendingSubscriptions.email, email.toLowerCase()),
+      isNull(pendingSubscriptions.claimedAt)
+    ))
+    .orderBy(pendingSubscriptions.createdAt)
+    .limit(1);
+
+  const tenantValues: any = { name, slug };
+
+  if (pending) {
+    tenantValues.stripeCustomerId = pending.stripeCustomerId;
+    tenantValues.stripeSubscriptionId = pending.stripeSubscriptionId;
+    tenantValues.subscriptionStatus = "active";
+    tenantValues.planType = pending.planSlug;
+    tenantValues.billingPeriodEnd = pending.billingPeriodEnd;
+  } else {
+    tenantValues.subscriptionStatus = "active";
+    tenantValues.planType = "free";
+  }
+
   const [newTenant] = await db.insert(tenants)
-    .values({ name, slug, subscriptionStatus: "active", planType: "free" })
+    .values(tenantValues)
     .returning();
 
   const [newRole] = await db.insert(userRoles)
@@ -50,6 +72,13 @@ export async function createTenantForUser(userId: string, email: string): Promis
       role: "super_admin",
     })
     .returning();
+
+  if (pending) {
+    await db.update(pendingSubscriptions)
+      .set({ claimedAt: new Date() })
+      .where(eq(pendingSubscriptions.id, pending.id));
+    console.log(`Pending subscription claimed by ${email} for tenant ${newTenant.id} (${pending.planSlug})`);
+  }
 
   return { tenant: newTenant, role: newRole };
 }
