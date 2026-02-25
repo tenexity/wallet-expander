@@ -8,7 +8,7 @@ setsockopt(S, SOL_SOCKET, SO_REUSEADDR, 1);
 setsockopt(S, SOL_SOCKET, 15, pack("l", 1));
 bind(S, pack_sockaddr_in($ENV{PORT}||5000, INADDR_ANY)) or die;
 listen(S, 128) or die;
-$SIG{TERM} = sub { exit 0 };
+$SIG{TERM} = sub { close S; exit 0 };
 while (accept(C, S)) {
   print C "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nOK";
   close C;
