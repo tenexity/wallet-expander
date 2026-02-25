@@ -346,13 +346,13 @@ export default function Landing() {
             >
               Pricing
             </button>
-            <a
-              href="/api/login"
+            <button
+              onClick={() => scrollToSection("pricing")}
               className="text-sm font-medium text-muted-foreground transition-colors"
               data-testid="nav-signup"
             >
               Sign Up
-            </a>
+            </button>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -362,11 +362,9 @@ export default function Landing() {
                 Login
               </Button>
             </a>
-            <a href="/api/login">
-              <Button size="sm" data-testid="button-get-started">
-                Get Started
-              </Button>
-            </a>
+            <Button size="sm" data-testid="button-get-started" onClick={() => scrollToSection("pricing")}>
+              Get Started
+            </Button>
           </div>
         </div>
       </header>
