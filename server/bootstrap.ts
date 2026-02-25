@@ -1,35 +1,22 @@
 var http = require("http");
 var port = +(process.env.PORT || 5000);
-var preloadPid = parseInt(process.env.PRELOAD_PID || "0", 10);
+var app: any = null;
 
 var srv = http.createServer(function(req: any, res: any) {
-  if ((srv as any)._app) return (srv as any)._app(req, res);
-  res.writeHead(200);
-  res.end("OK");
+  if (app) return app(req, res);
+  if (req.url === "/health") {
+    res.writeHead(200, {"Content-Type": "application/json"});
+    return res.end('{"status":"OK","starting":true}');
+  }
+  res.writeHead(200, {"Content-Type": "text/html"});
+  res.end("<!DOCTYPE html><html><head><meta http-equiv='refresh' content='3'></head><body><p>Starting up...</p></body></html>");
 });
 
-function listen() {
-  srv.listen(port, "0.0.0.0", function() {
-    console.log("[bootstrap] Ready on port " + port);
-  });
-  srv.on("error", function(e: any) {
-    if (e.code === "EADDRINUSE") {
-      srv.removeAllListeners("error");
-      if (preloadPid > 0) {
-        try { process.kill(preloadPid, "SIGTERM"); } catch(ex) {}
-      }
-      setTimeout(listen, 250);
-    }
-  });
-}
-
-new Function("p", "return import(p)")(__dirname + "/app.cjs").then(async function(mod: any) {
-  await mod.initialize(srv);
-  (srv as any)._app = mod.expressApp;
-  console.log("[bootstrap] App initialized, taking over port");
-
-  if (preloadPid > 0) {
-    try { process.kill(preloadPid, "SIGTERM"); } catch(e) {}
-  }
-  setTimeout(listen, 300);
-}).catch(function(e: any) { console.error(e); process.exit(1); });
+srv.listen(port, "0.0.0.0", function() {
+  console.log("[bootstrap] Listening on port " + port);
+  new Function("p", "return import(p)")(__dirname + "/app.cjs").then(async function(mod: any) {
+    await mod.initialize(srv);
+    app = mod.expressApp;
+    console.log("[bootstrap] Ready");
+  }).catch(function(e: any) { console.error(e); process.exit(1); });
+});

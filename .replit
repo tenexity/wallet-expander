@@ -54,7 +54,7 @@ PORT = "5000"
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["bash", "./dist/start.sh"]
+run = ["node", "./dist/bootstrap.cjs"]
 build = ["npm", "run", "build"]
 publicDir = "dist/public"
 
