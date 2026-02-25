@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { SubscriptionPlan } from "@shared/schema";
@@ -237,7 +238,9 @@ const stats = [
 
 export default function Landing() {
   const { toast } = useToast();
+  const { user, isAuthenticated } = useAuth();
   const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
 
   const { data: plans, isLoading: plansLoading } = useQuery<SubscriptionPlan[]>({
     queryKey: ["/api/subscription/plans"],
@@ -259,13 +262,38 @@ export default function Landing() {
     onError: (error: any) => {
       toast({
         title: "Checkout Error",
-        description: error.message || "Failed to start checkout. Please log in first.",
+        description: error.message || "Failed to start checkout. Please try again.",
         variant: "destructive",
       });
     },
   });
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pendingPlan = params.get("plan");
+    const pendingCycle = params.get("cycle") as "monthly" | "yearly" | null;
+    if (pendingPlan && isAuthenticated) {
+      if (pendingCycle === "monthly" || pendingCycle === "yearly") {
+        setBillingCycle(pendingCycle);
+      }
+      setSelectedPlan(pendingPlan);
+      window.history.replaceState({}, "", window.location.pathname);
+      if (pendingPlan !== "starter") {
+        checkoutMutation.mutate({ planSlug: pendingPlan, cycle: pendingCycle || billingCycle });
+      }
+    }
+  }, [isAuthenticated]);
+
   const handleSelectPlan = (planSlug: string) => {
+    if (planSlug === "starter") {
+      window.location.href = "/api/login";
+      return;
+    }
+    if (!isAuthenticated) {
+      const returnTo = encodeURIComponent(`/promo?plan=${planSlug}&cycle=${billingCycle}`);
+      window.location.href = `/api/login?returnTo=${returnTo}`;
+      return;
+    }
     checkoutMutation.mutate({ planSlug, cycle: billingCycle });
   };
 
@@ -981,11 +1009,19 @@ export default function Landing() {
                     enterprise: "Custom enterprise solution",
                   };
 
+                  const isSelected = selectedPlan === plan.slug;
+
                   return (
                     <Card
                       key={plan.slug}
-                      className={`relative p-6 flex flex-col ${isPopular ? "border-primary shadow-lg" : ""
-                        }`}
+                      className={`relative p-6 flex flex-col cursor-pointer transition-all duration-200 ${
+                        isSelected
+                          ? "border-primary ring-2 ring-primary shadow-lg"
+                          : isPopular
+                            ? "border-primary/50 shadow-md"
+                            : "hover:border-muted-foreground/30"
+                      }`}
+                      onClick={() => !isEnterprise && setSelectedPlan(plan.slug)}
                       data-testid={`card-plan-${plan.slug}`}
                     >
                       {isPopular && (
@@ -1050,8 +1086,8 @@ export default function Landing() {
                       ) : (
                         <Button
                           className="w-full"
-                          variant={isPopular ? "default" : "outline"}
-                          onClick={() => handleSelectPlan(plan.slug)}
+                          variant={isSelected ? "default" : "outline"}
+                          onClick={(e) => { e.stopPropagation(); handleSelectPlan(plan.slug); }}
                           disabled={checkoutMutation.isPending}
                           data-testid={`button-select-plan-${plan.slug}`}
                         >
@@ -1073,7 +1109,11 @@ export default function Landing() {
               </div>
             ) : (
               <div className="grid md:grid-cols-4 gap-6">
-                <Card className="p-6" data-testid="card-plan-starter">
+                <Card
+                  className={`p-6 cursor-pointer transition-all duration-200 ${selectedPlan === "starter" ? "border-primary ring-2 ring-primary shadow-lg" : "hover:border-muted-foreground/30"}`}
+                  onClick={() => setSelectedPlan("starter")}
+                  data-testid="card-plan-starter"
+                >
                   <div className="text-center mb-6">
                     <h3 className="text-xl font-bold mb-2">Starter</h3>
                     <p className="text-sm text-muted-foreground mb-4">Try it free with one account</p>
@@ -1103,14 +1143,21 @@ export default function Landing() {
                       <span>Basic gap analysis</span>
                     </li>
                   </ul>
-                  <a href="/api/login">
-                    <Button variant="outline" className="w-full" data-testid="button-select-plan-starter-fallback">
-                      Get Started Free
-                    </Button>
-                  </a>
+                  <Button
+                    variant={selectedPlan === "starter" ? "default" : "outline"}
+                    className="w-full"
+                    onClick={(e) => { e.stopPropagation(); handleSelectPlan("starter"); }}
+                    data-testid="button-select-plan-starter-fallback"
+                  >
+                    Get Started Free
+                  </Button>
                 </Card>
 
-                <Card className="p-6" data-testid="card-plan-growth">
+                <Card
+                  className={`p-6 cursor-pointer transition-all duration-200 ${selectedPlan === "growth" ? "border-primary ring-2 ring-primary shadow-lg" : "hover:border-muted-foreground/30"}`}
+                  onClick={() => setSelectedPlan("growth")}
+                  data-testid="card-plan-growth"
+                >
                   <div className="text-center mb-6">
                     <h3 className="text-xl font-bold mb-2">Growth</h3>
                     <p className="text-sm text-muted-foreground mb-4">For teams up to 5 users</p>
@@ -1150,14 +1197,21 @@ export default function Landing() {
                       <span>Email intelligence</span>
                     </li>
                   </ul>
-                  <a href="/api/login">
-                    <Button variant="outline" className="w-full" data-testid="button-select-plan-growth-fallback">
-                      Get Started
-                    </Button>
-                  </a>
+                  <Button
+                    variant={selectedPlan === "growth" ? "default" : "outline"}
+                    className="w-full"
+                    onClick={(e) => { e.stopPropagation(); handleSelectPlan("growth"); }}
+                    data-testid="button-select-plan-growth-fallback"
+                  >
+                    Get Started
+                  </Button>
                 </Card>
 
-                <Card className="p-6 border-primary shadow-lg relative" data-testid="card-plan-scale">
+                <Card
+                  className={`p-6 relative cursor-pointer transition-all duration-200 ${selectedPlan === "scale" ? "border-primary ring-2 ring-primary shadow-lg" : "border-primary/50 shadow-md"}`}
+                  onClick={() => setSelectedPlan("scale")}
+                  data-testid="card-plan-scale"
+                >
                   <Badge className="absolute -top-3 left-1/2 -translate-x-1/2">
                     <Crown className="w-3 h-3 mr-1" />
                     Most Popular
@@ -1201,11 +1255,14 @@ export default function Landing() {
                       <span>Priority support</span>
                     </li>
                   </ul>
-                  <a href="/api/login">
-                    <Button className="w-full" data-testid="button-select-plan-scale-fallback">
-                      Get Started
-                    </Button>
-                  </a>
+                  <Button
+                    variant={selectedPlan === "scale" ? "default" : "outline"}
+                    className="w-full"
+                    onClick={(e) => { e.stopPropagation(); handleSelectPlan("scale"); }}
+                    data-testid="button-select-plan-scale-fallback"
+                  >
+                    Get Started
+                  </Button>
                 </Card>
 
                 <Card className="p-6" data-testid="card-plan-enterprise">

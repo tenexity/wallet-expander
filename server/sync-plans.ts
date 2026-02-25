@@ -1,6 +1,7 @@
 import { db } from "./db";
 import { subscriptionPlans } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { getStripeConfig } from "./utils/stripeConfig";
 
 const CURRENT_PLANS = [
   {
@@ -80,32 +81,89 @@ const CURRENT_PLANS = [
 ];
 
 export async function syncSubscriptionPlans(): Promise<void> {
+  const stripePriceMap = await fetchStripePriceMap();
+
   for (const plan of CURRENT_PLANS) {
+    const priceMapping = stripePriceMap.get(plan.slug);
     const [existing] = await db
       .select()
       .from(subscriptionPlans)
       .where(eq(subscriptionPlans.slug, plan.slug))
       .limit(1);
 
+    const planData: any = {
+      name: plan.name,
+      monthlyPrice: plan.monthlyPrice,
+      yearlyPrice: plan.yearlyPrice,
+      features: plan.features,
+      limits: plan.limits,
+      isActive: plan.isActive,
+      displayOrder: plan.displayOrder,
+    };
+
+    if (priceMapping) {
+      if (priceMapping.monthly) planData.stripeMonthlyPriceId = priceMapping.monthly;
+      if (priceMapping.yearly) planData.stripeYearlyPriceId = priceMapping.yearly;
+    }
+
     if (existing) {
       await db
         .update(subscriptionPlans)
-        .set({
-          name: plan.name,
-          monthlyPrice: plan.monthlyPrice,
-          yearlyPrice: plan.yearlyPrice,
-          features: plan.features,
-          limits: plan.limits,
-          isActive: plan.isActive,
-          displayOrder: plan.displayOrder,
-        })
+        .set(planData)
         .where(eq(subscriptionPlans.slug, plan.slug));
-      console.log(`[sync-plans] Updated plan: ${plan.slug}`);
+      console.log(`[sync-plans] Updated plan: ${plan.slug}${priceMapping ? " (with Stripe prices)" : ""}`);
     } else {
-      await db.insert(subscriptionPlans).values(plan);
+      await db.insert(subscriptionPlans).values({ ...plan, ...planData });
       console.log(`[sync-plans] Created plan: ${plan.slug}`);
     }
   }
 
   console.log("[sync-plans] Subscription plans synced successfully");
+}
+
+async function fetchStripePriceMap(): Promise<Map<string, { monthly?: string; yearly?: string }>> {
+  const result = new Map<string, { monthly?: string; yearly?: string }>();
+  const config = getStripeConfig();
+
+  if (!config.stripe || !config.isConfigured || config.priceIds.length === 0) {
+    return result;
+  }
+
+  const planPriceAmounts: Record<string, { monthly: number; yearly: number }> = {
+    growth: { monthly: 2400, yearly: 24000 },
+    scale: { monthly: 5000, yearly: 50000 },
+  };
+
+  try {
+    for (const priceId of config.priceIds) {
+      const price = await config.stripe.prices.retrieve(priceId);
+      if (!price.active || !price.unit_amount) continue;
+
+      const amountInCents = price.unit_amount;
+      const interval = price.recurring?.interval;
+
+      for (const [slug, amounts] of Object.entries(planPriceAmounts)) {
+        const monthlyInCents = amounts.monthly * 100;
+        const yearlyInCents = amounts.yearly * 100;
+
+        if (!result.has(slug)) {
+          result.set(slug, {});
+        }
+
+        if (interval === "month" && amountInCents === monthlyInCents) {
+          result.get(slug)!.monthly = priceId;
+        } else if (interval === "year" && amountInCents === yearlyInCents) {
+          result.get(slug)!.yearly = priceId;
+        }
+      }
+    }
+
+    if (result.size > 0) {
+      console.log(`[sync-plans] Mapped Stripe prices for plans: ${[...result.keys()].join(", ")}`);
+    }
+  } catch (error: any) {
+    console.warn(`[sync-plans] Could not fetch Stripe prices: ${error.message}`);
+  }
+
+  return result;
 }
