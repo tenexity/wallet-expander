@@ -3040,6 +3040,7 @@ KEY TALKING POINTS:
             product_data: {
               name: `Wallet Share - ${planName} Plan`,
               description: `Price for Tenexity Wallet Share Expander - ${planName} edition\n${formattedPrice} / ${intervalLabel}`,
+              images: [`${config.baseUrl}/tenexity-logo.png`],
             },
           },
           quantity: 1,
@@ -3131,6 +3132,7 @@ KEY TALKING POINTS:
             product_data: {
               name: `Wallet Share - ${plan.name} Plan`,
               description: `Price for Tenexity Wallet Share Expander - ${plan.name} edition\n${formattedPrice} / ${intervalLabel}`,
+              images: [`${config.baseUrl}/tenexity-logo.png`],
             },
           },
           quantity: 1,
