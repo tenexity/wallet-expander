@@ -9,11 +9,27 @@ import { syncDemoSettings } from "./sync-settings";
 const app = express();
 const httpServer = createServer(app);
 
+let appReady = false;
+
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;
   }
 }
+
+app.get("/health", (_req, res) => {
+  res.json({ status: "OK", timestamp: new Date().toISOString() });
+});
+
+app.use((req, res, next) => {
+  if (!appReady && !req.path.startsWith("/api/stripe/webhook")) {
+    if (req.path === "/" || !req.path.startsWith("/api")) {
+      return res.status(200).send("<!DOCTYPE html><html><head><meta charset='utf-8'><title>Loading...</title><meta http-equiv='refresh' content='3'></head><body><p>Starting up, please wait...</p></body></html>");
+    }
+    return res.status(503).json({ message: "Application is starting up" });
+  }
+  next();
+});
 
 app.use(
   express.json({
@@ -24,10 +40,6 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
-
-app.get("/health", (_req, res) => {
-  res.json({ status: "OK", timestamp: new Date().toISOString() });
-});
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -118,5 +130,6 @@ httpServer.listen(
     await setupVite(httpServer, app);
   }
 
+  appReady = true;
   log("Application fully initialized");
 })();
