@@ -2934,6 +2934,17 @@ KEY TALKING POINTS:
     }
   });
 
+  const CHECKOUT_PLAN_DESCRIPTIONS: Record<string, string> = {
+    starter: 'This plan provides 1 user, 25 AI credits per month, and 1 enrolled account. Includes basic gap analysis, standard playbooks, and Ask Anything AI (limited). Additional users can be added by upgrading to Growth or Scale. Contact support@tenexity.ai for assistance.',
+    growth: 'This plan provides up to 5 users, 500 AI credits per month, and up to 20 enrolled accounts. Includes AI gap analysis & playbooks, ICP Builder, email intelligence, and Ask Anything AI. Additional users can be added by contacting support@tenexity.ai',
+    scale: 'This plan provides up to 20 users and unlimited enrolled accounts. Includes 2,000 AI credits per month, agentic daily briefings, CRM Intelligence auto-population, Account Dossier & Email Composer, and unlimited Ask Anything AI. Additional users can be added by contacting support@tenexity.ai',
+    enterprise: 'This plan provides unlimited users, unlimited AI credits, and everything in Scale. Includes custom AI training, white-label branding, dedicated CSM, and SSO & advanced security. Contact support@tenexity.ai for custom pricing.',
+  };
+
+  function getCheckoutPlanDescription(slug: string): string {
+    return CHECKOUT_PLAN_DESCRIPTIONS[slug] || `Tenexity Wallet Share Expander subscription. Contact support@tenexity.ai for details.`;
+  }
+
   /**
    * Create a Stripe checkout session for subscription purchase
    * @route POST /api/stripe/create-checkout-session
@@ -3015,11 +3026,12 @@ KEY TALKING POINTS:
       }
 
       const planName = plan?.name || 'Subscription';
+      const planSlugKey = plan?.slug || planSlug || 'starter';
       const intervalLabel = billingCycle === 'yearly' ? 'year' : 'month';
       const priceAmount = billingCycle === 'yearly'
         ? parseInt(plan?.yearlyPrice || '0', 10)
         : parseInt(plan?.monthlyPrice || '0', 10);
-      const formattedPrice = `$${(priceAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+      const planDescription = getCheckoutPlanDescription(planSlugKey);
 
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
@@ -3039,7 +3051,7 @@ KEY TALKING POINTS:
             recurring: { interval: billingCycle === 'yearly' ? 'year' : 'month' },
             product_data: {
               name: `Wallet Share - ${planName} Plan`,
-              description: `Price for Tenexity Wallet Share Expander - ${planName} edition\n${formattedPrice} / ${intervalLabel}`,
+              description: planDescription,
               images: [`${config.baseUrl}/tenexity-logo.png`],
             },
           },
@@ -3109,11 +3121,10 @@ KEY TALKING POINTS:
 
       const config = getStripeConfig();
 
-      const intervalLabel = billingCycle === 'yearly' ? 'year' : 'month';
       const priceAmount = billingCycle === 'yearly'
         ? parseInt(plan.yearlyPrice || '0', 10)
         : parseInt(plan.monthlyPrice || '0', 10);
-      const formattedPrice = `$${(priceAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+      const planDescription = getCheckoutPlanDescription(planSlug);
 
       const session = await stripe.checkout.sessions.create({
         mode: 'subscription',
@@ -3131,7 +3142,7 @@ KEY TALKING POINTS:
             recurring: { interval: billingCycle === 'yearly' ? 'year' : 'month' },
             product_data: {
               name: `Wallet Share - ${plan.name} Plan`,
-              description: `Price for Tenexity Wallet Share Expander - ${plan.name} edition\n${formattedPrice} / ${intervalLabel}`,
+              description: planDescription,
               images: [`${config.baseUrl}/tenexity-logo.png`],
             },
           },
