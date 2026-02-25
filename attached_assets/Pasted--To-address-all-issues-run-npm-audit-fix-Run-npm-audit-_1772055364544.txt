@@ -1,0 +1,71 @@
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+
+npm notice
+npm notice New major version of npm available! 10.8.2 -> 11.10.1
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.10.1
+npm notice To update run: npm install -g npm@11.10.1
+npm notice
+
+2026-02-25T21:31:18Z info: Starting Build
+
+> rest-express@1.0.0 build
+> tsx script/build.ts
+
+
+building client...
+
+vite v7.3.0 building client environment for production...
+
+transforming...
+
+
+A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+
+✓ 2519 modules transformed.
+
+rendering chunks...
+
+computing gzip size...
+
+../dist/public/index.html                                                 2.01 kB │ gzip:   0.76 kB
+../dist/public/assets/Tenexity_Logo_final_1769263645437-wETyPlOy.png     11.00 kB
+
+../dist/public/assets/Tenexity Official Logo BW Cirlce-DBHci-RD.png      19.32 kB
+../dist/public/assets/teeter-totter-workflow-JcEgdGbP.png               482.01 kB
+../dist/public/assets/hero-construction-wide-BqY5nocE.png             1,639.47 kB
+../dist/public/assets/index-bOzvP30I.css                                114.78 kB │ gzip:  17.82 kB
+../dist/public/assets/index-zlFzC7de.js                               1,501.85 kB │ gzip: 391.04 kB
+
+✓ built in 7.40s
+building server...
+
+
+  dist/bootstrap.cjs  1.2kb
+
+⚡ Done in 3ms
+
+
+  dist/app.cjs  1.6mb ⚠️
+
+⚡ Done in 326ms
+
+2026-02-25T21:31:29Z info: Pushing pid1 binary layer...
+2026-02-25T21:31:30Z info: Pushing Repl layer...
+2026-02-25T21:31:30Z info: Pushing hosting layer...
+2026-02-25T21:31:30Z info: Created hosting layer
+2026-02-25T21:31:30Z info: Created pid1 binary layer
+2026-02-25T21:31:46Z info: Created Repl layer
+2026-02-25T21:31:46Z info: Pushing Repl (cache) layer...
+2026-02-25T21:31:46Z info: Created Repl (cache) layer
+2026-02-25T21:31:48Z info: Pushed image manifest
+2026-02-25T21:31:49Z info: Pushed soci index manifest
+2026-02-25T21:31:52Z info: Creating Autoscale service
+[sync-settings] Logo loaded from: /home/runner/workspace/server/assets/demo-logo.png
+Bootstrap server listening on port 5000
+[sync-plans] Updated plan: growth (with Stripe prices)
+9:32:09 PM [express] Application fully initialized
+2026-02-25T21:34:15Z error: The deployment is failing health checks. This can happen if the application isn't responding, responds with an error, or doesn't respond in time. Health checks are sent to the / endpoint by default and must respond as soon as possible. Make sure that the / endpoint is implemented and returns a 200 status code in a timely manner. Avoid doing expensive or long running operations on the / endpoint, prefer deferring them to a different route. Check the logs for more information.
